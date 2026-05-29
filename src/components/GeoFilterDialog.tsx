@@ -81,14 +81,14 @@ export default function GeoFilterDialog({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onCancel]);
 
-  if (!open) return null;
-
+  // Hooks must run on every render — `useMemo` cannot sit after the
+  // `if (!open) return null` guard below (Rules of Hooks).
   const layerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
   const layerCounts = countsByLayer[activeLayer];
   // Populated areas first (descending by count). Ties broken alphabetically so
   // the ordering is stable. 0-count options keep their original label order
   // at the bottom — they remain pickable per the agreed UX.
-  const sortedOptions = useMemo(() => {
+  const filteredOptions = useMemo(() => {
     const list = q
       ? layerOptions.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
       : layerOptions.slice();
@@ -100,7 +100,9 @@ export default function GeoFilterDialog({
     });
     return list;
   }, [layerOptions, layerCounts, q]);
-  const filteredOptions = sortedOptions;
+
+  if (!open) return null;
+
   const layerPicks = working[activeLayer] ?? [];
 
   function toggleArea(areaId: string): void {
