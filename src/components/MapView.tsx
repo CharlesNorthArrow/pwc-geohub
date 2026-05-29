@@ -9,6 +9,7 @@ import maplibregl, {
 
 import type {
   CommunityResponse,
+  GeoSelectionResponse,
   IndicatorPublic,
   SchoolsResponse,
 } from '../contract/types';
@@ -36,6 +37,9 @@ interface Props {
   filteredSchoolDbns: Set<string>;
   /** Phase 3 — when set, flyTo these coordinates (school filter pick). */
   flyToCoords: number[] | null;
+  /** Phase 3 polish — polygons of the currently-selected Geo filter areas.
+   *  Drawn as a line-only outline above tracts, below the school layers. */
+  geoSelection: GeoSelectionResponse | null;
 }
 
 const NYC_BOUNDS: [number, number, number, number] = [-74.27, 40.49, -73.68, 40.92];
@@ -44,8 +48,11 @@ const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
 const SOURCE_SCHOOLS = 'schools';
 const SOURCE_TRACTS = 'tracts';
+const SOURCE_GEO_SELECTION = 'geo-selection';
 const LAYER_TRACTS_FILL = 'tracts-fill';
 const LAYER_TRACTS_LINE = 'tracts-line';
+const LAYER_GEO_SELECTION_FILL = 'geo-selection-fill';
+const LAYER_GEO_SELECTION_LINE = 'geo-selection-line';
 const LAYER_HALO_OUTER = 'schools-halo-outer'; // Healing Arts (or both)
 const LAYER_HALO_INNER = 'schools-halo-inner'; // Anchor (or both) / pwc_other
 const LAYER_SCHOOLS = 'schools-circles';
@@ -93,6 +100,7 @@ export default function MapView({
   schoolType,
   filteredSchoolDbns,
   flyToCoords,
+  geoSelection,
 }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -115,6 +123,31 @@ export default function MapView({
     map.on('load', () => {
       // Empty sources/layers up-front; populated by the effects below.
       map.addSource(SOURCE_SCHOOLS, { type: 'geojson', data: EMPTY_FC });
+
+      // Selected-geographies overlay — drawn ABOVE tracts (so users can read
+      // boundaries against the choropleth) but BELOW school points. Fill is
+      // nearly transparent so the choropleth stays legible; the line carries
+      // the real signal.
+      map.addSource(SOURCE_GEO_SELECTION, { type: 'geojson', data: EMPTY_FC });
+      map.addLayer({
+        id: LAYER_GEO_SELECTION_FILL,
+        type: 'fill',
+        source: SOURCE_GEO_SELECTION,
+        paint: {
+          'fill-color': '#002040',
+          'fill-opacity': 0.04,
+        },
+      });
+      map.addLayer({
+        id: LAYER_GEO_SELECTION_LINE,
+        type: 'line',
+        source: SOURCE_GEO_SELECTION,
+        paint: {
+          'line-color': '#002040',
+          'line-width': 2,
+          'line-opacity': 0.85,
+        },
+      });
 
       // Halo (outer) — Healing Arts or Both. Drawn first so it sits BELOW
       // the inner halo + data point. Radius = data radius + 7px.
@@ -327,6 +360,19 @@ export default function MapView({
     if (styleReadyRef.current) apply();
     else map.once('phase1-style-ready', apply);
   }, [schoolType, filteredSchoolDbns]);
+
+  // --- Selected-geographies overlay: update source data only ------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = (): void => {
+      const src = map.getSource(SOURCE_GEO_SELECTION) as GeoJSONSource | undefined;
+      if (!src) return;
+      src.setData(geoSelection ?? EMPTY_FC);
+    };
+    if (styleReadyRef.current) apply();
+    else map.once('phase1-style-ready', apply);
+  }, [geoSelection]);
 
   // --- flyTo when the user picks a school (spec §6.4) -------------------
   useEffect(() => {

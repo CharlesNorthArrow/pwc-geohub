@@ -10,6 +10,7 @@ import SchoolDetailsStub from './SchoolDetailsStub';
 import {
   fetchCommunityValues,
   fetchGeographies,
+  fetchGeoSelection,
   fetchIndicators,
   fetchPwcMembership,
   fetchSchoolFeatures,
@@ -19,6 +20,7 @@ import {
 import type {
   CommunityResponse,
   GeographiesResponse,
+  GeoSelectionResponse,
   IndicatorPublic,
   PwcMember,
   SchoolFeature,
@@ -54,6 +56,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const [pwcMembers, setPwcMembers] = useState<PwcMember[] | null>(null);
   const [schoolsMaster, setSchoolsMaster] = useState<SchoolMaster[] | null>(null);
   const [geographies, setGeographies] = useState<GeographiesResponse | null>(null);
+  const [geoSelection, setGeoSelection] = useState<GeoSelectionResponse | null>(null);
 
   const schoolId = useHubStore((s) => s.activeSchoolIndicator);
   const communityId = useHubStore((s) => s.activeCommunityIndicator);
@@ -160,6 +163,24 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       abandoned = true;
     };
   }, [communityIndicator, communityYear]);
+
+  // Fetch the polygons of the currently-selected Geo filters so MapView can
+  // outline them. Empty selection → resolve immediately to an empty FC and
+  // skip the server round-trip (handled inside fetchGeoSelection).
+  useEffect(() => {
+    let abandoned = false;
+    fetchGeoSelection(geoFilters)
+      .then((r) => !abandoned && setGeoSelection(r))
+      .catch((err) => {
+        if (!abandoned) {
+          console.warn('[Shell] geo selection fetch failed', err);
+          setGeoSelection(null);
+        }
+      });
+    return () => {
+      abandoned = true;
+    };
+  }, [geoFilters]);
 
   // Merge PWC flags into school features (unchanged from Phase 2).
   const enrichedSchoolData: SchoolsResponse | null = useMemo(() => {
@@ -289,6 +310,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
             schoolType={schoolType}
             filteredSchoolDbns={universe.schoolDbns}
             flyToCoords={selectedSchoolCoords}
+            geoSelection={geoSelection}
           />
         </div>
       </main>

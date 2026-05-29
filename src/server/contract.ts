@@ -17,6 +17,8 @@ import type {
   CommunityResponse,
   GeoArea,
   GeoFilterLayerId,
+  GeoSelectionFeature,
+  GeoSelectionResponse,
   GeographiesResponse,
   IndicatorPublic,
   PwcCategory,
@@ -347,6 +349,63 @@ export async function getGeographies(): Promise<GeographiesResponse> {
     });
   }
   return { layers };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Selected-geographies overlay                                               */
+/* -------------------------------------------------------------------------- */
+
+interface SelectionRow {
+  geo_layer: GeoFilterLayerId;
+  area_id: string;
+  label: string | null;
+  /** ST_AsGeoJSON output — a GeoJSON geometry string. */
+  geom: string;
+}
+
+/**
+ * Returns the polygons for a user's current Geo-filter selections so the
+ * map can outline what's in scope. Two parallel arrays (layers / areas)
+ * encode the (layer, area_id) pairs; we unnest them in SQL and join against
+ * `geographies` for the exact matches — no over-fetching.
+ */
+export async function getSelectedGeometries(
+  picks: Partial<Record<GeoFilterLayerId, string[]>>,
+): Promise<GeoSelectionResponse> {
+  const layers: GeoFilterLayerId[] = [];
+  const areaIds: string[] = [];
+  for (const layer of GEO_FILTER_LAYERS) {
+    const ids = picks[layer.id];
+    if (!ids || ids.length === 0) continue;
+    for (const id of ids) {
+      layers.push(layer.id);
+      areaIds.push(id);
+    }
+  }
+  if (layers.length === 0) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+  const rows = await sql<SelectionRow>`
+    SELECT g.geo_layer, g.area_id, g.label, ST_AsGeoJSON(g.geom) AS geom
+    FROM geographies g
+    JOIN unnest(${layers}::text[], ${areaIds}::text[]) AS p(layer, area)
+      ON g.geo_layer = p.layer AND g.area_id = p.area
+  `;
+  const features: GeoSelectionFeature[] = [];
+  for (const r of rows) {
+    let geometry: GeoSelectionFeature['geometry'];
+    try {
+      geometry = JSON.parse(r.geom) as GeoSelectionFeature['geometry'];
+    } catch {
+      continue;
+    }
+    features.push({
+      type: 'Feature',
+      geometry,
+      properties: { geo_layer: r.geo_layer, area_id: r.area_id, label: r.label },
+    });
+  }
+  return { type: 'FeatureCollection', features };
 }
 
 /* -------------------------------------------------------------------------- */

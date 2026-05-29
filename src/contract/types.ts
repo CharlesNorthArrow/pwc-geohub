@@ -172,3 +172,25 @@ export interface SchoolMaster {
 export interface SchoolsMasterResponse {
   schools: SchoolMaster[];
 }
+
+/* -------------------------------------------------------------------------- */
+/* Selected geographies overlay (Phase 3 polish)                              */
+/* -------------------------------------------------------------------------- */
+
+export interface GeoSelectionFeature {
+  type: 'Feature';
+  geometry: { type: 'MultiPolygon'; coordinates: number[][][][] };
+  properties: {
+    geo_layer: GeoFilterLayerId;
+    area_id: string;
+    label: string | null;
+  };
+}
+
+/** GET /api/geo/selection?picks=… → MultiPolygons for the currently-selected
+ *  (layer, area_id) pairs. Drawn on the map as an outline overlay so users
+ *  see the boundaries of what they're filtering on. */
+export interface GeoSelectionResponse {
+  type: 'FeatureCollection';
+  features: GeoSelectionFeature[];
+}

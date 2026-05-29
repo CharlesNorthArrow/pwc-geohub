@@ -40,7 +40,7 @@ export default function GeoFilterDialog({
   const [q, setQ] = useState('');
   /**
    * Sort key — defaults to district number (numerical), with a click on the
-   * "Matched Districts" column header switching to count-descending. Per-tab
+   * "Matched Schools" column header switching to count-descending. Per-tab
    * (`sortByLayer[activeLayer]`) so flipping between tabs preserves intent.
    * Counties have no district number; we fall back to alphabetical-natural
    * sort there regardless of the chosen mode.
@@ -302,7 +302,7 @@ export default function GeoFilterDialog({
                 }
               />
               <SortHeader
-                label="Matched Districts"
+                label="Matched Schools"
                 active={sortBy === 'count'}
                 onClick={() =>
                   setSortByLayer((prev) => ({ ...prev, [activeLayer]: 'count' }))

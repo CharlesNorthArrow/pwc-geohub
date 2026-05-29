@@ -6,11 +6,13 @@
 import type {
   CommunityResponse,
   GeographiesResponse,
+  GeoSelectionResponse,
   IndicatorsResponse,
   PwcResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
 } from './types';
+import type { GeoFilterLayerId } from './types';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -58,4 +60,15 @@ export function fetchSchoolsMaster(): Promise<SchoolsMasterResponse> {
 
 export function fetchGeographies(): Promise<GeographiesResponse> {
   return getJson<GeographiesResponse>('/api/geographies');
+}
+
+export function fetchGeoSelection(
+  picks: Partial<Record<GeoFilterLayerId, string[]>>,
+): Promise<GeoSelectionResponse> {
+  // Empty selection → don't hit the server.
+  const hasAny = Object.values(picks).some((arr) => (arr?.length ?? 0) > 0);
+  if (!hasAny) return Promise.resolve({ type: 'FeatureCollection', features: [] });
+  return getJson<GeoSelectionResponse>(
+    `/api/geo/selection?picks=${encodeURIComponent(JSON.stringify(picks))}`,
+  );
 }
