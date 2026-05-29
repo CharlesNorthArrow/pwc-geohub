@@ -129,12 +129,17 @@ export type GeoFilterLayerId =
   | 'school_district'
   | 'community_district';
 
+/** Ordered by administrative hierarchy — Federal → State → Local — and
+ *  prefixed accordingly. The order drives the Geo popup tab layout. */
 export const GEO_FILTER_LAYERS: ReadonlyArray<{ id: GeoFilterLayerId; label: string }> = [
-  { id: 'county', label: 'Counties' },
-  { id: 'senate', label: 'State Senate' },
-  { id: 'assembly', label: 'State Assembly' },
+  // Federal
   { id: 'congressional', label: 'US Congressional' },
-  { id: 'council', label: 'City Council' },
+  // State
+  { id: 'senate', label: 'NYS Senate' },
+  { id: 'assembly', label: 'NYS Assembly' },
+  // Local
+  { id: 'county', label: 'NYC Counties' },
+  { id: 'council', label: 'NYC City Council' },
   { id: 'school_district', label: 'NYC School Districts' },
   { id: 'community_district', label: 'NYC Community Districts' },
 ];

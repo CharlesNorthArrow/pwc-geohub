@@ -85,9 +85,13 @@ export default function GeoFilterDialog({
   // `if (!open) return null` guard below (Rules of Hooks).
   const layerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
   const layerCounts = countsByLayer[activeLayer];
-  // Populated areas first (descending by count). Ties broken alphabetically so
-  // the ordering is stable. 0-count options keep their original label order
-  // at the bottom — they remain pickable per the agreed UX.
+  // Populated areas first (descending by count); within a tier, natural-numeric
+  // sort so "Council 2" lands before "Council 10" instead of after. 0-count
+  // options stay pickable at the bottom per the agreed UX.
+  const naturalCollator = useMemo(
+    () => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }),
+    [],
+  );
   const filteredOptions = useMemo(() => {
     const list = q
       ? layerOptions.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
@@ -96,10 +100,10 @@ export default function GeoFilterDialog({
       const ca = layerCounts.get(a.area_id) ?? 0;
       const cb = layerCounts.get(b.area_id) ?? 0;
       if (ca !== cb) return cb - ca;
-      return a.label.localeCompare(b.label);
+      return naturalCollator.compare(a.label, b.label);
     });
     return list;
-  }, [layerOptions, layerCounts, q]);
+  }, [layerOptions, layerCounts, naturalCollator, q]);
 
   if (!open) return null;
 
@@ -230,7 +234,7 @@ export default function GeoFilterDialog({
           </nav>
 
           {/* List */}
-          <section style={{ padding: 12, display: 'grid', gridTemplateRows: 'auto 1fr', minHeight: 0 }}>
+          <section style={{ padding: 12, display: 'grid', gridTemplateRows: 'auto auto 1fr', minHeight: 0 }}>
             <input
               type="text"
               placeholder={`Search ${labelOf(activeLayer)}…`}
@@ -245,6 +249,24 @@ export default function GeoFilterDialog({
                 marginBottom: 8,
               }}
             />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                padding: '0 4px 4px 4px',
+                fontSize: 10,
+                color: '#467c9d',
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+                fontWeight: 700,
+                borderBottom: '1px solid #eef0f3',
+                marginBottom: 4,
+              }}
+            >
+              <span>{labelOf(activeLayer)}</span>
+              <span>Matched Districts</span>
+            </div>
             <div style={{ overflowY: 'auto', minHeight: 0 }}>
               {filteredOptions.length === 0 ? (
                 <div style={{ fontSize: 11, color: '#999' }}>No matches.</div>
