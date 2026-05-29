@@ -361,14 +361,36 @@ export default function MapView({
     else map.once('phase1-style-ready', apply);
   }, [schoolType, filteredSchoolDbns]);
 
-  // --- Selected-geographies overlay: update source data only ------------
+  // --- Selected-geographies overlay: update source data + zoom + tract filter
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const apply = (): void => {
       const src = map.getSource(SOURCE_GEO_SELECTION) as GeoJSONSource | undefined;
-      if (!src) return;
-      src.setData(geoSelection ?? EMPTY_FC);
+      if (src) src.setData(geoSelection ?? EMPTY_FC);
+
+      // Filter the community tract layers to the intersection set. Empty
+      // selection → no filter (full NYC choropleth, as before).
+      const tracts = geoSelection?.intersectingTractGeoids ?? [];
+      const tractFilter: unknown = tracts.length === 0
+        ? true
+        : ['in', ['get', 'GEOID'], ['literal', tracts]];
+      for (const id of [LAYER_TRACTS_FILL, LAYER_TRACTS_LINE]) {
+        if (map.getLayer(id)) map.setFilter(id, tractFilter as never);
+      }
+
+      // Fit the viewport to the union of selected polygons. We only zoom IN
+      // when there is a selection — clearing filters preserves current view.
+      const bbox = geoSelection ? boundsOf(geoSelection) : null;
+      if (bbox) {
+        map.fitBounds(
+          [
+            [bbox[0], bbox[1]],
+            [bbox[2], bbox[3]],
+          ],
+          { padding: 80, maxZoom: 13, duration: 500 },
+        );
+      }
     };
     if (styleReadyRef.current) apply();
     else map.once('phase1-style-ready', apply);
@@ -416,6 +438,33 @@ export default function MapView({
       aria-label="Map of NYC"
     />
   );
+}
+
+/** Walk every coordinate in a selection FC and return [w, s, e, n], or null
+ *  when the collection is empty. */
+function boundsOf(fc: GeoSelectionResponse): [number, number, number, number] | null {
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  let touched = false;
+  for (const f of fc.features) {
+    for (const poly of f.geometry.coordinates) {
+      for (const ring of poly) {
+        for (const pt of ring) {
+          const x = pt[0];
+          const y = pt[1];
+          if (typeof x !== 'number' || typeof y !== 'number') continue;
+          if (x < w) w = x;
+          if (x > e) e = x;
+          if (y < s) s = y;
+          if (y > n) n = y;
+          touched = true;
+        }
+      }
+    }
+  }
+  return touched ? [w, s, e, n] : null;
 }
 
 /**

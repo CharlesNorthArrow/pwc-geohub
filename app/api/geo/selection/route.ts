@@ -19,7 +19,7 @@ const VALID_LAYERS = new Set<string>(GEO_FILTER_LAYERS.map((l) => l.id));
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const raw = req.nextUrl.searchParams.get('picks');
   if (!raw) {
-    return NextResponse.json({ type: 'FeatureCollection', features: [] });
+    return NextResponse.json({ type: 'FeatureCollection', features: [], intersectingTractGeoids: [] });
   }
   let parsed: Partial<Record<GeoFilterLayerId, string[]>>;
   try {

@@ -188,9 +188,13 @@ export interface GeoSelectionFeature {
 }
 
 /** GET /api/geo/selection?picks=… → MultiPolygons for the currently-selected
- *  (layer, area_id) pairs. Drawn on the map as an outline overlay so users
- *  see the boundaries of what they're filtering on. */
+ *  (layer, area_id) pairs PLUS the census tract GEOIDs that fall within or
+ *  overlap those polygons. The map draws the boundaries as an overlay and
+ *  filters the community choropleth to `intersectingTractGeoids`. */
 export interface GeoSelectionResponse {
   type: 'FeatureCollection';
   features: GeoSelectionFeature[];
+  /** Distinct tract GEOIDs (11 chars) intersecting the UNION of selected
+   *  polygons. Empty array when nothing is selected. */
+  intersectingTractGeoids: string[];
 }

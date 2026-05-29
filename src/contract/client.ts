@@ -67,7 +67,9 @@ export function fetchGeoSelection(
 ): Promise<GeoSelectionResponse> {
   // Empty selection → don't hit the server.
   const hasAny = Object.values(picks).some((arr) => (arr?.length ?? 0) > 0);
-  if (!hasAny) return Promise.resolve({ type: 'FeatureCollection', features: [] });
+  if (!hasAny) {
+    return Promise.resolve({ type: 'FeatureCollection', features: [], intersectingTractGeoids: [] });
+  }
   return getJson<GeoSelectionResponse>(
     `/api/geo/selection?picks=${encodeURIComponent(JSON.stringify(picks))}`,
   );
