@@ -294,10 +294,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
 /* -------------------------------------------------------------------------- */
 
 /**
- * ACS 5-year endpoint year. Spec uses 2024 (which corresponds to the
- * 2020–2024 5-yr release). Centralized so future updates touch one constant.
+ * ACS 5-year endpoint year. Centralized so future updates touch one constant.
+ * Use the most recent available 5-yr vintage. The 2024 release (covering
+ * 2020–2024) was published Dec 2025 and is the current target, but some
+ * tables / endpoints take longer to publish — fall back to 2023 if needed.
  */
-export const ACS_YEAR = '2024';
+export const ACS_YEAR = '2023';
 
 /** CDC PLACES release year — refreshed annually; populated by the fetch script. */
 export const CDC_PLACES_YEAR_DEFAULT = '2024';

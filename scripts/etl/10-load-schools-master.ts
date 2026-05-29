@@ -10,7 +10,7 @@
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db } from '../lib/db.js';
+import { bulkUpsert } from '../lib/db.js';
 import { readCsv } from '../lib/csv.js';
 import { normalizeDbn, wasDbnRemapped } from '../lib/dbn.js';
 import { toNullableNumber, toNullableInt } from '../lib/normalize.js';
@@ -54,8 +54,6 @@ async function main(): Promise<void> {
   console.log(`[etl:schools] reading ${MASTER_PATH}`);
   const rows = (await readCsv(MASTER_PATH)) as unknown as MasterRow[];
   console.log(`[etl:schools] ${rows.length} raw rows`);
-
-  const sql = db();
 
   // ---------------------------------------------------------------------------
   // Pass 1: collect every (DBN, school_year) row and apply DBN remap.
@@ -121,96 +119,66 @@ async function main(): Promise<void> {
   }
 
   console.log(`[etl:schools] upserting ${schoolRows.length} schools (null-coord: ${nullCoordSchools})`);
-  const CHUNK = 500;
-  for (let i = 0; i < schoolRows.length; i += CHUNK) {
-    const chunk = schoolRows.slice(i, i + CHUNK);
-    await Promise.all(
-      chunk.map((s) =>
-        sql`
-          INSERT INTO schools (
-            dbn, school_name, borough, address, managed_by, location_category,
-            location_type, grades, latitude, longitude, geom, identity_source_year, updated_at
-          ) VALUES (
-            ${s.dbn}, ${s.school_name}, ${s.borough}, ${s.address}, ${s.managed_by},
-            ${s.location_category}, ${s.location_type}, ${s.grades},
-            ${s.latitude}, ${s.longitude},
-            CASE WHEN ${s.latitude}::float8 IS NULL OR ${s.longitude}::float8 IS NULL
-                 THEN NULL
-                 ELSE ST_SetSRID(ST_MakePoint(${s.longitude}, ${s.latitude}), 4326)
-            END,
-            ${s.identity_source_year},
-            now()
-          )
-          ON CONFLICT (dbn) DO UPDATE SET
-            school_name = EXCLUDED.school_name,
-            borough     = EXCLUDED.borough,
-            address     = EXCLUDED.address,
-            managed_by  = EXCLUDED.managed_by,
-            location_category = EXCLUDED.location_category,
-            location_type     = EXCLUDED.location_type,
-            grades      = EXCLUDED.grades,
-            latitude    = EXCLUDED.latitude,
-            longitude   = EXCLUDED.longitude,
-            geom        = EXCLUDED.geom,
-            identity_source_year = EXCLUDED.identity_source_year,
-            updated_at  = now()
-        `,
-      ),
-    );
-  }
+  await bulkUpsert({
+    table: 'schools',
+    columns: [
+      'dbn', 'school_name', 'borough', 'address', 'managed_by', 'location_category',
+      'location_type', 'grades', 'latitude', 'longitude', 'geom', 'identity_source_year',
+    ],
+    rows: schoolRows.map((s) => [
+      s.dbn, s.school_name, s.borough, s.address, s.managed_by, s.location_category,
+      s.location_type, s.grades, s.latitude, s.longitude,
+      s.latitude == null || s.longitude == null
+        ? null
+        : `SRID=4326;POINT(${s.longitude} ${s.latitude})`,
+      s.identity_source_year,
+    ]),
+    conflictKeys: ['dbn'],
+    valueExpressions: {
+      geom: (n) => ({ expr: `ST_GeomFromEWKT($${n}::text)`, consumes: 1 }),
+    },
+  });
 
   // ---------------------------------------------------------------------------
-  // Pass 3: load schools_year (wide demographics per year).
+  // Pass 3: load schools_year (wide demographics per year) via bulk upsert.
   // ---------------------------------------------------------------------------
-  let yearRowCount = 0;
+  const yearRows: unknown[][] = [];
   for (const [dbn, rs] of perDbn) {
     for (const r of rs) {
       if (!r.school_year) continue;
-      yearRowCount++;
-      await sql`
-        INSERT INTO schools_year (
-          dbn, school_year,
-          total_enrollment,
-          n_students_with_disabilities, pct_students_with_disabilities,
-          n_english_language_learners,  pct_english_language_learners,
-          n_poverty, pct_poverty, economic_need_index,
-          n_asian, pct_asian, n_black, pct_black,
-          n_hispanic, pct_hispanic, n_white, pct_white,
-          n_multi_racial, pct_multi_racial,
-          n_female, pct_female, n_male, pct_male
-        ) VALUES (
-          ${dbn}, ${r.school_year},
-          ${toNullableInt(r.total_enrollment)},
-          ${toNullableInt(r.n_students_with_disabilities)}, ${toNullableNumber(r.pct_students_with_disabilities)},
-          ${toNullableInt(r.n_english_language_learners)},  ${toNullableNumber(r.pct_english_language_learners)},
-          ${toNullableInt(r.n_poverty)}, ${toNullableNumber(r.pct_poverty)}, ${toNullableNumber(r.economic_need_index)},
-          ${toNullableInt(r.n_asian)}, ${toNullableNumber(r.pct_asian)},
-          ${toNullableInt(r.n_black)}, ${toNullableNumber(r.pct_black)},
-          ${toNullableInt(r.n_hispanic)}, ${toNullableNumber(r.pct_hispanic)},
-          ${toNullableInt(r.n_white)}, ${toNullableNumber(r.pct_white)},
-          ${toNullableInt(r.n_multi_racial)}, ${toNullableNumber(r.pct_multi_racial)},
-          ${toNullableInt(r.n_female)}, ${toNullableNumber(r.pct_female)},
-          ${toNullableInt(r.n_male)}, ${toNullableNumber(r.pct_male)}
-        )
-        ON CONFLICT (dbn, school_year) DO UPDATE SET
-          total_enrollment = EXCLUDED.total_enrollment,
-          n_students_with_disabilities = EXCLUDED.n_students_with_disabilities,
-          pct_students_with_disabilities = EXCLUDED.pct_students_with_disabilities,
-          n_english_language_learners = EXCLUDED.n_english_language_learners,
-          pct_english_language_learners = EXCLUDED.pct_english_language_learners,
-          n_poverty = EXCLUDED.n_poverty,
-          pct_poverty = EXCLUDED.pct_poverty,
-          economic_need_index = EXCLUDED.economic_need_index,
-          n_asian = EXCLUDED.n_asian, pct_asian = EXCLUDED.pct_asian,
-          n_black = EXCLUDED.n_black, pct_black = EXCLUDED.pct_black,
-          n_hispanic = EXCLUDED.n_hispanic, pct_hispanic = EXCLUDED.pct_hispanic,
-          n_white = EXCLUDED.n_white, pct_white = EXCLUDED.pct_white,
-          n_multi_racial = EXCLUDED.n_multi_racial, pct_multi_racial = EXCLUDED.pct_multi_racial,
-          n_female = EXCLUDED.n_female, pct_female = EXCLUDED.pct_female,
-          n_male   = EXCLUDED.n_male,   pct_male   = EXCLUDED.pct_male
-      `;
+      yearRows.push([
+        dbn, r.school_year,
+        toNullableInt(r.total_enrollment),
+        toNullableInt(r.n_students_with_disabilities), toNullableNumber(r.pct_students_with_disabilities),
+        toNullableInt(r.n_english_language_learners),  toNullableNumber(r.pct_english_language_learners),
+        toNullableInt(r.n_poverty), toNullableNumber(r.pct_poverty), toNullableNumber(r.economic_need_index),
+        toNullableInt(r.n_asian), toNullableNumber(r.pct_asian),
+        toNullableInt(r.n_black), toNullableNumber(r.pct_black),
+        toNullableInt(r.n_hispanic), toNullableNumber(r.pct_hispanic),
+        toNullableInt(r.n_white), toNullableNumber(r.pct_white),
+        toNullableInt(r.n_multi_racial), toNullableNumber(r.pct_multi_racial),
+        toNullableInt(r.n_female), toNullableNumber(r.pct_female),
+        toNullableInt(r.n_male), toNullableNumber(r.pct_male),
+      ]);
     }
   }
+  const yearRowCount = await bulkUpsert({
+    table: 'schools_year',
+    columns: [
+      'dbn', 'school_year',
+      'total_enrollment',
+      'n_students_with_disabilities', 'pct_students_with_disabilities',
+      'n_english_language_learners',  'pct_english_language_learners',
+      'n_poverty', 'pct_poverty', 'economic_need_index',
+      'n_asian', 'pct_asian', 'n_black', 'pct_black',
+      'n_hispanic', 'pct_hispanic', 'n_white', 'pct_white',
+      'n_multi_racial', 'pct_multi_racial',
+      'n_female', 'pct_female', 'n_male', 'pct_male',
+    ],
+    rows: yearRows,
+    conflictKeys: ['dbn', 'school_year'],
+  });
+  console.log(`[etl:schools] ${yearRowCount} schools_year rows upserted`);
 
   await recordFinding('ingestion_summary', 'schools_master', {
     csv_rows: rows.length,

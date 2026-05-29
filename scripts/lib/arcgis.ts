@@ -64,14 +64,7 @@ export async function fetchAllFeatures(
     url.searchParams.set('resultRecordCount', String(pageSize));
     url.searchParams.set('resultOffset', String(offset));
 
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-      throw new Error(`ArcGIS fetch failed (${res.status}) for ${url.toString()}`);
-    }
-    const body = (await res.json()) as ArcGisFeatureCollection & {
-      exceededTransferLimit?: boolean;
-      properties?: { exceededTransferLimit?: boolean };
-    };
+    const body = await fetchPageWithRetry(url.toString());
     if (!body.features) {
       throw new Error(`ArcGIS response missing features for ${url.toString()}`);
     }
@@ -88,4 +81,37 @@ export async function fetchAllFeatures(
   }
 
   return { type: 'FeatureCollection', features };
+}
+
+type ArcGisPage = ArcGisFeatureCollection & {
+  exceededTransferLimit?: boolean;
+  properties?: { exceededTransferLimit?: boolean };
+};
+
+/** Retry the fetch a few times on transient socket / 5xx errors. */
+async function fetchPageWithRetry(url: string): Promise<ArcGisPage> {
+  const maxAttempts = 4;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status >= 500 && attempt < maxAttempts) {
+          await sleep(500 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw new Error(`ArcGIS fetch failed (${res.status}) for ${url}`);
+      }
+      return (await res.json()) as ArcGisPage;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= maxAttempts) break;
+      await sleep(500 * 2 ** (attempt - 1));
+    }
+  }
+  throw lastErr;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }

@@ -17,7 +17,7 @@
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db } from '../lib/db.js';
+import { db, bulkUpsert } from '../lib/db.js';
 import { readCsv } from '../lib/csv.js';
 import { normalizeDbn, wasDbnRemapped } from '../lib/dbn.js';
 import { toNullableNumber, toNullableText, isSentinelNull } from '../lib/normalize.js';
@@ -54,7 +54,6 @@ async function loadOneIndicator(
   console.log(`[etl:indicators] ${ind.id} ← ${source.dataset} (${source.value_field})`);
   const rows = await readCsv(path);
 
-  const sql = db();
   const result: IndicatorLoadResult = {
     indicator_id: ind.id,
     rows_seen: rows.length,
@@ -65,6 +64,14 @@ async function loadOneIndicator(
     year_coverage: {},
   };
   const unmatched = new Set<string>();
+  const toInsert: Array<{
+    dbn: string;
+    school_year: string;
+    value_num: number | null;
+    value_text: string | null;
+    label: string | null;
+    source_year: string | null;
+  }> = [];
 
   for (const r of rows) {
     const rawDbn = r['DBN'];
@@ -106,22 +113,16 @@ async function loadOneIndicator(
       value_text = toNullableText(r[source.categorical_field]);
     }
 
-    await sql`
-      INSERT INTO school_indicator_values (
-        dbn, school_year, indicator_id, value_num, value_text, label, source_year
-      ) VALUES (
-        ${dbn}, ${school_year}, ${ind.id}, ${value_num}, ${value_text}, ${label}, ${source_year}
-      )
-      ON CONFLICT (dbn, school_year, indicator_id) DO UPDATE SET
-        value_num   = EXCLUDED.value_num,
-        value_text  = EXCLUDED.value_text,
-        label       = EXCLUDED.label,
-        source_year = EXCLUDED.source_year
-    `;
-    result.rows_inserted++;
+    toInsert.push({ dbn, school_year, value_num, value_text, label, source_year });
     result.year_coverage[school_year] = (result.year_coverage[school_year] ?? 0) + 1;
   }
 
+  result.rows_inserted = await bulkUpsert({
+    table: 'school_indicator_values',
+    columns: ['dbn', 'school_year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
+    rows: toInsert.map((r) => [r.dbn, r.school_year, ind.id, r.value_num, r.value_text, r.label, r.source_year]),
+    conflictKeys: ['dbn', 'school_year', 'indicator_id'],
+  });
   result.unmatched_dbns = [...unmatched];
   return result;
 }

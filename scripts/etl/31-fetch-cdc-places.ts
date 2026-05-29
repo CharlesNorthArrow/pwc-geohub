@@ -9,7 +9,7 @@
  * the NYC FIPS set and use `locationname` (11-char tract GEOID) as area_id.
  */
 
-import { db } from '../lib/db.js';
+import { bulkUpsert } from '../lib/db.js';
 import { fetchCdcPlaces, type CdcPlacesRow } from '../lib/cdc.js';
 import { recordFinding } from '../lib/findings.js';
 import { activeCdcIndicators, CDC_PLACES_YEAR_DEFAULT } from '../../src/registry/indicators.js';
@@ -36,9 +36,8 @@ async function processIndicator(ind: IndicatorRegistryEntry): Promise<void> {
     `[etl:cdc] ${ind.id}: ${all.length} NY rows → ${rows.length} NYC tract rows (year ${releaseYear})`,
   );
 
-  const sql = db();
-  let inserted = 0;
   let nonNull = 0;
+  const toInsert: unknown[][] = [];
   for (const r of rows) {
     const geoid = r.locationname?.trim();
     if (!geoid) continue;
@@ -47,22 +46,15 @@ async function processIndicator(ind: IndicatorRegistryEntry): Promise<void> {
     if (value_num != null) nonNull++;
     const label =
       value_num == null ? null : `${value_num.toFixed(1)}% ${r.short_question_text ?? r.measure}`;
-
-    await sql`
-      INSERT INTO community_indicator_values (
-        area_id, geo_layer, year, indicator_id, value_num, value_text, label, source_year, fetched_at
-      ) VALUES (
-        ${geoid}, 'tract', ${releaseYear}, ${ind.id},
-        ${value_num}, ${null}, ${label}, ${r.year}, now()
-      )
-      ON CONFLICT (area_id, geo_layer, indicator_id, year) DO UPDATE SET
-        value_num   = EXCLUDED.value_num,
-        label       = EXCLUDED.label,
-        source_year = EXCLUDED.source_year,
-        fetched_at  = EXCLUDED.fetched_at
-    `;
-    inserted++;
+    toInsert.push([geoid, 'tract', releaseYear, ind.id, value_num, null, label, r.year]);
   }
+
+  const inserted = await bulkUpsert({
+    table: 'community_indicator_values',
+    columns: ['area_id', 'geo_layer', 'year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
+    rows: toInsert,
+    conflictKeys: ['area_id', 'geo_layer', 'indicator_id', 'year'],
+  });
 
   await recordFinding('indicator_loaded', ind.id, {
     rows_inserted: inserted,

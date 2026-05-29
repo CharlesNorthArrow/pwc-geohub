@@ -47,18 +47,12 @@ function toMultiPolygonWkt(geom: AnyGeometry | null): string | null {
 
 function filterByLayer(layer: GeoLayerConfig, features: ArcGisFeature[]): ArcGisFeature[] {
   if (layer.id === 'senate') {
-    return features.filter((f) => {
-      const p = f.properties;
-      const stateFp = String(p['STATEFP'] ?? p['STATE_FIPS'] ?? '');
-      return stateFp === NY_STATE_FIPS;
-    });
+    // Senate service: NY is STATE='36'.
+    return features.filter((f) => String(f.properties['STATE'] ?? '') === NY_STATE_FIPS);
   }
   if (layer.id === 'congressional') {
-    return features.filter((f) => {
-      const p = f.properties;
-      const stateFp = String(p['STATEFP'] ?? p['STATE_FIPS'] ?? '');
-      return stateFp === NY_STATE_FIPS;
-    });
+    // Congressional service: NY is STFIPS='36'.
+    return features.filter((f) => String(f.properties['STFIPS'] ?? '') === NY_STATE_FIPS);
   }
   return features;
 }
@@ -124,7 +118,10 @@ async function processLayer(layer: GeoLayerConfig): Promise<void> {
   if (layer.id === 'county') {
     fc = await fetchCounties();
   } else if (layer.feature_service_url) {
-    fc = await fetchAllFeatures(layer.feature_service_url);
+    const opts = layer.where ? { where: layer.where } : {};
+    fc = await fetchAllFeatures(layer.feature_service_url, opts);
+    // Server-side filter is preferred; client-side filter is a fallback for
+    // any feature that slipped through (e.g., the where clause wasn't honored).
     fc.features = filterByLayer(layer, fc.features);
   } else {
     throw new Error(`No source URL for layer ${layer.id}`);
@@ -158,10 +155,27 @@ async function processLayer(layer: GeoLayerConfig): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const failures: Array<{ layer: string; error: string }> = [];
   for (const layer of GEO_LAYERS) {
-    await processLayer(layer);
+    try {
+      await processLayer(layer);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[etl:geos] ${layer.id}: FAILED — ${message}`);
+      failures.push({ layer: layer.id, error: message });
+      await recordFinding('ingestion_summary', `geography:${layer.id}`, {
+        features_fetched: 0,
+        features_inserted: 0,
+        features_skipped: 0,
+        fetch_error: message,
+      });
+    }
   }
-  console.log('[etl:geos] done.');
+  if (failures.length > 0) {
+    console.log(`[etl:geos] done with ${failures.length} layer failure(s):`, failures.map((f) => f.layer).join(', '));
+  } else {
+    console.log('[etl:geos] done.');
+  }
 }
 
 main().catch((err) => {

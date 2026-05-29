@@ -32,6 +32,12 @@ export interface GeoLayerConfig {
   label_field: string;
   /** Additional attribute fields to preserve verbatim in `geographies.attributes`. */
   passthrough_fields?: string[];
+  /**
+   * Optional ArcGIS `where` clause to filter rows server-side. Use this for
+   * national layers (senate, congressional) to avoid pulling 50 states only
+   * to discard 49.
+   */
+  where?: string;
 }
 
 const ARCGIS = {
@@ -81,9 +87,12 @@ export const GEO_LAYERS: readonly GeoLayerConfig[] = [
     id: 'senate',
     label: 'NYS Senate Districts',
     feature_service_url: ARCGIS.senate,
-    // Layer is national; we filter to NY state in the ETL by STATEFP=36 if available.
+    // Layer is national; filter to NY (STATE='36') server-side to keep the
+    // payload small enough to survive flaky proxies. Field is `STATE`, not STATEFP.
     id_field: 'NAME',
     label_field: 'NAME',
+    where: "STATE='36'",
+    passthrough_fields: ['STATE', 'SLDU', 'GEOID'],
   },
   {
     id: 'school_district',
@@ -103,10 +112,11 @@ export const GEO_LAYERS: readonly GeoLayerConfig[] = [
     id: 'congressional',
     label: 'US Congressional Districts (119th)',
     feature_service_url: ARCGIS.congressional,
-    // Layer is national; filter to NY (STATE_FIPS=36 or NAMELSAD-style) in ETL.
+    // National layer — filter to NY server-side. This service uses `STFIPS`.
     id_field: 'DISTRICTID',
-    label_field: 'DISTRICTID',
-    passthrough_fields: ['STATE_FIPS', 'STATEFP', 'NAMELSAD', 'BASENAME'],
+    label_field: 'NAME',
+    passthrough_fields: ['STFIPS', 'CDFIPS', 'STATE_ABBR', 'NAME', 'PARTY'],
+    where: "STFIPS='36'",
   },
   {
     id: 'nda',

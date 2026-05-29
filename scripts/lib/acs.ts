@@ -36,13 +36,20 @@ export async function acsFetch(
   if (key) url.searchParams.set('key', key);
 
   const res = await fetch(url.toString());
+  const bodyText = await res.text();
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
     throw new Error(
-      `ACS fetch failed (${res.status}) for ${url.toString()}: ${body.slice(0, 200)}`,
+      `ACS fetch failed (${res.status}) for ${url.toString()}: ${bodyText.slice(0, 300)}`,
     );
   }
-  const payload = (await res.json()) as string[][];
+  let payload: string[][];
+  try {
+    payload = JSON.parse(bodyText) as string[][];
+  } catch {
+    throw new Error(
+      `ACS returned non-JSON (status ${res.status}) for ${url.toString()}: ${bodyText.slice(0, 300)}`,
+    );
+  }
   if (!Array.isArray(payload) || payload.length === 0) {
     throw new Error(`ACS empty response for ${url.toString()}`);
   }
@@ -52,7 +59,10 @@ export async function acsFetch(
 }
 
 function buildUrl(opts: AcsFetchOptions): URL {
-  const base = `https://api.census.gov/data/${opts.year}/${opts.endpoint}`;
+  // Census ACS endpoints are namespaced under /acs/ (e.g. /acs/acs5,
+  // /acs/acs5/subject, /acs/acs5/profile). The registry stores the trailing
+  // segment ('acs5', 'acs5/subject', ...) for readability; we prepend /acs/.
+  const base = `https://api.census.gov/data/${opts.year}/acs/${opts.endpoint}`;
   const url = new URL(base);
   url.searchParams.set('get', ['NAME', ...opts.fields].join(','));
   const [forKv, inKv] = (opts.geo ?? 'for=tract:*&in=state:36').split('&');

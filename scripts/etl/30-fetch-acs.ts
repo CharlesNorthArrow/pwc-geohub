@@ -8,7 +8,7 @@
  */
 
 import { acsFetch, buildTractGeoid } from '../lib/acs.js';
-import { db } from '../lib/db.js';
+import { bulkUpsert } from '../lib/db.js';
 import { recordFinding } from '../lib/findings.js';
 import { activeAcsIndicators, ACS_YEAR } from '../../src/registry/indicators.js';
 import type { AcsSource, IndicatorRegistryEntry } from '../../src/registry/types.js';
@@ -151,23 +151,14 @@ function computeAcsValue(
 }
 
 async function upsertRows(rows: CommunityRow[]): Promise<void> {
-  const sql = db();
-  for (const r of rows) {
-    await sql`
-      INSERT INTO community_indicator_values (
-        area_id, geo_layer, year, indicator_id, value_num, value_text, label, source_year, fetched_at
-      ) VALUES (
-        ${r.area_id}, ${r.geo_layer}, ${r.year}, ${r.indicator_id},
-        ${r.value_num}, ${r.value_text}, ${r.label}, ${r.source_year}, now()
-      )
-      ON CONFLICT (area_id, geo_layer, indicator_id, year) DO UPDATE SET
-        value_num   = EXCLUDED.value_num,
-        value_text  = EXCLUDED.value_text,
-        label       = EXCLUDED.label,
-        source_year = EXCLUDED.source_year,
-        fetched_at  = EXCLUDED.fetched_at
-    `;
-  }
+  await bulkUpsert({
+    table: 'community_indicator_values',
+    columns: ['area_id', 'geo_layer', 'year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
+    rows: rows.map((r) => [
+      r.area_id, r.geo_layer, r.year, r.indicator_id, r.value_num, r.value_text, r.label, r.source_year,
+    ]),
+    conflictKeys: ['area_id', 'geo_layer', 'indicator_id', 'year'],
+  });
 }
 
 async function main(): Promise<void> {

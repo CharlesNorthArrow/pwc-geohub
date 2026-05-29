@@ -1,22 +1,31 @@
-import 'dotenv/config';
-import {
-  neon,
-  neonConfig,
-  Pool,
-  type NeonQueryFunction,
-} from '@neondatabase/serverless';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { Pool } from '@neondatabase/serverless';
 
 /**
- * Two Neon entry points:
- *   - `db()` returns the HTTP tagged-template function for ergonomic
- *     parameterized queries in ETL scripts (`sql\`...\``).
- *   - `pool()` returns a node-pg-compatible Pool used by `execScript()` to
- *     run multi-statement DDL files (schema.sql).
+ * Neon access for ETL scripts.
+ *
+ * We route everything through the WebSocket-based `Pool` rather than the
+ * HTTP `neon()` driver. The HTTP endpoint is blocked from this network, but
+ * the WebSocket proxy (used by Pool) goes through fine.
+ *
+ * `db()` returns a tagged-template `sql` function (same ergonomics as the
+ * HTTP driver), backed by `pool.query()`. ETL scripts use it as
+ * `await sql\`SELECT ... WHERE x = ${val}\`` and get rows back.
  */
 
-neonConfig.fetchConnectionCache = true;
+// Match Vercel/Next.js convention: `.env.local` overrides `.env`. Vercel CLI
+// writes pulled vars to `.env.local`, so that file MUST take precedence.
+for (const file of ['.env.local', '.env']) {
+  if (existsSync(file)) loadEnv({ path: file, override: false });
+}
 
-let cachedSql: NeonQueryFunction<false, false> | null = null;
+export type SqlFn = <T = Record<string, unknown>>(
+  strings: TemplateStringsArray,
+  ...params: unknown[]
+) => Promise<T[]>;
+
+let cachedSql: SqlFn | null = null;
 let cachedPool: Pool | null = null;
 
 function getConnectionString(): string {
@@ -30,16 +39,29 @@ function getConnectionString(): string {
   return url;
 }
 
-export function db(): NeonQueryFunction<false, false> {
-  if (cachedSql) return cachedSql;
-  cachedSql = neon(getConnectionString());
-  return cachedSql;
-}
-
 export function pool(): Pool {
   if (cachedPool) return cachedPool;
   cachedPool = new Pool({ connectionString: getConnectionString() });
   return cachedPool;
+}
+
+/** Tagged-template SQL backed by Pool. Drop-in replacement for neon()'s API. */
+export function db(): SqlFn {
+  if (cachedSql) return cachedSql;
+  const p = pool();
+  cachedSql = (async <T = Record<string, unknown>>(
+    strings: TemplateStringsArray,
+    ...params: unknown[]
+  ): Promise<T[]> => {
+    let text = '';
+    for (let i = 0; i < strings.length; i++) {
+      text += strings[i];
+      if (i < params.length) text += `$${i + 1}`;
+    }
+    const result = await p.query(text, params as unknown[]);
+    return result.rows as T[];
+  }) as SqlFn;
+  return cachedSql;
 }
 
 /** Run a multi-statement SQL script (e.g., schema.sql). */
@@ -51,6 +73,77 @@ export async function execScript(sqlText: string): Promise<void> {
     if (!trimmed) continue;
     await p.query(trimmed);
   }
+}
+
+/**
+ * Multi-row UPSERT helper for bulk loading.
+ *
+ * One round-trip per chunk instead of one per row — turns a 10-minute load
+ * into a 10-second one. Generates parameterized
+ * `INSERT INTO t (cols) VALUES (...), (...), ... ON CONFLICT (...) DO UPDATE SET ...`.
+ *
+ * `valueExpressions` lets a column's $-placeholder be wrapped in a SQL
+ * expression — e.g. `geom` from `ST_SetSRID(ST_MakePoint($1, $2), 4326)`.
+ * Each entry maps a column name to a function that takes a starting param
+ * index and returns the SQL expression + how many params it consumed.
+ */
+export interface BulkUpsertOptions {
+  table: string;
+  columns: string[];
+  rows: unknown[][];
+  conflictKeys: string[];
+  /** Columns to update on conflict. Defaults to all columns not in conflictKeys. */
+  updateColumns?: string[];
+  /** Optional per-column SQL expression overrides (e.g., PostGIS functions). */
+  valueExpressions?: Record<string, (paramIndex: number) => { expr: string; consumes: number }>;
+  /** Rows per round-trip. Default 100. */
+  chunkSize?: number;
+}
+
+export async function bulkUpsert(opts: BulkUpsertOptions): Promise<number> {
+  const p = pool();
+  const chunkSize = opts.chunkSize ?? 100;
+  const updateCols =
+    opts.updateColumns ??
+    opts.columns.filter((c) => !opts.conflictKeys.includes(c));
+  const setClause =
+    updateCols.length > 0
+      ? `DO UPDATE SET ${updateCols.map((c) => `${c} = EXCLUDED.${c}`).join(', ')}`
+      : 'DO NOTHING';
+
+  let written = 0;
+  for (let i = 0; i < opts.rows.length; i += chunkSize) {
+    const chunk = opts.rows.slice(i, i + chunkSize);
+    const rowSql: string[] = [];
+    const params: unknown[] = [];
+    let nextParam = 1;
+    for (const row of chunk) {
+      const cellSql: string[] = [];
+      for (let c = 0; c < opts.columns.length; c++) {
+        const col = opts.columns[c]!;
+        const expr = opts.valueExpressions?.[col];
+        if (expr) {
+          const { expr: sql, consumes } = expr(nextParam);
+          cellSql.push(sql);
+          // The wrapper consumes `consumes` values from `row`; push them all.
+          for (let k = 0; k < consumes; k++) params.push(row[c + k]);
+          nextParam += consumes;
+          c += consumes - 1; // advance past consumed input columns
+        } else {
+          cellSql.push(`$${nextParam}`);
+          params.push(row[c]);
+          nextParam += 1;
+        }
+      }
+      rowSql.push(`(${cellSql.join(', ')})`);
+    }
+    const text =
+      `INSERT INTO ${opts.table} (${opts.columns.join(', ')}) VALUES ${rowSql.join(', ')} ` +
+      `ON CONFLICT (${opts.conflictKeys.join(', ')}) ${setClause}`;
+    await p.query(text, params);
+    written += chunk.length;
+  }
+  return written;
 }
 
 /**
