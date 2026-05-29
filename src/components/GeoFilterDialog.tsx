@@ -92,18 +92,31 @@ export default function GeoFilterDialog({
     () => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }),
     [],
   );
+  // Build a display row per area: a primary label (sortable, the district
+  // number on Congressional) and an optional secondary (rep name). Other
+  // layers leave secondary null — primary stays as opt.label.
+  const decoratedOptions = useMemo(() => {
+    return layerOptions.map((opt) => {
+      const display = displayFor(activeLayer, opt);
+      return { opt, display };
+    });
+  }, [layerOptions, activeLayer]);
   const filteredOptions = useMemo(() => {
-    const list = q
-      ? layerOptions.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
-      : layerOptions.slice();
+    const ql = q.trim().toLowerCase();
+    const list = ql
+      ? decoratedOptions.filter((d) =>
+          d.display.primary.toLowerCase().includes(ql) ||
+          (d.display.secondary?.toLowerCase().includes(ql) ?? false),
+        )
+      : decoratedOptions.slice();
     list.sort((a, b) => {
-      const ca = layerCounts.get(a.area_id) ?? 0;
-      const cb = layerCounts.get(b.area_id) ?? 0;
+      const ca = layerCounts.get(a.opt.area_id) ?? 0;
+      const cb = layerCounts.get(b.opt.area_id) ?? 0;
       if (ca !== cb) return cb - ca;
-      return naturalCollator.compare(a.label, b.label);
+      return naturalCollator.compare(a.display.primary, b.display.primary);
     });
     return list;
-  }, [layerOptions, layerCounts, naturalCollator, q]);
+  }, [decoratedOptions, layerCounts, naturalCollator, q]);
 
   if (!open) return null;
 
@@ -271,7 +284,7 @@ export default function GeoFilterDialog({
               {filteredOptions.length === 0 ? (
                 <div style={{ fontSize: 11, color: '#999' }}>No matches.</div>
               ) : null}
-              {filteredOptions.map((opt) => {
+              {filteredOptions.map(({ opt, display }) => {
                 const picked = layerPicks.includes(opt.area_id);
                 const count = layerCounts.get(opt.area_id) ?? 0;
                 const empty = count === 0;
@@ -280,10 +293,10 @@ export default function GeoFilterDialog({
                     key={opt.area_id}
                     title={empty ? 'No NYC schools in this district' : `${count} NYC schools`}
                     style={{
-                      display: 'flex',
-                      gap: 6,
+                      display: 'grid',
+                      gridTemplateColumns: 'auto 1fr auto',
+                      gap: 8,
                       alignItems: 'center',
-                      justifyContent: 'space-between',
                       padding: '3px 4px',
                       fontSize: 12,
                       cursor: 'pointer',
@@ -298,7 +311,18 @@ export default function GeoFilterDialog({
                         checked={picked}
                         onChange={() => toggleArea(opt.area_id)}
                       />
-                      <span>{opt.label}</span>
+                      <span>{display.primary}</span>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: empty ? '#c5cdd6' : '#467c9d',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {display.secondary ?? ''}
                     </span>
                     <span style={{ fontSize: 10, color: empty ? '#c5cdd6' : '#467c9d' }}>
                       ({count})
@@ -346,6 +370,41 @@ export default function GeoFilterDialog({
 
 function labelOf(id: GeoFilterLayerId): string {
   return GEO_FILTER_LAYERS.find((l) => l.id === id)?.label ?? id;
+}
+
+interface AreaDisplay {
+  /** Sortable primary string shown leftmost (after the checkbox). */
+  primary: string;
+  /** Optional secondary string shown in a subdued middle column. */
+  secondary: string | null;
+}
+
+/**
+ * Per-layer display decomposition. Congressional gets a two-column treatment:
+ * district number leads (so the list reads 1, 2, … 26) and the rep name sits
+ * to its right as a secondary label that participates in search. Other layers
+ * keep the existing label as primary and have no secondary.
+ *
+ * Congressional `area_id` is STFIPS+CDFIPS — e.g. NY District 13 = '3613'. We
+ * peel off the leading state FIPS ('36') to reveal the district number.
+ */
+function displayFor(layer: GeoFilterLayerId, opt: GeoArea): AreaDisplay {
+  if (layer === 'congressional') {
+    const districtNum = stripStateFips(opt.area_id);
+    return {
+      primary: `District ${districtNum}`,
+      secondary: opt.label && opt.label !== opt.area_id ? opt.label : null,
+    };
+  }
+  return { primary: opt.label, secondary: null };
+}
+
+function stripStateFips(areaId: string): string {
+  // NY congressional area_ids are 4 chars: '36' + 2-digit district. Trim and
+  // parse so '3601' becomes '1', '3613' becomes '13'.
+  const tail = areaId.length > 2 ? areaId.slice(2) : areaId;
+  const n = Number.parseInt(tail, 10);
+  return Number.isFinite(n) ? String(n) : tail;
 }
 
 function btnStyle(kind: 'primary' | 'ghost'): React.CSSProperties {
