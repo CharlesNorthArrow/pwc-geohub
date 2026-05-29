@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import FilterDropdown, { type DropdownOption } from './FilterDropdown';
 import GeoFilterDialog from './GeoFilterDialog';
+import TimeSlider from './TimeSlider';
 import {
   GEO_FILTER_LAYERS,
   type GeographiesResponse,
@@ -163,32 +164,35 @@ export default function HeaderBar({ geographies, schoolsMaster, universe }: Prop
         onPick={(v) => setSelectedSchool(v)}
       />
 
-      {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
-      schoolType !== 'all' ||
-      cohort != null ||
-      selectedSchoolDbn != null ? (
-        <button
-          type="button"
-          onClick={() => {
-            clearGeoFilters();
-            setSchoolType('all');
-            setCohort(null);
-            setSelectedSchool(null);
-          }}
-          style={{
-            marginLeft: 'auto',
-            background: 'transparent',
-            border: '1px solid #c5cdd6',
-            color: '#467c9d',
-            borderRadius: 4,
-            padding: '4px 10px',
-            fontSize: 11,
-            cursor: 'pointer',
-          }}
-        >
-          ↺ Reset all
-        </button>
-      ) : null}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <TimeSlider />
+
+        {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
+        schoolType !== 'all' ||
+        cohort != null ||
+        selectedSchoolDbn != null ? (
+          <button
+            type="button"
+            onClick={() => {
+              clearGeoFilters();
+              setSchoolType('all');
+              setCohort(null);
+              setSelectedSchool(null);
+            }}
+            style={{
+              background: 'transparent',
+              border: '1px solid #c5cdd6',
+              color: '#467c9d',
+              borderRadius: 4,
+              padding: '4px 10px',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            ↺ Reset filters
+          </button>
+        ) : null}
+      </div>
 
       <GeoFilterDialog
         open={geoOpen}

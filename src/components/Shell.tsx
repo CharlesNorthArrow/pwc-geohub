@@ -27,6 +27,7 @@ import type {
 } from '../contract/types';
 import { useHubStore } from '../store/useHubStore';
 import { applyFilters, type FilteredUniverse } from '../store/derived';
+import { isSliderYear, toCommunityYear, type SliderYear } from '../contract/year';
 
 interface InitialProps {
   initialIndicators: IndicatorPublic[];
@@ -56,14 +57,12 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
 
   const schoolId = useHubStore((s) => s.activeSchoolIndicator);
   const communityId = useHubStore((s) => s.activeCommunityIndicator);
-  const schoolYearOverride = useHubStore((s) => s.schoolYearOverride);
-  const communityYearOverride = useHubStore((s) => s.communityYearOverride);
+  const year = useHubStore((s) => s.year);
   const schoolType = useHubStore((s) => s.schoolType);
   const geoFilters = useHubStore((s) => s.geoFilters);
   const cohort = useHubStore((s) => s.cohort);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
-  const setSchoolYearOverride = useHubStore((s) => s.setSchoolYearOverride);
-  const setCommunityYearOverride = useHubStore((s) => s.setCommunityYearOverride);
+  const setYear = useHubStore((s) => s.setYear);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
 
   // One-shot fetches.
@@ -82,19 +81,27 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       .catch((err) => console.warn('[Shell] geographies fetch failed', err));
   }, []);
 
-  // Hydrate year overrides from URL params.
+  // Hydrate ?year= from URL once on mount. Preserves shareable links and the
+  // Phase 1 missing-year acceptance test (?year=2019-20 forces a 🗓️ branch
+  // — though now only inside the slider's valid range).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sy = params.get('schoolYear');
-    if (sy) setSchoolYearOverride(sy);
-    const cy = params.get('communityYear');
-    if (cy) setCommunityYearOverride(cy);
-  }, [setSchoolYearOverride, setCommunityYearOverride]);
+    const y = params.get('year');
+    if (y && isSliderYear(y)) setYear(y as SliderYear);
+  }, [setYear]);
 
   const schoolIndicator = indicators.find((i) => i.id === schoolId) ?? null;
   const communityIndicator = indicators.find((i) => i.id === communityId) ?? null;
-  const schoolYear = resolveYear(schoolIndicator, schoolYearOverride);
-  const communityYear = resolveYear(communityIndicator, communityYearOverride);
+
+  // Independent per-layer year resolution (acceptance test #3): each layer
+  // either has data for the chosen year or shows 🗓️ — without breaking the
+  // other layer.
+  const schoolYear = schoolIndicator && schoolIndicator.years.includes(year) ? year : null;
+  const communityCalYear = toCommunityYear(year);
+  const communityYear =
+    communityIndicator && communityCalYear && communityIndicator.years.includes(communityCalYear)
+      ? communityCalYear
+      : null;
 
   // School + PWC + Community fetches (unchanged from Phase 2).
   useEffect(() => {
@@ -218,18 +225,20 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     return schoolsMaster.find((s) => s.dbn === selectedSchoolDbn)?.school_name ?? null;
   }, [selectedSchoolDbn, schoolsMaster]);
 
-  /* -------------------- No-data flags (Phase 1) -------------------- */
+  /* -------------------- No-data flags (per-layer, independent) --------------------
+   * Each layer fires the 🗓️ branch ONLY when:
+   *  (a) its indicator is active, and
+   *  (b) the selected slider year doesn't map to a year the indicator has,
+   *      OR the API returned zero features for that year.
+   * The independence is what keeps the OTHER layer rendering — acceptance test #3.
+   */
   const schoolNoData = Boolean(
     schoolIndicator &&
-      schoolYear &&
-      (schoolData ? schoolData.features.length === 0 : !schoolIndicator.years.includes(schoolYear)),
+      (schoolYear == null || (schoolData ? schoolData.features.length === 0 : false)),
   );
   const communityNoData = Boolean(
     communityIndicator &&
-      communityYear &&
-      (communityData
-        ? Object.keys(communityData.values).length === 0
-        : !communityIndicator.years.includes(communityYear)),
+      (communityYear == null || (communityData ? Object.keys(communityData.values).length === 0 : false)),
   );
 
   return (
@@ -244,6 +253,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     >
       <LeftPanel
         indicators={indicators}
+        sliderYear={year}
         schoolIndicator={schoolIndicator}
         schoolYear={schoolYear}
         schoolDomain={schoolData?.domain ?? null}
@@ -294,15 +304,6 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       />
     </div>
   );
-}
-
-function resolveYear(
-  indicator: IndicatorPublic | null,
-  override: string | null,
-): string | null {
-  if (!indicator) return null;
-  if (override) return override;
-  return indicator.years[indicator.years.length - 1] ?? null;
 }
 
 function stripPwcFlags(f: SchoolFeature): SchoolFeature {

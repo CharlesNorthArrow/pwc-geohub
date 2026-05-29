@@ -1,21 +1,19 @@
 /**
  * Single state store — spec §11.3.
  *
- * Phase 1 slice only: the two active indicators, plus optional per-layer
- * `displayYear` overrides used to test the no-data branch ahead of the
- * Phase 4 time slider. No `cohort`, `schoolType`, `geoFilters`,
- * `selectedSchool`, or `aggregationArea` yet — those land in Phases 2–5.
+ * One slice grows phase by phase; later phases extend it, never fork it.
+ *   - Phase 1: active indicators + (temporary) per-layer year overrides
+ *   - Phase 2: schoolType
+ *   - Phase 3: geoFilters, cohort, selectedSchoolDbn
+ *   - Phase 4: replaces the per-layer overrides with one `year` (slider)
  */
 
 import { create } from 'zustand';
 import type { GeoFilterLayerId } from '../contract/types';
+import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 
 /**
- * Spec §6.2 — School Type filter. Phase 2 wires this to the **map only** via
- * a temporary left-panel toggle; Phase 3 attaches the real header control to
- * the same state, no fork.
- *
- * Semantics:
+ * Spec §6.2 — School Type filter.
  *  - 'all'           → every plottable school, no PWC filter
  *  - 'pwc'           → any active PWC school (anchor | healing_arts | both | pwc_other)
  *  - 'anchor'        → core_school=true (INCLUDES both-category schools)
@@ -32,12 +30,13 @@ export interface HubState {
   activeCommunityIndicator: string | null;
 
   /**
-   * Optional override on the displayed year for each layer. When null, the
-   * layer uses its registry-defined latest year (per spec §6.5). Phase 4
-   * replaces this with a single shared `year` driven by the time slider.
+   * Spec §6.5 — the time slider's current school_year. Both layers resolve
+   * their data availability from this single value (community via
+   * `toCommunityYear`). When an active indicator has no data for the chosen
+   * year, that layer shows the 🗓️ notice while the OTHER layer keeps
+   * rendering — independent resolution.
    */
-  schoolYearOverride: string | null;
-  communityYearOverride: string | null;
+  year: SliderYear;
 
   /** Spec §6.2 — see SchoolType doc above. Default 'all'. */
   schoolType: SchoolType;
@@ -55,8 +54,7 @@ export interface HubState {
 
   setSchoolIndicator: (id: string | null) => void;
   setCommunityIndicator: (id: string | null) => void;
-  setSchoolYearOverride: (year: string | null) => void;
-  setCommunityYearOverride: (year: string | null) => void;
+  setYear: (year: SliderYear) => void;
   setSchoolType: (t: SchoolType) => void;
   setGeoFilters: (next: GeoFilterMap) => void;
   clearGeoFilters: () => void;
@@ -67,20 +65,14 @@ export interface HubState {
 export const useHubStore = create<HubState>((set) => ({
   activeSchoolIndicator: null,
   activeCommunityIndicator: null,
-  schoolYearOverride: null,
-  communityYearOverride: null,
+  year: DEFAULT_YEAR,
   schoolType: 'all',
   geoFilters: {},
   cohort: null,
   selectedSchoolDbn: null,
-  setSchoolIndicator: (id) =>
-    // Clearing the indicator also clears its year override — both are
-    // per-indicator state and should reset together.
-    set({ activeSchoolIndicator: id, schoolYearOverride: null }),
-  setCommunityIndicator: (id) =>
-    set({ activeCommunityIndicator: id, communityYearOverride: null }),
-  setSchoolYearOverride: (year) => set({ schoolYearOverride: year }),
-  setCommunityYearOverride: (year) => set({ communityYearOverride: year }),
+  setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
+  setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
+  setYear: (year) => set({ year }),
   setSchoolType: (t) => set({ schoolType: t }),
   setGeoFilters: (next) => set({ geoFilters: next }),
   clearGeoFilters: () => set({ geoFilters: {} }),

@@ -9,11 +9,15 @@ import type { IndicatorPublic } from '../contract/types';
 
 interface Props {
   indicators: IndicatorPublic[];
+  /** Current slider position (always set; spec §6.5 default = 2024-25). */
+  sliderYear: string;
   schoolIndicator: IndicatorPublic | null;
+  /** School layer's resolved year, or null when the slider year has no school data. */
   schoolYear: string | null;
   schoolDomain: { min: number; max: number } | null;
   schoolNoData: boolean;
   communityIndicator: IndicatorPublic | null;
+  /** Community layer's resolved year (calendar year), or null when missing. */
   communityYear: string | null;
   communityDomain: { min: number; max: number } | null;
   communityNoData: boolean;
@@ -21,6 +25,7 @@ interface Props {
 
 export default function LeftPanel({
   indicators,
+  sliderYear,
   schoolIndicator,
   schoolYear,
   schoolDomain,
@@ -60,17 +65,22 @@ export default function LeftPanel({
         >
           Legend
         </div>
-        {(schoolIndicator && schoolYear) || (communityIndicator && communityYear) ? (
+        {schoolIndicator || communityIndicator ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {schoolIndicator && schoolYear ? (
-              <YearBadge family="school" indicator={schoolIndicator} displayYear={schoolYear} noData={schoolNoData} />
+            {schoolIndicator ? (
+              <YearBadge
+                family="school"
+                indicator={schoolIndicator}
+                displayYear={schoolYear}
+                sliderYear={sliderYear}
+              />
             ) : null}
-            {communityIndicator && communityYear ? (
+            {communityIndicator ? (
               <YearBadge
                 family="community"
                 indicator={communityIndicator}
                 displayYear={communityYear}
-                noData={communityNoData}
+                sliderYear={sliderYear}
               />
             ) : null}
           </div>
@@ -84,11 +94,19 @@ export default function LeftPanel({
           />
         </div>
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {schoolNoData && schoolIndicator && schoolYear ? (
-            <NoDataNotice family="school" indicatorLabel={schoolIndicator.label} year={schoolYear} />
+          {schoolNoData && schoolIndicator ? (
+            <NoDataNotice
+              family="school"
+              indicatorLabel={schoolIndicator.label}
+              year={sliderYear}
+            />
           ) : null}
-          {communityNoData && communityIndicator && communityYear ? (
-            <NoDataNotice family="community" indicatorLabel={communityIndicator.label} year={communityYear} />
+          {communityNoData && communityIndicator ? (
+            <NoDataNotice
+              family="community"
+              indicatorLabel={communityIndicator.label}
+              year={sliderYear}
+            />
           ) : null}
         </div>
       </div>
