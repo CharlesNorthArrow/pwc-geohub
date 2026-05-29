@@ -4,10 +4,19 @@ export default function Logo(): React.JSX.Element {
       href="https://partnershipwithchildren.org/"
       target="_blank"
       rel="noreferrer"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#002040', textDecoration: 'none' }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        textDecoration: 'none',
+        color: '#002040',
+      }}
+      aria-label="Partnership with Children"
     >
-      <img src="/brand/PWC-Logo.png" alt="Partnership with Children" style={{ height: 32, width: 'auto' }} />
-      <span style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.2 }}>Geospatial Hub</span>
+      <img
+        src="/brand/PWC-Logo.png"
+        alt="Partnership with Children"
+        style={{ height: 48, width: 'auto' }}
+      />
     </a>
   );
 }

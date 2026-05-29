@@ -3,6 +3,7 @@
 import IndicatorSelector from './IndicatorSelector';
 import InSchoolServicesStub from './InSchoolServicesStub';
 import Legend from './Legend';
+import Logo from './Logo';
 import YearBadge from './YearBadge';
 import NoDataNotice from './NoDataNotice';
 import type { IndicatorPublic } from '../contract/types';
@@ -40,7 +41,7 @@ export default function LeftPanel({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: 12,
         padding: 12,
         borderRight: '1px solid #e5e9ee',
         background: '#f2f8ee',
@@ -48,23 +49,22 @@ export default function LeftPanel({
         minHeight: 0,
       }}
     >
-      <IndicatorSelector indicators={indicators} />
+      {/* Logo — top of panel, larger, no subtitle. */}
+      <header style={{ paddingBottom: 8, borderBottom: '1px solid #dde4ea' }}>
+        <Logo />
+      </header>
 
+      {/* Indicators */}
+      <Section title="Indicators">
+        <IndicatorSelector indicators={indicators} />
+      </Section>
+
+      {/* PWC entry-point stub */}
       <InSchoolServicesStub />
 
-      <div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 0.5,
-            textTransform: 'uppercase',
-            color: '#002040',
-            marginBottom: 6,
-          }}
-        >
-          Legend
-        </div>
+      {/* Legend — visually separated from Indicators */}
+      <SectionDivider />
+      <Section title="Legend">
         {schoolIndicator || communityIndicator ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {schoolIndicator ? (
@@ -109,7 +109,38 @@ export default function LeftPanel({
             />
           ) : null}
         </div>
-      </div>
+      </Section>
     </aside>
   );
+}
+
+/** Small consistent section wrapper — heading + body. */
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <section>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+          color: '#002040',
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SectionDivider(): React.JSX.Element {
+  return <div style={{ borderTop: '1px solid #dde4ea', margin: '4px 0' }} />;
 }

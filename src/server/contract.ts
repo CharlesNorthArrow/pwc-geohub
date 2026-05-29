@@ -35,12 +35,27 @@ import { GEO_FILTER_LAYERS } from '../contract/types';
 /* Indicators                                                                 */
 /* -------------------------------------------------------------------------- */
 
+function describeSource(i: IndicatorRegistryEntry): string {
+  switch (i.source.type) {
+    case 'hosted':
+      return `PWC-hosted: ${i.source.dataset}`;
+    case 'api':
+      if (i.source.provider === 'acs5') {
+        return `US Census ACS 5-yr — table ${i.source.table} (${i.source.endpoint})`;
+      }
+      return `CDC PLACES — measure ${i.source.measure_id} (${i.source.resource})`;
+    case 'deferred':
+      return `Deferred — planned: ${i.source.planned_method}`;
+  }
+}
+
 function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
   return {
     id: i.id,
     family: i.family,
     theme: i.theme,
     label: i.label,
+    short_label: i.short_label,
     description: i.description,
     format: i.format,
     scale: {
@@ -51,6 +66,7 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
     // Phase 1 only renders point + polygon families. Site (deferred crime) is filtered out.
     geometry: i.geometry === 'point' ? 'point' : 'polygon',
     years: [...i.years],
+    source_description: describeSource(i),
   };
 }
 

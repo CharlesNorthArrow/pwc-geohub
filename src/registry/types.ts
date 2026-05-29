@@ -79,6 +79,9 @@ export interface IndicatorRegistryEntry {
   family: IndicatorFamily;
   theme: string;
   label: string;
+  /** Optional short form for tight UI surfaces (left-panel selector). Falls
+   *  back to `label` when absent. */
+  short_label?: string;
   description?: string;
   source: IndicatorSource;
   format: Format;

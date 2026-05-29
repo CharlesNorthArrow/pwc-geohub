@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import HeaderBar from './HeaderBar';
 import LeftPanel from './LeftPanel';
-import Logo from './Logo';
 import MapView from './MapView';
 import SchoolDetailsStub from './SchoolDetailsStub';
 import {
@@ -298,9 +297,6 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           universe={universe}
         />
         <div style={{ position: 'relative', minHeight: 0 }}>
-          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2 }}>
-            <Logo />
-          </div>
           <MapView
             schoolIndicator={schoolIndicator}
             schoolPoints={schoolNoData ? null : enrichedSchoolData}

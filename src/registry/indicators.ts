@@ -29,6 +29,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Educational Enrichment',
     label: 'Arts education access (# disciplines, 0–4)',
+    short_label: 'Arts education',
     source: {
       type: 'hosted',
       dataset: 'arts_ed.csv',
@@ -50,6 +51,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Student Demographics & Equity',
     label: 'Suspension / disciplinary rate (per 100)',
+    short_label: 'Suspension rate',
     source: {
       type: 'hosted',
       dataset: 'suspensions.csv',
@@ -70,6 +72,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Student Demographics & Equity',
     label: '% students in temporary housing',
+    short_label: 'Temp housing',
     source: {
       type: 'hosted',
       dataset: 'temp_housing.csv',
@@ -89,6 +92,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Academic Outcomes',
     label: 'Math proficiency (gr 3–8, % L3+4)',
+    short_label: 'Math proficiency',
     source: {
       type: 'hosted',
       dataset: 'math.csv',
@@ -109,6 +113,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Academic Outcomes',
     label: 'ELA proficiency (gr 3–8, % L3+4)',
+    short_label: 'ELA proficiency',
     source: {
       type: 'hosted',
       dataset: 'ela.csv',
@@ -128,6 +133,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Academic Outcomes',
     label: 'Chronic absenteeism rate',
+    short_label: 'Chronic absenteeism',
     source: {
       type: 'hosted',
       dataset: 'chronic_absenteeism.csv',
@@ -147,6 +153,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Academic Outcomes',
     label: '4-yr HS graduation rate',
+    short_label: 'HS graduation',
     source: {
       type: 'hosted',
       dataset: 'graduation.csv',
@@ -169,6 +176,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Strengthening Support Network',
     label: 'Safety & school climate (% positive)',
+    short_label: 'Safety & climate',
     source: {
       type: 'hosted',
       dataset: 'school_quality.csv',
@@ -192,6 +200,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Strengthening Support Network',
     label: 'Family satisfaction with education (q36)',
+    short_label: 'Family satisfaction',
     source: {
       type: 'hosted',
       dataset: 'family_survey.csv',
@@ -211,6 +220,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Strengthening Support Network',
     label: 'Teacher: access to behavioral supports (q120)',
+    short_label: 'Teacher: supports access',
     source: {
       type: 'hosted',
       dataset: 'teacher_survey.csv',
@@ -230,6 +240,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Health',
     label: 'Student: knows where to go for mental-health support (q20)',
+    short_label: 'Student: MH support',
     source: {
       type: 'hosted',
       dataset: 'student_survey.csv',
@@ -249,6 +260,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Health',
     label: 'Student: felt happy at school (q22)',
+    short_label: 'Student: felt happy',
     source: {
       type: 'hosted',
       dataset: 'student_survey.csv',
@@ -270,6 +282,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Strengthening Support Network',
     label: 'Teacher: recognizes disruptive behavior as SEL opportunity (q119)',
+    short_label: 'Teacher: SEL view',
     source: {
       type: 'hosted',
       dataset: 'teacher_survey.csv',
@@ -327,6 +340,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Health',
     label: 'Adult mental-health distress (≥14 days, age 18+)',
+    short_label: 'Adult mental health',
     source: {
       type: 'api',
       provider: 'cdc_places',
@@ -345,6 +359,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Economic Conditions',
     label: 'Child poverty rate (<18 below poverty)',
+    short_label: 'Child poverty',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -372,6 +387,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Economic Conditions',
     label: 'Adult unemployment (proxy: civilian unemployment rate)',
+    short_label: 'Adult unemployment',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -395,6 +411,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Family Type',
     label: 'Single-parent household rate (own children <18)',
+    short_label: 'Single-parent HH',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -415,6 +432,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Housing & Stability',
     label: 'Housing insecurity (past 12 mo, age 18+)',
+    short_label: 'Housing insecurity',
     source: {
       type: 'api',
       provider: 'cdc_places',
@@ -434,6 +452,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Housing & Stability',
     label: 'Overcrowded household units (1.51+ occupants/room)',
+    short_label: 'Overcrowded units',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -454,6 +473,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Immigration & Language',
     label: 'Children in immigrant families (foreign-born)',
+    short_label: 'Immigrant family kids',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -476,6 +496,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Demographics',
     label: 'Racial predominance (argmax of Black/White/Asian/Hispanic)',
+    short_label: 'Racial predominance',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -502,6 +523,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'community',
     theme: 'Safety',
     label: 'Violent incidents near schools (deferred)',
+    short_label: 'Crime near schools',
     source: {
       type: 'deferred',
       planned_method:

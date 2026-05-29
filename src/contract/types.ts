@@ -19,6 +19,9 @@ export interface IndicatorPublic {
   family: IndicatorFamily;
   theme: string;
   label: string;
+  /** UI-friendly short form, e.g. "Math proficiency" instead of
+   *  "Math proficiency (gr 3–8, % L3+4)". Falls back to `label` when absent. */
+  short_label?: string;
   description?: string;
   format: Format;
   scale: {
@@ -29,6 +32,9 @@ export interface IndicatorPublic {
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
   years: string[];
+  /** Human-readable source string for the info icon, e.g.
+   *  "PWC-hosted: arts_ed.csv" or "ACS 5-yr: B17001". */
+  source_description: string;
 }
 
 /** GET /api/indicators */
