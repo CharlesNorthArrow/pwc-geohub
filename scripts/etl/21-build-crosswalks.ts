@@ -23,6 +23,9 @@ const CROSSWALK_LAYERS = [
   'assembly',
   'council',
   'community_district',
+  // Added per user request — US Congressional Districts (not in §6.1 but
+  // useful to PWC advocacy work).
+  'congressional',
 ] as const;
 
 async function buildOne(layer: string): Promise<void> {

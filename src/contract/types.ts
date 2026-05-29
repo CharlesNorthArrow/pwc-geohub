@@ -117,13 +117,14 @@ export interface PwcResponse {
 /* Geo filter + schools-master (Phase 3)                                      */
 /* -------------------------------------------------------------------------- */
 
-/** The 6 boundary layers the §6.1 Geo filter spans. NDA / NTA / congressional
- *  exist in `geographies` but aren't surfaced here — they're used elsewhere
- *  (aggregation toggle, future overlays). */
+/** Layers the §6.1 Geo filter spans. NDA / NTA exist in `geographies` but
+ *  aren't surfaced here — they're used elsewhere (aggregation toggle, future
+ *  overlays). Spec §6.1 lists 6; Congressional was added at user request. */
 export type GeoFilterLayerId =
   | 'county'
   | 'senate'
   | 'assembly'
+  | 'congressional'
   | 'council'
   | 'school_district'
   | 'community_district';
@@ -132,6 +133,7 @@ export const GEO_FILTER_LAYERS: ReadonlyArray<{ id: GeoFilterLayerId; label: str
   { id: 'county', label: 'Counties' },
   { id: 'senate', label: 'State Senate' },
   { id: 'assembly', label: 'State Assembly' },
+  { id: 'congressional', label: 'US Congressional' },
   { id: 'council', label: 'City Council' },
   { id: 'school_district', label: 'NYC School Districts' },
   { id: 'community_district', label: 'NYC Community Districts' },

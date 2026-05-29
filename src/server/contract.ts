@@ -331,6 +331,7 @@ export async function getGeographies(): Promise<GeographiesResponse> {
     county: [],
     senate: [],
     assembly: [],
+    congressional: [],
     council: [],
     school_district: [],
     community_district: [],

@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   GEO_FILTER_LAYERS,
   type GeoArea,
   type GeoFilterLayerId,
   type GeographiesResponse,
+  type SchoolMaster,
 } from '../contract/types';
 import type { GeoFilterMap } from '../store/useHubStore';
 
 interface Props {
   open: boolean;
   geographies: GeographiesResponse | null;
+  /** Schools universe — used to compute per-area NYC-school counts. */
+  schoolsMaster: SchoolMaster[];
   /** Current store value — used to initialize local working state. */
   initial: GeoFilterMap;
   onCancel: () => void;
@@ -27,6 +30,7 @@ interface Props {
 export default function GeoFilterDialog({
   open,
   geographies,
+  schoolsMaster,
   initial,
   onCancel,
   onApply,
@@ -34,6 +38,30 @@ export default function GeoFilterDialog({
   const [working, setWorking] = useState<GeoFilterMap>(initial);
   const [activeLayer, setActiveLayer] = useState<GeoFilterLayerId>('council');
   const [q, setQ] = useState('');
+
+  // Per-(layer, area_id) → count of NYC schools in that area. Lets us sort
+  // populated districts first + grey 0-count ones. The same crosswalk we use
+  // for the §6.6 map filter; no extra round-trip.
+  const countsByLayer = useMemo(() => {
+    const out: Record<GeoFilterLayerId, Map<string, number>> = {
+      county: new Map(),
+      senate: new Map(),
+      assembly: new Map(),
+      congressional: new Map(),
+      council: new Map(),
+      school_district: new Map(),
+      community_district: new Map(),
+    };
+    for (const s of schoolsMaster) {
+      for (const layer of GEO_FILTER_LAYERS) {
+        const area = s.geos[layer.id];
+        if (!area) continue;
+        const m = out[layer.id];
+        m.set(area, (m.get(area) ?? 0) + 1);
+      }
+    }
+    return out;
+  }, [schoolsMaster]);
 
   // Reset working state every time the dialog re-opens.
   useEffect(() => {
@@ -56,9 +84,23 @@ export default function GeoFilterDialog({
   if (!open) return null;
 
   const layerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
-  const filteredOptions = q
-    ? layerOptions.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
-    : layerOptions;
+  const layerCounts = countsByLayer[activeLayer];
+  // Populated areas first (descending by count). Ties broken alphabetically so
+  // the ordering is stable. 0-count options keep their original label order
+  // at the bottom — they remain pickable per the agreed UX.
+  const sortedOptions = useMemo(() => {
+    const list = q
+      ? layerOptions.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+      : layerOptions.slice();
+    list.sort((a, b) => {
+      const ca = layerCounts.get(a.area_id) ?? 0;
+      const cb = layerCounts.get(b.area_id) ?? 0;
+      if (ca !== cb) return cb - ca;
+      return a.label.localeCompare(b.label);
+    });
+    return list;
+  }, [layerOptions, layerCounts, q]);
+  const filteredOptions = sortedOptions;
   const layerPicks = working[activeLayer] ?? [];
 
   function toggleArea(areaId: string): void {
@@ -207,26 +249,36 @@ export default function GeoFilterDialog({
               ) : null}
               {filteredOptions.map((opt) => {
                 const picked = layerPicks.includes(opt.area_id);
+                const count = layerCounts.get(opt.area_id) ?? 0;
+                const empty = count === 0;
                 return (
                   <label
                     key={opt.area_id}
+                    title={empty ? 'No NYC schools in this district' : `${count} NYC schools`}
                     style={{
                       display: 'flex',
                       gap: 6,
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       padding: '3px 4px',
                       fontSize: 12,
                       cursor: 'pointer',
                       borderRadius: 3,
                       background: picked ? '#eef4f8' : 'transparent',
+                      color: empty ? '#a8b3bf' : '#002040',
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={picked}
-                      onChange={() => toggleArea(opt.area_id)}
-                    />
-                    <span>{opt.label}</span>
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={picked}
+                        onChange={() => toggleArea(opt.area_id)}
+                      />
+                      <span>{opt.label}</span>
+                    </span>
+                    <span style={{ fontSize: 10, color: empty ? '#c5cdd6' : '#467c9d' }}>
+                      ({count})
+                    </span>
                   </label>
                 );
               })}

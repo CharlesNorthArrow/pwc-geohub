@@ -189,6 +189,7 @@ function layerShortName(id: GeoFilterLayerId): string {
     case 'county': return 'County';
     case 'senate': return 'Senate';
     case 'assembly': return 'Assembly';
+    case 'congressional': return 'Cong';
     case 'council': return 'Council';
     case 'school_district': return 'SD';
     case 'community_district': return 'CD';

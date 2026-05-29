@@ -197,6 +197,7 @@ export default function HeaderBar({ geographies, schoolsMaster, universe }: Prop
       <GeoFilterDialog
         open={geoOpen}
         geographies={geographies}
+        schoolsMaster={schoolsMaster}
         initial={geoFilters}
         onCancel={() => setGeoOpen(false)}
         onApply={(next) => {
