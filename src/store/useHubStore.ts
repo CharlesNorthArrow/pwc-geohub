@@ -21,8 +21,9 @@ import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
  */
 export type SchoolType = 'all' | 'pwc' | 'anchor' | 'healing_arts';
 
-/** Spec §6.1 — multi-select per layer, UNION within a layer + INTERSECTION
- *  across layers. Missing key = no constraint from that layer. */
+/** Spec §6.1 — multi-select per layer. UNION within a layer + UNION across
+ *  layers (a school qualifies if it's in any selected pair). Missing key =
+ *  no constraint from that layer. */
 export type GeoFilterMap = Partial<Record<GeoFilterLayerId, string[]>>;
 
 export interface HubState {

@@ -11,9 +11,9 @@
  *   - Phase 5 (later)  → KPI cards / ranked list / community aggregation read
  *                        the SAME set so they can't drift from the map
  *
- * Semantics (locked in §6.1 + goal):
+ * Semantics:
  *   - within a layer: UNION (school in layer A area-id1 OR area-id2)
- *   - across layers:  INTERSECTION
+ *   - across layers:  UNION (school qualifies if it's in any selected pair)
  *   - missing layer:  no constraint
  *   - cascade order:  Geo → SchoolType → Cohort → School
  *
@@ -133,15 +133,18 @@ function countGeoLayers(g: GeoFilterMap): number {
 }
 
 function passesGeo(s: SchoolMaster, g: GeoFilterMap): boolean {
-  // Across layers = INTERSECTION; within layer = UNION; empty layer = pass.
+  // Within a layer = UNION; ACROSS layers = UNION too (OR). A school passes
+  // if it sits in at least one selected (layer, area_id) pair. With no
+  // selections anywhere, the filter is unconstrained and everything passes.
+  let anyActive = false;
   for (const layer of GEO_FILTER_LAYERS) {
     const picks = g[layer.id];
-    if (!picks || picks.length === 0) continue; // unconstrained
+    if (!picks || picks.length === 0) continue;
+    anyActive = true;
     const schoolArea = s.geos[layer.id];
-    if (!schoolArea) return false; // school has no crosswalk for this layer → can't satisfy
-    if (!picks.includes(schoolArea)) return false;
+    if (schoolArea && picks.includes(schoolArea)) return true;
   }
-  return true;
+  return !anyActive;
 }
 
 function passesSchoolType(

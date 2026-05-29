@@ -408,29 +408,15 @@ export async function getSelectedGeometries(
   }
 
   // 2. Compute the census-tract GEOIDs that fall WITHIN or OVERLAP the
-  //    selection. We mirror the schools cascade — within a layer = UNION,
-  //    across layers = INTERSECTION — so a tract is included only if it
-  //    intersects at least one selected polygon in EVERY layer that has
-  //    selections. Implemented as count-distinct over layers per tract.
-  const distinctLayerCount = new Set(layers).size;
+  //    selection. Mirrors the schools cascade: across-layer UNION, so a tract
+  //    is included if it intersects ANY selected polygon in any layer.
   const tractRows = await sql<{ area_id: string }>`
-    WITH selected AS (
-      SELECT g.geo_layer, g.geom
-      FROM geographies g
-      JOIN unnest(${layers}::text[], ${areaIds}::text[]) AS p(layer, area)
-        ON g.geo_layer = p.layer AND g.area_id = p.area
-    ),
-    per_tract_layer AS (
-      SELECT t.area_id AS tract_id, s.geo_layer
-      FROM geographies t
-      JOIN selected s ON ST_Intersects(t.geom, s.geom)
-      WHERE t.geo_layer = 'tract'
-      GROUP BY t.area_id, s.geo_layer
-    )
-    SELECT tract_id AS area_id
-    FROM per_tract_layer
-    GROUP BY tract_id
-    HAVING COUNT(DISTINCT geo_layer) = ${distinctLayerCount}
+    SELECT DISTINCT t.area_id
+    FROM geographies t
+    JOIN geographies s ON ST_Intersects(t.geom, s.geom)
+    JOIN unnest(${layers}::text[], ${areaIds}::text[]) AS p(layer, area)
+      ON s.geo_layer = p.layer AND s.area_id = p.area
+    WHERE t.geo_layer = 'tract'
   `;
   const intersectingTractGeoids = tractRows.map((r) => r.area_id);
 
