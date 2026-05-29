@@ -294,21 +294,32 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
 /* -------------------------------------------------------------------------- */
 
 /**
- * ACS 5-year endpoint year. Centralized so future updates touch one constant.
- * Use the most recent available 5-yr vintage. The 2024 release (covering
- * 2020–2024) was published Dec 2025 and is the current target, but some
- * tables / endpoints take longer to publish — fall back to 2023 if needed.
+ * ACS 5-year vintages we ingest. Each year is a separate
+ * `api.census.gov/data/YYYY/acs/acs5` endpoint; the ETL loops over them. The
+ * 2020 release (covering 2016–2020) was the special COVID-disrupted release
+ * with several tables suppressed — we still fetch it and record per-(indicator,
+ * year) findings for anything that 404s or comes back empty.
+ *
+ * The slider's school_year → calendar year mapping (`toCommunityYear`) is:
+ *   2020-21 → 2021, 2021-22 → 2022, 2022-23 → 2023, 2023-24 → 2024, 2024-25 → 2025.
+ * 2025 isn't released yet (≈Dec 2026), so the rightmost slider stop stays 🗓️
+ * for community indicators until next year's vintage lands.
  */
-export const ACS_YEAR = '2023';
+export const ACS_YEARS = ['2020', '2021', '2022', '2023', '2024'] as const;
+
+/** Convenience: the latest vintage we expect, used for fallback / display. */
+export const ACS_YEAR_LATEST = ACS_YEARS[ACS_YEARS.length - 1];
 
 /**
- * CDC PLACES release year — refreshed annually; populated by the fetch script.
- * The 2024 release (data through 2022) tags rows with `year='2023'`, which is
- * what `etl:cdc` lands under in Neon. The registry must match what's on disk;
- * otherwise the UI's "latest year" lookup misses every CDC indicator. Bump
- * when a new PLACES vintage is fetched.
+ * CDC PLACES vintages currently on disk. The active `cwsq-ngmh` Socrata
+ * dataset is a CURRENT-release feed and holds ONE year of estimates at a
+ * time (today: 2023). Historical PLACES releases live in separate dataset
+ * endpoints whose IDs change per release and which Socrata sometimes
+ * deprecates; pulling them in is a follow-up if PWC wants CDC longitudinal.
+ * For now we honestly advertise just what we have.
  */
-export const CDC_PLACES_YEAR_DEFAULT = '2023';
+export const CDC_PLACES_YEARS = ['2023'] as const;
+export const CDC_PLACES_YEAR_DEFAULT = CDC_PLACES_YEARS[CDC_PLACES_YEARS.length - 1];
 
 const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
   {
@@ -326,7 +337,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [CDC_PLACES_YEAR_DEFAULT],
+    years: [...CDC_PLACES_YEARS],
     status: 'active',
   },
   {
@@ -353,7 +364,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
   },
   {
@@ -373,7 +384,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
     notes:
       'S2301 does not split by "households with children" at tract grain. ' +
@@ -396,7 +407,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
   },
   {
@@ -415,7 +426,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [CDC_PLACES_YEAR_DEFAULT],
+    years: [...CDC_PLACES_YEARS],
     status: 'active',
   },
   {
@@ -435,7 +446,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
   },
   {
@@ -456,7 +467,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     format: 'percent',
     scale: { type: 'sequential', good_direction: 'none', ramp: 'viridis' },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
     notes: 'ETL resolves the exact B05009 cell decomposition at fetch time.',
   },
@@ -482,7 +493,7 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       categories: ['White', 'Black', 'Asian', 'Hispanic'],
     },
     geometry: 'polygon',
-    years: [ACS_YEAR],
+    years: [...ACS_YEARS],
     status: 'active',
   },
   /* --- Crime: deferred per §3.3. Slot reserved so the future add is config + ETL. */

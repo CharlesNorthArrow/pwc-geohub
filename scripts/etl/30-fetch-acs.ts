@@ -10,7 +10,7 @@
 import { acsFetch, buildTractGeoid } from '../lib/acs.js';
 import { bulkUpsert } from '../lib/db.js';
 import { recordFinding } from '../lib/findings.js';
-import { activeAcsIndicators, ACS_YEAR } from '../../src/registry/indicators.js';
+import { activeAcsIndicators, ACS_YEARS } from '../../src/registry/indicators.js';
 import type { AcsSource, IndicatorRegistryEntry } from '../../src/registry/types.js';
 import { NYC_COUNTY_FIPS } from '../../src/registry/geographies.js';
 
@@ -40,11 +40,14 @@ function isNycTract(row: Record<string, string>): boolean {
   return Boolean(county) && county! in NYC_COUNTY_FIPS;
 }
 
-async function processIndicator(ind: IndicatorRegistryEntry): Promise<CommunityRow[]> {
+async function processIndicator(
+  ind: IndicatorRegistryEntry,
+  year: string,
+): Promise<CommunityRow[]> {
   const src = ind.source as AcsSource;
-  const records = await acsFetch({ year: ACS_YEAR, endpoint: src.endpoint, fields: src.fields });
+  const records = await acsFetch({ year, endpoint: src.endpoint, fields: src.fields });
   const nyc = records.filter(isNycTract);
-  console.log(`[etl:acs] ${ind.id}: ${records.length} NY records → ${nyc.length} NYC tract rows`);
+  console.log(`[etl:acs] ${ind.id} @ ${year}: ${records.length} NY records → ${nyc.length} NYC tract rows`);
 
   const out: CommunityRow[] = [];
   for (const r of nyc) {
@@ -53,12 +56,12 @@ async function processIndicator(ind: IndicatorRegistryEntry): Promise<CommunityR
     out.push({
       area_id: geoid,
       geo_layer: 'tract',
-      year: ACS_YEAR,
+      year,
       indicator_id: ind.id,
       value_num: v.value_num,
       value_text: v.value_text,
       label: v.label,
-      source_year: ACS_YEAR,
+      source_year: year,
     });
   }
   return out;
@@ -163,17 +166,36 @@ async function upsertRows(rows: CommunityRow[]): Promise<void> {
 
 async function main(): Promise<void> {
   const indicators = activeAcsIndicators();
-  console.log(`[etl:acs] processing ${indicators.length} ACS indicators for year ${ACS_YEAR}`);
+  console.log(
+    `[etl:acs] processing ${indicators.length} ACS indicators × ${ACS_YEARS.length} vintages`,
+  );
 
-  for (const ind of indicators) {
-    const rows = await processIndicator(ind);
-    await upsertRows(rows);
-    const nonNull = rows.filter((r) => r.value_num != null || r.value_text != null).length;
-    await recordFinding('indicator_loaded', ind.id, {
-      rows_inserted: rows.length,
-      rows_with_value: nonNull,
-      acs_year: ACS_YEAR,
-    });
+  // Outer loop: year. Inner loop: indicator. A per-(indicator,year) failure is
+  // logged as a finding and the run continues — the 2020 5-yr release in
+  // particular has table suppressions that would otherwise abort the ETL.
+  for (const year of ACS_YEARS) {
+    console.log(`[etl:acs] === vintage ${year} ===`);
+    for (const ind of indicators) {
+      try {
+        const rows = await processIndicator(ind, year);
+        await upsertRows(rows);
+        const nonNull = rows.filter((r) => r.value_num != null || r.value_text != null).length;
+        await recordFinding('indicator_loaded', `${ind.id}@${year}`, {
+          rows_inserted: rows.length,
+          rows_with_value: nonNull,
+          acs_year: year,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[etl:acs] ${ind.id} @ ${year}: FAILED — ${message}`);
+        await recordFinding('indicator_loaded', `${ind.id}@${year}`, {
+          rows_inserted: 0,
+          rows_with_value: 0,
+          acs_year: year,
+          fetch_error: message,
+        });
+      }
+    }
   }
   console.log('[etl:acs] done.');
 }

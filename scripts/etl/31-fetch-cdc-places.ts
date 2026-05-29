@@ -12,7 +12,7 @@
 import { bulkUpsert } from '../lib/db.js';
 import { fetchCdcPlaces, type CdcPlacesRow } from '../lib/cdc.js';
 import { recordFinding } from '../lib/findings.js';
-import { activeCdcIndicators, CDC_PLACES_YEAR_DEFAULT } from '../../src/registry/indicators.js';
+import { activeCdcIndicators } from '../../src/registry/indicators.js';
 import type { CdcPlacesSource, IndicatorRegistryEntry } from '../../src/registry/types.js';
 import { NYC_COUNTY_FIPS } from '../../src/registry/geographies.js';
 
@@ -29,39 +29,50 @@ async function processIndicator(ind: IndicatorRegistryEntry): Promise<void> {
   const src = ind.source as CdcPlacesSource;
   const all = await fetchCdcPlaces({ resource: src.resource, measureId: src.measure_id });
   const rows = nycOnly(all);
-  const releaseYear =
-    rows.length > 0 ? rows[0]!.year ?? CDC_PLACES_YEAR_DEFAULT : CDC_PLACES_YEAR_DEFAULT;
 
+  // The PLACES feed packs ALL release years in one response. Group by the
+  // row's own `year` column so we land each vintage under its true tag —
+  // exactly what the Phase 4 slider's calendar-year mapping queries against.
+  const byYear = new Map<string, CdcPlacesRow[]>();
+  for (const r of rows) {
+    const y = r.year?.trim();
+    if (!y) continue;
+    const list = byYear.get(y) ?? [];
+    list.push(r);
+    byYear.set(y, list);
+  }
   console.log(
-    `[etl:cdc] ${ind.id}: ${all.length} NY rows → ${rows.length} NYC tract rows (year ${releaseYear})`,
+    `[etl:cdc] ${ind.id}: ${all.length} NY rows → ${rows.length} NYC tract rows across ${byYear.size} year(s) [${[...byYear.keys()].sort().join(', ')}]`,
   );
 
-  let nonNull = 0;
-  const toInsert: unknown[][] = [];
-  for (const r of rows) {
-    const geoid = r.locationname?.trim();
-    if (!geoid) continue;
-    const value = r.data_value != null && r.data_value !== '' ? Number(r.data_value) : null;
-    const value_num = value != null && Number.isFinite(value) ? value : null;
-    if (value_num != null) nonNull++;
-    const label =
-      value_num == null ? null : `${value_num.toFixed(1)}% ${r.short_question_text ?? r.measure}`;
-    toInsert.push([geoid, 'tract', releaseYear, ind.id, value_num, null, label, r.year]);
+  for (const [year, yearRows] of byYear) {
+    let nonNull = 0;
+    const toInsert: unknown[][] = [];
+    for (const r of yearRows) {
+      const geoid = r.locationname?.trim();
+      if (!geoid) continue;
+      const value = r.data_value != null && r.data_value !== '' ? Number(r.data_value) : null;
+      const value_num = value != null && Number.isFinite(value) ? value : null;
+      if (value_num != null) nonNull++;
+      const label =
+        value_num == null ? null : `${value_num.toFixed(1)}% ${r.short_question_text ?? r.measure}`;
+      toInsert.push([geoid, 'tract', year, ind.id, value_num, null, label, year]);
+    }
+
+    const inserted = await bulkUpsert({
+      table: 'community_indicator_values',
+      columns: ['area_id', 'geo_layer', 'year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
+      rows: toInsert,
+      conflictKeys: ['area_id', 'geo_layer', 'indicator_id', 'year'],
+    });
+
+    await recordFinding('indicator_loaded', `${ind.id}@${year}`, {
+      rows_inserted: inserted,
+      rows_with_value: nonNull,
+      cdc_year: year,
+      measure_id: src.measure_id,
+    });
   }
-
-  const inserted = await bulkUpsert({
-    table: 'community_indicator_values',
-    columns: ['area_id', 'geo_layer', 'year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
-    rows: toInsert,
-    conflictKeys: ['area_id', 'geo_layer', 'indicator_id', 'year'],
-  });
-
-  await recordFinding('indicator_loaded', ind.id, {
-    rows_inserted: inserted,
-    rows_with_value: nonNull,
-    cdc_year: releaseYear,
-    measure_id: src.measure_id,
-  });
 }
 
 async function main(): Promise<void> {
