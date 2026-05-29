@@ -1,0 +1,61 @@
+/**
+ * Client-side fetchers — the only path the React components use to read data.
+ * Components must NOT fetch CSVs or external APIs directly (spec §11.1).
+ */
+
+import type {
+  CommunityResponse,
+  GeographiesResponse,
+  IndicatorsResponse,
+  PwcResponse,
+  SchoolsMasterResponse,
+  SchoolsResponse,
+} from './types';
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${res.statusText} ${detail}`);
+  }
+  return (await res.json()) as T;
+}
+
+export function fetchIndicators(): Promise<IndicatorsResponse> {
+  return getJson<IndicatorsResponse>('/api/indicators');
+}
+
+export function fetchSchoolFeatures(
+  indicatorId: string,
+  year: string,
+): Promise<SchoolsResponse> {
+  return getJson<SchoolsResponse>(
+    `/api/schools?indicator=${encodeURIComponent(indicatorId)}&year=${encodeURIComponent(year)}`,
+  );
+}
+
+export function fetchCommunityValues(
+  indicatorId: string,
+  year: string,
+): Promise<CommunityResponse> {
+  return getJson<CommunityResponse>(
+    `/api/community?indicator=${encodeURIComponent(indicatorId)}&year=${encodeURIComponent(year)}`,
+  );
+}
+
+export async function fetchTractGeoJsonUrl(): Promise<string> {
+  const { url } = await getJson<{ url: string }>('/api/geo/tracts');
+  return url;
+}
+
+export function fetchPwcMembership(year: string): Promise<PwcResponse> {
+  return getJson<PwcResponse>(`/api/pwc?year=${encodeURIComponent(year)}`);
+}
+
+export function fetchSchoolsMaster(): Promise<SchoolsMasterResponse> {
+  return getJson<SchoolsMasterResponse>('/api/schools-master');
+}
+
+export function fetchGeographies(): Promise<GeographiesResponse> {
+  return getJson<GeographiesResponse>('/api/geographies');
+}

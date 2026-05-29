@@ -17,7 +17,7 @@
  * `school_year` (cohort 2012 → 2015-16, etc.).
  */
 
-import type { IndicatorRegistryEntry } from './types.js';
+import type { IndicatorRegistryEntry } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* School indicators — hosted, point layer                                    */
@@ -301,8 +301,14 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
  */
 export const ACS_YEAR = '2023';
 
-/** CDC PLACES release year — refreshed annually; populated by the fetch script. */
-export const CDC_PLACES_YEAR_DEFAULT = '2024';
+/**
+ * CDC PLACES release year — refreshed annually; populated by the fetch script.
+ * The 2024 release (data through 2022) tags rows with `year='2023'`, which is
+ * what `etl:cdc` lands under in Neon. The registry must match what's on disk;
+ * otherwise the UI's "latest year" lookup misses every CDC indicator. Bump
+ * when a new PLACES vintage is fetched.
+ */
+export const CDC_PLACES_YEAR_DEFAULT = '2023';
 
 const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
   {

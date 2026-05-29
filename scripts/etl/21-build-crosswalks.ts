@@ -1,20 +1,29 @@
 /**
  * ETL 21 — build school↔geography crosswalks in PostGIS.
  *
- * Required by Phase 0 acceptance tests:
- *   - school_district (used by §5.6 aggregation toggle)
- *   - nta_2020       (used by §5.6 aggregation toggle)
+ * Layers:
+ *   - school_district + nta_2020       (Phase 0 — used by §5.6 aggregation toggle)
+ *   - county, senate, assembly,
+ *     council, community_district      (Phase 3 — used by the §6.1 Geo filter)
  *
- * Implemented as a single ST_Within insert per layer. The table is general by
- * `geo_layer`, so when later phases enable Council / Assembly / Senate /
- * Community District / Congressional / NDA, we drop them into the same loop
- * with zero DDL.
+ * One ST_Within insert per layer; the table is general by `geo_layer`.
+ * Re-runnable: each layer's rows are deleted + repopulated.
  */
 
 import { db } from '../lib/db.js';
 import { recordFinding } from '../lib/findings.js';
 
-const PHASE0_LAYERS = ['school_district', 'nta_2020'] as const;
+const CROSSWALK_LAYERS = [
+  // Phase 0
+  'school_district',
+  'nta_2020',
+  // Phase 3 — §6.1 Geo filter (Counties, Senate, Assembly, Council, School Dist, Community Dist)
+  'county',
+  'senate',
+  'assembly',
+  'council',
+  'community_district',
+] as const;
 
 async function buildOne(layer: string): Promise<void> {
   const sql = db();
@@ -62,7 +71,7 @@ async function buildOne(layer: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  for (const layer of PHASE0_LAYERS) {
+  for (const layer of CROSSWALK_LAYERS) {
     await buildOne(layer);
   }
   console.log('[etl:crosswalks] done.');

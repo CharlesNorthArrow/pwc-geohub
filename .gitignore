@@ -11,5 +11,9 @@ dist/
 *.log
 .DS_Store
 
+# Next.js
+.next/
+tsconfig.tsbuildinfo
+
 .vercel
 .env*.local

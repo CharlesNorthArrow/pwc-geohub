@@ -91,6 +91,12 @@ async function persistLayer(
       for (const k of layer.passthrough_fields) attributes[k] = props[k] ?? null;
     }
 
+    // ST_MakeValid handles a well-known ArcGIS quirk: the `f=geojson` endpoint
+    // sometimes flattens multi-component polygons (e.g. NYC Council 42's
+    // disjoint Brooklyn pieces) into a single Polygon with multiple outer rings,
+    // which is invalid GeoJSON. ST_GeomFromGeoJSON parses it as outer+holes,
+    // producing a self-intersecting geometry whose envelope shrinks to a few
+    // square meters. ST_MakeValid splits it back into a clean MultiPolygon.
     await sql`
       INSERT INTO geographies (geo_layer, area_id, label, attributes, geom, fetched_at)
       VALUES (
@@ -98,7 +104,7 @@ async function persistLayer(
         ${String(id)},
         ${label != null ? String(label) : null},
         ${JSON.stringify(attributes)}::jsonb,
-        ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(${mpJson}), 4326)),
+        ST_Multi(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${mpJson}), 4326))),
         now()
       )
       ON CONFLICT (geo_layer, area_id) DO UPDATE SET

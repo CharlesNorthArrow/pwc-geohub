@@ -11,17 +11,26 @@
     "etl:pwc": "tsx scripts/etl/12-load-pwc-schools.ts",
     "etl:geos": "tsx scripts/etl/20-fetch-geographies.ts",
     "etl:crosswalks": "tsx scripts/etl/21-build-crosswalks.ts",
+    "etl:tracts": "tsx scripts/etl/22-fetch-tracts.ts",
     "etl:acs": "tsx scripts/etl/30-fetch-acs.ts",
     "etl:cdc": "tsx scripts/etl/31-fetch-cdc-places.ts",
     "etl:report": "tsx scripts/etl/90-data-quality-report.ts",
-    "etl:all": "npm run etl:init && npm run etl:schools && npm run etl:indicators && npm run etl:pwc && npm run etl:geos && npm run etl:crosswalks && npm run etl:acs && npm run etl:cdc && npm run etl:report",
+    "etl:all": "npm run etl:init && npm run etl:schools && npm run etl:indicators && npm run etl:pwc && npm run etl:geos && npm run etl:crosswalks && npm run etl:tracts && npm run etl:acs && npm run etl:cdc && npm run etl:report",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
     "@vercel/blob": "^2.4.0",
     "csv-parse": "^5.5.6",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "maplibre-gl": "^5.24.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
