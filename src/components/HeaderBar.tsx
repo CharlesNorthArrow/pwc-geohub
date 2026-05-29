@@ -8,6 +8,8 @@ import {
   GEO_FILTER_LAYERS,
   type GeographiesResponse,
   type GeoFilterLayerId,
+  type PwcHistoryResponse,
+  type PwcMember,
   type SchoolMaster,
 } from '../contract/types';
 import { useHubStore, type SchoolType } from '../store/useHubStore';
@@ -17,6 +19,7 @@ interface Props {
   geographies: GeographiesResponse | null;
   schoolsMaster: SchoolMaster[];
   universe: FilteredUniverse;
+  pwcHistory: PwcHistoryResponse | null;
 }
 
 const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> = [
@@ -31,7 +34,7 @@ const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> =
  * Geo → School Type → Cohort → School; every dropdown reads its options
  * from the same `applyFilters` selector so the pre-filter notes stay honest.
  */
-export default function HeaderBar({ geographies, schoolsMaster, universe }: Props): React.JSX.Element {
+export default function HeaderBar({ geographies, schoolsMaster, universe, pwcHistory }: Props): React.JSX.Element {
   const geoFilters = useHubStore((s) => s.geoFilters);
   const setGeoFilters = useHubStore((s) => s.setGeoFilters);
   const clearGeoFilters = useHubStore((s) => s.clearGeoFilters);
@@ -43,6 +46,27 @@ export default function HeaderBar({ geographies, schoolsMaster, universe }: Prop
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
 
   const [geoOpen, setGeoOpen] = useState(false);
+
+  /* -------------------- Latest-year PWC membership -------------------- */
+  // The Geo dialog shows a "Matched PWC schools (latest year)" column. Per
+  // CLAUDE.md the PWC panel runs through 2025-26 (one year past public data),
+  // so we pick the lexicographically max key from the history snapshot —
+  // robust to whatever vintages have been ingested.
+  const latestPwc: PwcMember[] = useMemo(() => {
+    if (!pwcHistory) return [];
+    const years = Object.keys(pwcHistory.byYear);
+    if (years.length === 0) return [];
+    years.sort();
+    const latest = years[years.length - 1];
+    return latest ? pwcHistory.byYear[latest] ?? [] : [];
+  }, [pwcHistory]);
+  const latestPwcYear: string | null = useMemo(() => {
+    if (!pwcHistory) return null;
+    const years = Object.keys(pwcHistory.byYear);
+    if (years.length === 0) return null;
+    years.sort();
+    return years[years.length - 1] ?? null;
+  }, [pwcHistory]);
 
   /* -------------------- Geo summary -------------------- */
   const geoSummary = useMemo(() => {
@@ -198,6 +222,8 @@ export default function HeaderBar({ geographies, schoolsMaster, universe }: Prop
         open={geoOpen}
         geographies={geographies}
         schoolsMaster={schoolsMaster}
+        pwcMembers={latestPwc}
+        pwcYear={latestPwcYear}
         initial={geoFilters}
         onCancel={() => setGeoOpen(false)}
         onApply={(next) => {

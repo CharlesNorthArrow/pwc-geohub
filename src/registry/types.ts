@@ -84,6 +84,12 @@ export interface IndicatorRegistryEntry {
   short_label?: string;
   description?: string;
   source: IndicatorSource;
+  /** Human-friendly upstream provider — surfaced in the info-icon tooltip in
+   *  place of the technical `source_description`. Pulled from the Public Data
+   *  Wishlist (column F) for school indicators. */
+  data_source?: string;
+  /** Optional canonical landing page for the upstream source. */
+  data_source_url?: string;
   format: Format;
   scale: IndicatorScale;
   geometry: Geometry;

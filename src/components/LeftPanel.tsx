@@ -3,7 +3,6 @@
 import IndicatorSelector from './IndicatorSelector';
 import Legend from './Legend';
 import Logo from './Logo';
-import YearBadge from './YearBadge';
 import NoDataNotice from './NoDataNotice';
 import type { IndicatorPublic } from '../contract/types';
 
@@ -38,92 +37,77 @@ export default function LeftPanel({
   return (
     <aside
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        padding: 12,
-        borderRight: '1px solid #e5e9ee',
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr',
         background: '#f2f8ee',
-        overflowY: 'auto',
+        borderRight: '1px solid #e5e9ee',
         minHeight: 0,
       }}
     >
-      {/* Logo — top of panel, larger, no subtitle. */}
-      <header style={{ paddingBottom: 8, borderBottom: '1px solid #dde4ea' }}>
-        <Logo />
-      </header>
+      {/* Logo — pinned (outside the scroll region). */}
+      <Logo />
 
-      {/* Indicators — no section title; the two family headers inside the
-       *  selector are already self-explanatory. */}
-      <IndicatorSelector indicators={indicators} />
+      {/* Scrollable content */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          padding: 12,
+          overflowY: 'auto',
+          minHeight: 0,
+        }}
+      >
+        {/* Indicators — no section title; the two family headers inside the
+         *  selector are already self-explanatory. */}
+        <IndicatorSelector indicators={indicators} />
 
-      {/* Legend — visually separated from Indicators */}
-      <SectionDivider />
-      <section>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            gap: 8,
-            marginBottom: 6,
-          }}
-        >
-          <span
+        {/* Legend — visually separated from Indicators */}
+        <SectionDivider />
+        <section>
+          <div
             style={{
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: 0.6,
               textTransform: 'uppercase',
               color: '#002040',
+              marginBottom: 8,
             }}
           >
             Legend
-          </span>
-          {schoolIndicator || communityIndicator ? (
-            <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-              {schoolIndicator ? (
-                <YearBadge
-                  family="school"
-                  indicator={schoolIndicator}
-                  displayYear={schoolYear}
-                  sliderYear={sliderYear}
-                />
-              ) : null}
-              {communityIndicator ? (
-                <YearBadge
-                  family="community"
-                  indicator={communityIndicator}
-                  displayYear={communityYear}
-                  sliderYear={sliderYear}
-                />
-              ) : null}
-            </span>
-          ) : null}
-        </div>
-        <Legend
-          schoolIndicator={schoolNoData ? null : schoolIndicator}
-          schoolDomain={schoolDomain}
-          communityIndicator={communityNoData ? null : communityIndicator}
-          communityDomain={communityDomain}
-        />
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {schoolNoData && schoolIndicator ? (
-            <NoDataNotice
-              family="school"
-              indicatorLabel={schoolIndicator.label}
-              year={sliderYear}
-            />
-          ) : null}
-          {communityNoData && communityIndicator ? (
-            <NoDataNotice
-              family="community"
-              indicatorLabel={communityIndicator.label}
-              year={sliderYear}
-            />
-          ) : null}
-        </div>
-      </section>
+          </div>
+          <Legend
+            // Always pass the indicator itself — the legend renders the title
+            // and falls back to "No values in range" when the domain is null
+            // (the no-data case). The NoDataNotice below the legend is the
+            // explicit surface for "no YYYY-YY data".
+            schoolIndicator={schoolIndicator}
+            schoolDomain={schoolDomain}
+            schoolYear={schoolYear}
+            communityIndicator={communityIndicator}
+            communityDomain={communityDomain}
+            communityYear={communityYear}
+            sliderYear={sliderYear}
+          />
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {schoolNoData && schoolIndicator ? (
+              <NoDataNotice
+                family="school"
+                indicatorLabel={schoolIndicator.label}
+                year={sliderYear}
+              />
+            ) : null}
+            {communityNoData && communityIndicator ? (
+              <NoDataNotice
+                family="community"
+                indicatorLabel={communityIndicator.label}
+                year={sliderYear}
+              />
+            ) : null}
+          </div>
+        </section>
+      </div>
     </aside>
   );
 }

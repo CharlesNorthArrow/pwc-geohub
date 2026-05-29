@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useHubStore } from '../store/useHubStore';
 import type { IndicatorPublic } from '../contract/types';
+import { SCHOOL_THEME_ORDER } from '../registry/indicators';
 
 /**
  * Spec §3.1 hard rule: at most one school indicator AND one community
@@ -30,12 +31,14 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         title="School indicators"
         items={school}
         activeId={activeSchool}
+        themeOrder={SCHOOL_THEME_ORDER}
         onPick={(id) => setSchool(activeSchool === id ? null : id)}
       />
       <FamilyGroup
         title="Community indicators"
         items={community}
         activeId={activeCommunity}
+        flat
         onPick={(id) => setCommunity(activeCommunity === id ? null : id)}
       />
     </div>
@@ -46,14 +49,22 @@ function FamilyGroup({
   title,
   items,
   activeId,
+  themeOrder,
+  flat = false,
   onPick,
 }: {
   title: string;
   items: IndicatorPublic[];
   activeId: string | null;
+  /** Render indicators as a flat list (no theme headers). */
+  flat?: boolean;
+  /** When set, render themes in this order; otherwise registry order. */
+  themeOrder?: readonly string[];
   onPick: (id: string) => void;
 }): React.JSX.Element {
-  // Group by theme, preserving the registry's theme order.
+  // Group by theme, then apply an explicit order when one is provided. Themes
+  // not listed in `themeOrder` are appended (alphabetical) so a new theme
+  // doesn't quietly disappear before the order constant is updated.
   const byTheme = useMemo(() => {
     const map = new Map<string, IndicatorPublic[]>();
     for (const i of items) {
@@ -61,8 +72,17 @@ function FamilyGroup({
       list.push(i);
       map.set(i.theme, list);
     }
-    return [...map.entries()];
-  }, [items]);
+    const entries = [...map.entries()];
+    if (!themeOrder) return entries;
+    const orderIdx = new Map(themeOrder.map((t, idx) => [t, idx]));
+    entries.sort(([a], [b]) => {
+      const ai = orderIdx.get(a) ?? Number.POSITIVE_INFINITY;
+      const bi = orderIdx.get(b) ?? Number.POSITIVE_INFINITY;
+      if (ai !== bi) return ai - bi;
+      return a.localeCompare(b);
+    });
+    return entries;
+  }, [items, themeOrder]);
 
   const activeTheme = useMemo(
     () => items.find((i) => i.id === activeId)?.theme ?? null,
@@ -75,10 +95,26 @@ function FamilyGroup({
     () => new Set(activeTheme ? [activeTheme] : []),
   );
 
-  // Keep the active theme open as the user changes indicators.
-  if (activeTheme && !expanded.has(activeTheme)) {
-    setExpanded((prev) => new Set([...prev, activeTheme]));
-  }
+  // Collapse a theme automatically when its indicator gets deselected — the
+  // theme only "stays open by virtue of an active pick" inside it. Manual
+  // expands by the user are preserved (we only collapse on the active→null
+  // transition).
+  const prevActiveTheme = useRef<string | null>(activeTheme);
+  useEffect(() => {
+    const prev = prevActiveTheme.current;
+    if (prev && prev !== activeTheme) {
+      setExpanded((cur) => {
+        if (!cur.has(prev)) return cur;
+        const next = new Set(cur);
+        next.delete(prev);
+        return next;
+      });
+    }
+    if (activeTheme) {
+      setExpanded((cur) => (cur.has(activeTheme) ? cur : new Set([...cur, activeTheme])));
+    }
+    prevActiveTheme.current = activeTheme;
+  }, [activeTheme]);
 
   function toggle(theme: string): void {
     setExpanded((prev) => {
@@ -103,6 +139,19 @@ function FamilyGroup({
       >
         {title}
       </div>
+      {flat ? (
+        // Community indicators render as a flat list — no theme headers.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {items.map((i) => (
+            <IndicatorRow
+              key={i.id}
+              indicator={i}
+              selected={i.id === activeId}
+              onPick={() => onPick(i.id)}
+            />
+          ))}
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {byTheme.map(([theme, list]) => {
           const open = expanded.has(theme);
@@ -132,7 +181,6 @@ function FamilyGroup({
                   {open ? '▼' : '▶'}
                 </span>
                 <span style={{ flex: 1 }}>{theme}</span>
-                <span style={{ fontSize: 10, color: '#a8b3bf' }}>{list.length}</span>
               </button>
               {open ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 14 }}>
@@ -150,6 +198,7 @@ function FamilyGroup({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -172,7 +221,8 @@ function IndicatorRow({
         : `${indicator.years[0]} – ${indicator.years[indicator.years.length - 1]}`;
   const tooltip = [
     indicator.label,
-    indicator.source_description,
+    `Source: ${indicator.source_description}`,
+    indicator.source_url ?? null,
     yearSpan ? `Years: ${yearSpan}` : null,
   ]
     .filter(Boolean)
@@ -210,26 +260,53 @@ function IndicatorRow({
       >
         {short}
       </button>
-      <span
-        aria-label={tooltip}
-        title={tooltip}
-        style={{
-          width: 14,
-          height: 14,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '50%',
-          fontSize: 9,
-          fontWeight: 700,
-          border: `1px solid ${selected ? 'rgba(255,255,255,0.6)' : 'rgba(70,124,157,0.45)'}`,
-          color: selected ? 'rgba(255,255,255,0.85)' : '#467c9d',
-          cursor: 'help',
-          userSelect: 'none',
-        }}
-      >
-        i
-      </span>
+      {indicator.source_url ? (
+        <a
+          href={indicator.source_url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={tooltip}
+          title={tooltip}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: 14,
+            height: 14,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            fontSize: 9,
+            fontWeight: 700,
+            border: `1px solid ${selected ? 'rgba(255,255,255,0.6)' : 'rgba(70,124,157,0.45)'}`,
+            color: selected ? 'rgba(255,255,255,0.85)' : '#467c9d',
+            textDecoration: 'none',
+            userSelect: 'none',
+          }}
+        >
+          i
+        </a>
+      ) : (
+        <span
+          aria-label={tooltip}
+          title={tooltip}
+          style={{
+            width: 14,
+            height: 14,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            fontSize: 9,
+            fontWeight: 700,
+            border: `1px solid ${selected ? 'rgba(255,255,255,0.6)' : 'rgba(70,124,157,0.45)'}`,
+            color: selected ? 'rgba(255,255,255,0.85)' : '#467c9d',
+            cursor: 'help',
+            userSelect: 'none',
+          }}
+        >
+          i
+        </span>
+      )}
     </div>
   );
 }

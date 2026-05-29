@@ -27,9 +27,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'arts_ed_score',
     family: 'school',
-    theme: 'Educational Enrichment',
+    theme: 'Student experience',
     label: 'Arts education access (# disciplines, 0–4)',
     short_label: 'Arts education',
+    data_source: 'NYC DOE Annual Arts in Schools Report',
+    data_source_url:
+      'https://sites.google.com/schools.nyc.gov/nycdoe-oasp/nycps-arts-data',
     source: {
       type: 'hosted',
       dataset: 'arts_ed.csv',
@@ -49,9 +52,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'suspension_rate',
     family: 'school',
-    theme: 'Student Demographics & Equity',
+    theme: 'Student experience',
     label: 'Suspension / disciplinary rate (per 100)',
     short_label: 'Suspension rate',
+    data_source: 'NYC DOE Suspension Reports (Local Law 93)',
+    data_source_url:
+      'https://infohub.nyced.org/reports/government-reports/suspension-reports',
     source: {
       type: 'hosted',
       dataset: 'suspensions.csv',
@@ -70,9 +76,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'temp_housing_rate',
     family: 'school',
-    theme: 'Student Demographics & Equity',
+    theme: 'Student need',
     label: '% students in temporary housing',
     short_label: 'Temp housing',
+    data_source: 'NYC DOE Students in Temporary Housing Reports',
+    data_source_url:
+      'https://infohub.nyced.org/reports/government-reports/students-in-temporary-housing-reports',
     source: {
       type: 'hosted',
       dataset: 'temp_housing.csv',
@@ -90,9 +99,11 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'math_proficiency',
     family: 'school',
-    theme: 'Academic Outcomes',
+    theme: 'Student outcomes',
     label: 'Math proficiency (gr 3–8, % L3+4)',
     short_label: 'Math proficiency',
+    data_source: 'NYC DOE / NYSED — state test results',
+    data_source_url: 'https://infohub.nyced.org/reports/academics/test-results',
     source: {
       type: 'hosted',
       dataset: 'math.csv',
@@ -111,9 +122,11 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'ela_proficiency',
     family: 'school',
-    theme: 'Academic Outcomes',
+    theme: 'Student outcomes',
     label: 'ELA proficiency (gr 3–8, % L3+4)',
     short_label: 'ELA proficiency',
+    data_source: 'NYC DOE / NYSED — state test results',
+    data_source_url: 'https://infohub.nyced.org/reports/academics/test-results',
     source: {
       type: 'hosted',
       dataset: 'ela.csv',
@@ -131,9 +144,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'chronic_absent_rate',
     family: 'school',
-    theme: 'Academic Outcomes',
+    theme: 'Student outcomes',
     label: 'Chronic absenteeism rate',
     short_label: 'Chronic absenteeism',
+    data_source: 'NYC DOE — End-of-Year Attendance & Chronic Absenteeism',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/information-and-data-overview/end-of-year-attendance-and-chronic-absenteeism-data',
     source: {
       type: 'hosted',
       dataset: 'chronic_absenteeism.csv',
@@ -151,9 +167,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'graduation_rate',
     family: 'school',
-    theme: 'Academic Outcomes',
+    theme: 'Student outcomes',
     label: '4-yr HS graduation rate',
     short_label: 'HS graduation',
+    data_source: 'NYC DOE Graduation Results',
+    data_source_url:
+      'https://infohub.nyced.org/reports/academics/graduation-results',
     source: {
       type: 'hosted',
       dataset: 'graduation.csv',
@@ -174,9 +193,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'safety_climate',
     family: 'school',
-    theme: 'Strengthening Support Network',
+    theme: 'Student experience',
     label: 'Safety & school climate (% positive)',
     short_label: 'Safety & climate',
+    data_source: 'NYC DOE School Quality Reports — Citywide Results',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources/school-quality-reports-citywide-results',
     source: {
       type: 'hosted',
       dataset: 'school_quality.csv',
@@ -198,9 +220,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'family_q36_satisfied',
     family: 'school',
-    theme: 'Strengthening Support Network',
+    theme: 'Staff & school culture',
     label: 'Family satisfaction with education (q36)',
     short_label: 'Family satisfaction',
+    data_source: 'NYC School Survey — Family Data File',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
     source: {
       type: 'hosted',
       dataset: 'family_survey.csv',
@@ -218,9 +243,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q120_supports',
     family: 'school',
-    theme: 'Strengthening Support Network',
+    theme: 'Staff & school culture',
     label: 'Teacher: access to behavioral supports (q120)',
     short_label: 'Teacher: supports access',
+    data_source: 'NYC School Survey — Teacher Data File',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
     source: {
       type: 'hosted',
       dataset: 'teacher_survey.csv',
@@ -238,9 +266,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'student_q20_mental_health',
     family: 'school',
-    theme: 'Health',
+    theme: 'Student experience',
     label: 'Student: knows where to go for mental-health support (q20)',
     short_label: 'Student: MH support',
+    data_source: 'NYC School Survey — Student Data File',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
     source: {
       type: 'hosted',
       dataset: 'student_survey.csv',
@@ -258,9 +289,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'student_q22_felt_happy',
     family: 'school',
-    theme: 'Health',
+    theme: 'Student experience',
     label: 'Student: felt happy at school (q22)',
     short_label: 'Student: felt happy',
+    data_source: 'NYC School Survey — Student Data File',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
     source: {
       type: 'hosted',
       dataset: 'student_survey.csv',
@@ -280,9 +314,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q119_disruptive_sel',
     family: 'school',
-    theme: 'Strengthening Support Network',
+    theme: 'Staff & school culture',
     label: 'Teacher: recognizes disruptive behavior as SEL opportunity (q119)',
     short_label: 'Teacher: SEL view',
+    data_source: 'NYC School Survey — Teacher Data File',
+    data_source_url:
+      'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
     source: {
       type: 'hosted',
       dataset: 'teacher_survey.csv',
@@ -542,6 +579,18 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
 export const INDICATORS: readonly IndicatorRegistryEntry[] = [
   ...SCHOOL_INDICATORS,
   ...COMMUNITY_INDICATORS,
+];
+
+/**
+ * Canonical display order for the four school-indicator themes. The selector
+ * renders headers in this order; indicators whose theme isn't listed appear
+ * at the end. Edit here to reorder the panel without touching component code.
+ */
+export const SCHOOL_THEME_ORDER: readonly string[] = [
+  'Student outcomes',
+  'Student experience',
+  'Student need',
+  'Staff & school culture',
 ];
 
 export const indicatorsById: ReadonlyMap<string, IndicatorRegistryEntry> = new Map(

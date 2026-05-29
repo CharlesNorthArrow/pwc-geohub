@@ -60,6 +60,11 @@ export interface HubState {
   /** Spec §2 — right panel is open by default, collapsible. */
   rightPanelCollapsed: boolean;
 
+  /** When BOTH a school and a community indicator are active, which one the
+   *  Analytics panel should focus on. When only one family is active this
+   *  preference is ignored (effective family is forced to whichever exists). */
+  analyticsFamily: 'school' | 'community';
+
   setSchoolIndicator: (id: string | null) => void;
   setCommunityIndicator: (id: string | null) => void;
   setYear: (year: SliderYear) => void;
@@ -70,6 +75,7 @@ export interface HubState {
   setSelectedSchool: (dbn: string | null) => void;
   setAggregationArea: (a: AggregationArea) => void;
   setRightPanelCollapsed: (collapsed: boolean) => void;
+  setAnalyticsFamily: (f: 'school' | 'community') => void;
 }
 
 export const useHubStore = create<HubState>((set) => ({
@@ -82,6 +88,7 @@ export const useHubStore = create<HubState>((set) => ({
   selectedSchoolDbn: null,
   aggregationArea: 'school_district',
   rightPanelCollapsed: false,
+  analyticsFamily: 'school',
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
   setYear: (year) => set({ year }),
@@ -92,4 +99,5 @@ export const useHubStore = create<HubState>((set) => ({
   setSelectedSchool: (dbn) => set({ selectedSchoolDbn: dbn }),
   setAggregationArea: (a) => set({ aggregationArea: a }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
+  setAnalyticsFamily: (f) => set({ analyticsFamily: f }),
 }));

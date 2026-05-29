@@ -18,6 +18,14 @@ interface Props {
   year: string;
   /** True when the active indicator is community → show aggregation toggle. */
   showAggregationToggle: boolean;
+  /** True only when BOTH a school and a community indicator are active —
+   *  show a 2-way switch so the user can pick which one drives the panel. */
+  showFamilyToggle: boolean;
+  /** Current effective analytics family. */
+  familyToggleValue: 'school' | 'community';
+  /** Labels for the toggle buttons (skipped when the family isn't active). */
+  schoolIndicatorLabel: string | null;
+  communityIndicatorLabel: string | null;
 }
 
 /**
@@ -34,9 +42,14 @@ export default function RightPanel({
   schoolsMaster,
   year,
   showAggregationToggle,
+  showFamilyToggle,
+  familyToggleValue,
+  schoolIndicatorLabel,
+  communityIndicatorLabel,
 }: Props): React.JSX.Element {
   const collapsed = useHubStore((s) => s.rightPanelCollapsed);
   const setCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
+  const setAnalyticsFamily = useHubStore((s) => s.setAnalyticsFamily);
 
   if (collapsed) {
     return (
@@ -126,6 +139,15 @@ export default function RightPanel({
         </button>
       </header>
 
+      {showFamilyToggle && schoolIndicatorLabel && communityIndicatorLabel ? (
+        <FamilyToggle
+          value={familyToggleValue}
+          schoolLabel={schoolIndicatorLabel}
+          communityLabel={communityIndicatorLabel}
+          onChange={setAnalyticsFamily}
+        />
+      ) : null}
+
       {showAggregationToggle ? <AggregationToggle /> : null}
 
       {indicator && analytics ? (
@@ -173,5 +195,108 @@ export default function RightPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+/** Segmented control shown when BOTH families are active — lets the user
+ *  pick which one drives the KPIs / timeline / list below. */
+function FamilyToggle({
+  value,
+  schoolLabel,
+  communityLabel,
+  onChange,
+}: {
+  value: 'school' | 'community';
+  schoolLabel: string;
+  communityLabel: string;
+  onChange: (next: 'school' | 'community') => void;
+}): React.JSX.Element {
+  return (
+    <div
+      role="group"
+      aria-label="Analytics focus"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 4,
+        padding: 3,
+        background: '#eef2f6',
+        borderRadius: 6,
+        border: '1px solid #dde4ea',
+      }}
+    >
+      <FamilyToggleButton
+        active={value === 'school'}
+        family="school"
+        label={schoolLabel}
+        onClick={() => onChange('school')}
+      />
+      <FamilyToggleButton
+        active={value === 'community'}
+        family="community"
+        label={communityLabel}
+        onClick={() => onChange('community')}
+      />
+    </div>
+  );
+}
+
+function FamilyToggleButton({
+  active,
+  family,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  family: 'school' | 'community';
+  label: string;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        background: active ? '#027BC0' : 'transparent',
+        color: active ? 'white' : '#002040',
+        border: 'none',
+        padding: '6px 8px',
+        borderRadius: 4,
+        cursor: 'pointer',
+        textAlign: 'left',
+        fontSize: 12,
+        fontWeight: active ? 600 : 500,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 1,
+        minWidth: 0,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 9,
+          letterSpacing: 0.5,
+          textTransform: 'uppercase',
+          opacity: active ? 0.85 : 0.6,
+        }}
+      >
+        {family === 'school' ? 'School' : 'Community'}
+      </span>
+      <span
+        style={{
+          fontSize: 11,
+          lineHeight: 1.2,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          maxWidth: '100%',
+        }}
+        title={label}
+      >
+        {label}
+      </span>
+    </button>
   );
 }

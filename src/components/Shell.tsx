@@ -76,6 +76,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
   const aggregationArea = useHubStore((s) => s.aggregationArea);
   const rightPanelCollapsed = useHubStore((s) => s.rightPanelCollapsed);
+  const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
 
   // One-shot fetches.
   useEffect(() => {
@@ -138,13 +139,12 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     };
   }, [schoolIndicator, schoolYear]);
 
+  // PWC membership follows the slider year — independent of whether a school
+  // indicator is active. This lets the baseline (no-indicator) view still
+  // surface PWC halos.
   useEffect(() => {
-    if (!schoolYear) {
-      setPwcMembers(null);
-      return;
-    }
     let abandoned = false;
-    fetchPwcMembership(schoolYear)
+    fetchPwcMembership(year)
       .then((r) => !abandoned && setPwcMembers(r.members))
       .catch((err) => {
         if (!abandoned) {
@@ -155,7 +155,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     return () => {
       abandoned = true;
     };
-  }, [schoolYear]);
+  }, [year]);
 
   useEffect(() => {
     if (!communityIndicator || !communityYear) {
@@ -223,6 +223,50 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     return { ...schoolData, features };
   }, [schoolData, pwcMembers]);
 
+  /**
+   * Baseline FC: every plottable NYC school as a unicolor point sized by
+   * enrollment, with PWC halos. Used when no school indicator is selected
+   * so the map is never empty — spec §6.6 + UX request "default = unicolor
+   * circles of all schools, with halos".
+   */
+  const baselineSchoolData: SchoolsResponse | null = useMemo(() => {
+    if (!schoolsMaster) return null;
+    const byDbn = new Map(
+      (pwcMembers ?? []).map((m) => [m.dbn, m] as const),
+    );
+    const features: SchoolFeature[] = schoolsMaster.map((s) => {
+      const m = byDbn.get(s.dbn);
+      const isAnchor = m?.category === 'anchor' || m?.category === 'both';
+      const isArts = m?.category === 'healing_arts' || m?.category === 'both';
+      const pwcOther = m?.category === 'pwc_other';
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [s.longitude, s.latitude] },
+        properties: {
+          dbn: s.dbn,
+          school_name: s.school_name,
+          total_enrollment: s.total_enrollment,
+          value_num: null,
+          value_text: null,
+          label: null,
+          is_pwc: Boolean(m),
+          is_anchor: isAnchor,
+          is_arts: isArts,
+          pwc_other: pwcOther,
+          pwc_category: m?.category ?? null,
+          pwc_cohort: m?.cohort ?? null,
+        },
+      };
+    });
+    return {
+      type: 'FeatureCollection',
+      indicator_id: '',
+      year,
+      domain: null,
+      features,
+    };
+  }, [schoolsMaster, pwcMembers, year]);
+
   /* -------------------- Filtered universe (Phase 3) -------------------- */
   // Discovered cohorts: union of `KNOWN_COHORTS` and whatever appears in the
   // current PWC membership snapshot. Drives the cohort dropdown options.
@@ -244,7 +288,23 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   /* -------------------- Phase 5 analytics series -------------------- */
   // Fetch when (active indicator, family, aggArea) changes. For community
   // indicators we re-fetch when the District ↔ NTA toggle moves.
-  const analyticsIndicator: IndicatorPublic | null = schoolIndicator ?? communityIndicator;
+  // When BOTH families are active, honor the user's analytics preference;
+  // otherwise force the family that's actually present so the panel never
+  // ends up "focused" on a family that has no indicator.
+  const bothFamiliesActive = !!schoolIndicator && !!communityIndicator;
+  const effectiveAnalyticsFamily: 'school' | 'community' | null = bothFamiliesActive
+    ? analyticsFamilyPref
+    : schoolIndicator
+      ? 'school'
+      : communityIndicator
+        ? 'community'
+        : null;
+  const analyticsIndicator: IndicatorPublic | null =
+    effectiveAnalyticsFamily === 'school'
+      ? schoolIndicator
+      : effectiveAnalyticsFamily === 'community'
+        ? communityIndicator
+        : null;
   const analyticsAggArea = analyticsIndicator?.family === 'community' ? aggregationArea : null;
   useEffect(() => {
     if (!analyticsIndicator) {
@@ -314,7 +374,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: rightPanelCollapsed ? '260px 1fr 28px' : '260px 1fr minmax(280px, 35%)',
+        gridTemplateColumns: rightPanelCollapsed ? '300px 1fr 28px' : '300px 1fr minmax(224px, 28%)',
         height: '100dvh',
         width: '100vw',
         background: '#fff',
@@ -344,11 +404,18 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           geographies={geographies}
           schoolsMaster={schoolsMaster ?? []}
           universe={universe}
+          pwcHistory={pwcHistory}
         />
         <div style={{ position: 'relative', minHeight: 0 }}>
           <MapView
             schoolIndicator={schoolIndicator}
-            schoolPoints={schoolNoData ? null : enrichedSchoolData}
+            schoolPoints={
+              schoolIndicator
+                ? schoolNoData
+                  ? null
+                  : enrichedSchoolData
+                : baselineSchoolData
+            }
             communityIndicator={communityIndicator}
             communityValues={communityNoData ? null : communityData}
             tractGeoJsonUrl={tractUrl}
@@ -366,6 +433,16 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
         schoolsMaster={schoolsMaster ?? []}
         year={year}
         showAggregationToggle={analyticsIndicator?.family === 'community'}
+        showFamilyToggle={bothFamiliesActive}
+        familyToggleValue={effectiveAnalyticsFamily ?? 'school'}
+        schoolIndicatorLabel={
+          schoolIndicator ? (schoolIndicator.short_label ?? schoolIndicator.label) : null
+        }
+        communityIndicatorLabel={
+          communityIndicator
+            ? (communityIndicator.short_label ?? communityIndicator.label)
+            : null
+        }
       />
 
       <SchoolDetailsStub

@@ -6,6 +6,7 @@ import {
   type GeoArea,
   type GeoFilterLayerId,
   type GeographiesResponse,
+  type PwcMember,
   type SchoolMaster,
 } from '../contract/types';
 import type { GeoFilterMap } from '../store/useHubStore';
@@ -15,6 +16,11 @@ interface Props {
   geographies: GeographiesResponse | null;
   /** Schools universe — used to compute per-area NYC-school counts. */
   schoolsMaster: SchoolMaster[];
+  /** PWC membership for the latest available year — drives the "Matched PWC
+   *  schools" column. Empty array when no PWC snapshot is loaded yet. */
+  pwcMembers: PwcMember[];
+  /** Latest PWC school_year (e.g. "2025-26") for the column header tooltip. */
+  pwcYear: string | null;
   /** Current store value — used to initialize local working state. */
   initial: GeoFilterMap;
   onCancel: () => void;
@@ -31,6 +37,8 @@ export default function GeoFilterDialog({
   open,
   geographies,
   schoolsMaster,
+  pwcMembers,
+  pwcYear,
   initial,
   onCancel,
   onApply,
@@ -39,13 +47,15 @@ export default function GeoFilterDialog({
   const [activeLayer, setActiveLayer] = useState<GeoFilterLayerId>('council');
   const [q, setQ] = useState('');
   /**
-   * Sort key — defaults to district number (numerical), with a click on the
-   * "Matched Schools" column header switching to count-descending. Per-tab
+   * Sort key — defaults to district number (numerical), with a click on a
+   * count column header switching to count-descending. Per-tab
    * (`sortByLayer[activeLayer]`) so flipping between tabs preserves intent.
    * Counties have no district number; we fall back to alphabetical-natural
    * sort there regardless of the chosen mode.
    */
-  const [sortByLayer, setSortByLayer] = useState<Partial<Record<GeoFilterLayerId, 'district' | 'count'>>>({});
+  const [sortByLayer, setSortByLayer] = useState<
+    Partial<Record<GeoFilterLayerId, 'district' | 'count' | 'pwc'>>
+  >({});
   const sortBy = sortByLayer[activeLayer] ?? 'district';
 
   // Per-(layer, area_id) → count of NYC schools in that area. Lets us sort
@@ -72,6 +82,34 @@ export default function GeoFilterDialog({
     return out;
   }, [schoolsMaster]);
 
+  // Per-(layer, area_id) → count of PWC schools (latest available year).
+  // Derived by re-using the school↔geo crosswalk but restricted to the DBN
+  // set in the PWC membership snapshot. "PWC school" here = any active
+  // category — anchor, healing_arts, both, or pwc_other.
+  const pwcCountsByLayer = useMemo(() => {
+    const out: Record<GeoFilterLayerId, Map<string, number>> = {
+      county: new Map(),
+      senate: new Map(),
+      assembly: new Map(),
+      congressional: new Map(),
+      council: new Map(),
+      school_district: new Map(),
+      community_district: new Map(),
+    };
+    if (pwcMembers.length === 0) return out;
+    const pwcDbns = new Set(pwcMembers.map((m) => m.dbn));
+    for (const s of schoolsMaster) {
+      if (!pwcDbns.has(s.dbn)) continue;
+      for (const layer of GEO_FILTER_LAYERS) {
+        const area = s.geos[layer.id];
+        if (!area) continue;
+        const m = out[layer.id];
+        m.set(area, (m.get(area) ?? 0) + 1);
+      }
+    }
+    return out;
+  }, [pwcMembers, schoolsMaster]);
+
   // Reset working state every time the dialog re-opens.
   useEffect(() => {
     if (open) {
@@ -94,6 +132,7 @@ export default function GeoFilterDialog({
   // `if (!open) return null` guard below (Rules of Hooks).
   const layerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
   const layerCounts = countsByLayer[activeLayer];
+  const layerPwcCounts = pwcCountsByLayer[activeLayer];
   // Populated areas first (descending by count); within a tier, natural-numeric
   // sort so "Council 2" lands before "Council 10" instead of after. 0-count
   // options stay pickable at the bottom per the agreed UX.
@@ -124,6 +163,11 @@ export default function GeoFilterDialog({
         const cb = layerCounts.get(b.opt.area_id) ?? 0;
         if (ca !== cb) return cb - ca;
         // count tie → fall through to district-number tiebreak
+      } else if (sortBy === 'pwc') {
+        const pa = layerPwcCounts.get(a.opt.area_id) ?? 0;
+        const pb = layerPwcCounts.get(b.opt.area_id) ?? 0;
+        if (pa !== pb) return pb - pa;
+        // PWC tie → fall through to district-number tiebreak
       }
       // Default mode (or tie-break under count mode): district number first,
       // then natural string compare on the primary label.
@@ -133,7 +177,7 @@ export default function GeoFilterDialog({
       return naturalCollator.compare(a.display.primary, b.display.primary);
     });
     return list;
-  }, [decoratedOptions, layerCounts, naturalCollator, q, sortBy]);
+  }, [decoratedOptions, layerCounts, layerPwcCounts, naturalCollator, q, sortBy]);
 
   if (!open) return null;
 
@@ -146,6 +190,16 @@ export default function GeoFilterDialog({
         ? cur.filter((a) => a !== areaId)
         : [...cur, areaId];
       return { ...prev, [activeLayer]: next };
+    });
+  }
+
+  /** Drop every pick in `layer` — used by the per-tab clear-X affordance. */
+  function clearLayer(layer: GeoFilterLayerId): void {
+    setWorking((prev) => {
+      if (!prev[layer] || prev[layer]!.length === 0) return prev;
+      const next = { ...prev };
+      delete next[layer];
+      return next;
     });
   }
 
@@ -187,22 +241,44 @@ export default function GeoFilterDialog({
       >
         <header
           style={{
-            padding: '12px 16px',
+            padding: '12px 16px 8px',
             borderBottom: '1px solid #eef0f3',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            rowGap: 6,
           }}
         >
           <strong style={{ color: '#002040' }}>Geographies</strong>
           <button
             type="button"
             onClick={onCancel}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18 }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              gridRow: '1 / span 2',
+              alignSelf: 'start',
+            }}
             aria-label="Close"
           >
             ×
           </button>
+          {/* Legend caption — explains the row coloring used in the list. */}
+          <div
+            style={{
+              gridColumn: 1,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 12,
+              fontSize: 11,
+              color: '#467c9d',
+            }}
+          >
+            <LegendKeyDot color="#002040" label="Has NYC schools" />
+            <LegendKeyDot color="#a8b3bf" label="No NYC schools (greyed)" />
+            <LegendKeyDot color="#903090" label="Has PWC schools" />
+          </div>
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', minHeight: 0 }}>
@@ -220,45 +296,81 @@ export default function GeoFilterDialog({
               const n = working[layer.id]?.length ?? 0;
               const active = activeLayer === layer.id;
               return (
-                <button
+                <div
                   key={layer.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveLayer(layer.id);
-                    setQ('');
-                  }}
                   style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '6px 8px',
-                    fontSize: 12,
-                    border: '1px solid transparent',
-                    borderRadius: 4,
-                    background: active ? '#027BC0' : 'transparent',
-                    color: active ? 'white' : '#002040',
-                    cursor: 'pointer',
+                    position: 'relative',
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
                     marginBottom: 2,
                   }}
                 >
-                  <span>{layer.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveLayer(layer.id);
+                      setQ('');
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px 8px',
+                      paddingRight: n > 0 ? 48 : 8,
+                      fontSize: 12,
+                      border: '1px solid transparent',
+                      borderRadius: 4,
+                      background: active ? '#027BC0' : 'transparent',
+                      color: active ? 'white' : '#002040',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>{layer.label}</span>
+                    {n > 0 ? (
+                      <span
+                        style={{
+                          background: active ? 'white' : '#027BC0',
+                          color: active ? '#027BC0' : 'white',
+                          borderRadius: 10,
+                          padding: '0 6px',
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {n}
+                      </span>
+                    ) : null}
+                  </button>
                   {n > 0 ? (
-                    <span
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearLayer(layer.id);
+                      }}
+                      title={`Clear ${layer.label} filters`}
+                      aria-label={`Clear ${layer.label} filters`}
                       style={{
-                        background: active ? 'white' : '#027BC0',
-                        color: active ? '#027BC0' : 'white',
-                        borderRadius: 10,
-                        padding: '0 6px',
-                        fontSize: 10,
-                        fontWeight: 700,
+                        position: 'absolute',
+                        right: 4,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: active ? 'white' : '#467c9d',
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: '2px 4px',
+                        borderRadius: 3,
                       }}
                     >
-                      {n}
-                    </span>
+                      ×
+                    </button>
                   ) : null}
-                </button>
+                </div>
               );
             })}
           </nav>
@@ -281,8 +393,9 @@ export default function GeoFilterDialog({
             />
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto auto',
+                gap: 16,
                 alignItems: 'baseline',
                 padding: '0 4px 4px 4px',
                 fontSize: 10,
@@ -308,6 +421,13 @@ export default function GeoFilterDialog({
                   setSortByLayer((prev) => ({ ...prev, [activeLayer]: 'count' }))
                 }
               />
+              <SortHeader
+                label={pwcYear ? `PWC Schools (${pwcYear})` : 'PWC Schools'}
+                active={sortBy === 'pwc'}
+                onClick={() =>
+                  setSortByLayer((prev) => ({ ...prev, [activeLayer]: 'pwc' }))
+                }
+              />
             </div>
             <div style={{ overflowY: 'auto', minHeight: 0 }}>
               {filteredOptions.length === 0 ? (
@@ -316,14 +436,21 @@ export default function GeoFilterDialog({
               {filteredOptions.map(({ opt, display }) => {
                 const picked = layerPicks.includes(opt.area_id);
                 const count = layerCounts.get(opt.area_id) ?? 0;
+                const pwcCount = layerPwcCounts.get(opt.area_id) ?? 0;
                 const empty = count === 0;
+                const titleParts = [
+                  empty ? 'No NYC schools in this district' : `${count} NYC schools`,
+                  pwcCount > 0
+                    ? `${pwcCount} PWC school${pwcCount === 1 ? '' : 's'}${pwcYear ? ` (${pwcYear})` : ''}`
+                    : null,
+                ].filter(Boolean) as string[];
                 return (
                   <label
                     key={opt.area_id}
-                    title={empty ? 'No NYC schools in this district' : `${count} NYC schools`}
+                    title={titleParts.join(' · ')}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'auto 1fr auto',
+                      gridTemplateColumns: 'auto 1fr auto auto',
                       gap: 8,
                       alignItems: 'center',
                       padding: '3px 4px',
@@ -353,8 +480,27 @@ export default function GeoFilterDialog({
                     >
                       {display.secondary ?? ''}
                     </span>
-                    <span style={{ fontSize: 10, color: empty ? '#c5cdd6' : '#467c9d' }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: empty ? '#c5cdd6' : '#467c9d',
+                        minWidth: 28,
+                        textAlign: 'right',
+                      }}
+                    >
                       ({count})
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        // PWC count colored when non-zero, greyed when zero.
+                        color: pwcCount > 0 ? '#903090' : '#c5cdd6',
+                        fontWeight: pwcCount > 0 ? 600 : 400,
+                        minWidth: 28,
+                        textAlign: 'right',
+                      }}
+                    >
+                      ({pwcCount})
                     </span>
                   </label>
                 );
@@ -399,6 +545,30 @@ export default function GeoFilterDialog({
 
 function labelOf(id: GeoFilterLayerId): string {
   return GEO_FILTER_LAYERS.find((l) => l.id === id)?.label ?? id;
+}
+
+function LegendKeyDot({
+  color,
+  label,
+}: {
+  color: string;
+  label: string;
+}): React.JSX.Element {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span
+        aria-hidden
+        style={{
+          display: 'inline-block',
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: color,
+        }}
+      />
+      <span>{label}</span>
+    </span>
+  );
 }
 
 function SortHeader({

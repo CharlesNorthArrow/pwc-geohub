@@ -40,6 +40,9 @@ import { GEO_FILTER_LAYERS } from '../contract/types';
 /* -------------------------------------------------------------------------- */
 
 function describeSource(i: IndicatorRegistryEntry): string {
+  // Prefer the curated public-facing label from the Public Data Wishlist when
+  // present (school indicators). Falls back to the technical source string.
+  if (i.data_source) return i.data_source;
   switch (i.source.type) {
     case 'hosted':
       return `PWC-hosted: ${i.source.dataset}`;
@@ -71,6 +74,7 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
     geometry: i.geometry === 'point' ? 'point' : 'polygon',
     years: [...i.years],
     source_description: describeSource(i),
+    source_url: i.data_source_url,
   };
 }
 
@@ -292,6 +296,9 @@ interface SchoolMasterRow {
   dbn: string;
   school_name: string | null;
   borough: string | null;
+  longitude: number | null;
+  latitude: number | null;
+  total_enrollment: number | null;
   /** PostGIS array_agg of `geo_layer:area_id` pairs, one per crosswalk hit. */
   geo_pairs: string[] | null;
 }
@@ -309,7 +316,15 @@ interface SchoolMasterRow {
 export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
   const layerIds = GEO_FILTER_LAYERS.map((l) => l.id);
   const rows = await sql<SchoolMasterRow>`
-    SELECT s.dbn, s.school_name, s.borough,
+    SELECT s.dbn, s.school_name, s.borough, s.longitude, s.latitude,
+      -- Latest non-null enrollment across all known school_year rows.
+      (
+        SELECT sy.total_enrollment
+        FROM schools_year sy
+        WHERE sy.dbn = s.dbn AND sy.total_enrollment IS NOT NULL
+        ORDER BY sy.school_year DESC
+        LIMIT 1
+      ) AS total_enrollment,
       ARRAY(
         SELECT c.geo_layer || ':' || c.area_id
         FROM school_geo_crosswalk c
@@ -329,7 +344,17 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
       const area = pair.slice(idx + 1);
       geos[layer] = area;
     }
-    return { dbn: r.dbn, school_name: r.school_name, borough: r.borough, geos };
+    return {
+      dbn: r.dbn,
+      school_name: r.school_name,
+      borough: r.borough,
+      // is_unplottable=false guarantees both coords; assert via Number() so
+      // string-typed numerics from the driver stay typed as number.
+      longitude: Number(r.longitude),
+      latitude: Number(r.latitude),
+      total_enrollment: r.total_enrollment,
+      geos,
+    };
   });
   return { schools };
 }

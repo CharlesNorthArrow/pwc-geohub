@@ -62,18 +62,24 @@ export function colorBinsFor(
   return { type: 'sequential', ramp, edges, format: formatterFor(indicator) };
 }
 
+/** Strip a trailing `.0` so legend brackets read `12%` not `12.0%`, while
+ *  keeping precision when the fractional part is non-zero (`12.5%`). */
+function trim(v: string): string {
+  return v.replace(/\.0+(?=[^\d]|$)/, '');
+}
+
 function formatterFor(indicator: IndicatorPublic): (v: number) => string {
   switch (indicator.format) {
     case 'percent':
     case 'rate_per_100':
-      return (v) => `${v.toFixed(1)}%`;
+      return (v) => `${trim(v.toFixed(1))}%`;
     case 'integer':
     case 'count':
       return (v) => `${Math.round(v)}`;
     case 'index':
-      return (v) => v.toFixed(2);
+      return (v) => trim(v.toFixed(2));
     default:
-      return (v) => v.toFixed(1);
+      return (v) => trim(v.toFixed(1));
   }
 }
 

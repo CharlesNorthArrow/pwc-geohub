@@ -35,6 +35,8 @@ export interface IndicatorPublic {
   /** Human-readable source string for the info icon, e.g.
    *  "PWC-hosted: arts_ed.csv" or "ACS 5-yr: B17001". */
   source_description: string;
+  /** Optional URL to the upstream provider's landing page (when known). */
+  source_url?: string;
 }
 
 /** GET /api/indicators */
@@ -178,6 +180,14 @@ export interface SchoolMaster {
   borough: string | null;
   /** {layer_id → area_id this school belongs to}. Missing key = no crosswalk. */
   geos: Partial<Record<GeoFilterLayerId, string>>;
+  /** Plottable coords from `schools`. Always non-null in the response (the
+   *  query filters unplottable rows out). */
+  longitude: number;
+  latitude: number;
+  /** Most recently observed total_enrollment across `schools_year` rows.
+   *  Null if no year has reported a non-null enrollment. Used to size the
+   *  baseline (no-indicator-selected) circles. */
+  total_enrollment: number | null;
 }
 
 /** GET /api/schools-master → ~1,779 plottable schools. */
