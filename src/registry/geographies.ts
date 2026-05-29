@@ -82,6 +82,10 @@ export const GEO_LAYERS: readonly GeoLayerConfig[] = [
     feature_service_url: ARCGIS.assembly,
     id_field: 'District',
     label_field: 'District',
+    // The NYS Assembly service carries member name + party on each district
+    // feature. We pass those through so the Geo popup can show the rep in
+    // the secondary column alongside the district number.
+    passthrough_fields: ['Name', 'Party'],
   },
   {
     id: 'senate',

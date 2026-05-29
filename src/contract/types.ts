@@ -147,6 +147,10 @@ export const GEO_FILTER_LAYERS: ReadonlyArray<{ id: GeoFilterLayerId; label: str
 export interface GeoArea {
   area_id: string;
   label: string;
+  /** Per-layer extras pulled from the source ArcGIS feature (e.g. Assembly
+   *  Name + Party, Congressional rep). Keys vary by layer; the Geo popup
+   *  picks the ones it knows about. Empty object when nothing extra. */
+  attributes?: Record<string, string | null>;
 }
 
 /** GET /api/geographies → all 6 §6.1 layers in one round-trip. */

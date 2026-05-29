@@ -316,13 +316,16 @@ interface GeoAreaRow {
   geo_layer: GeoFilterLayerId;
   area_id: string;
   label: string | null;
+  attributes: Record<string, string | null> | null;
 }
 
-/** All 6 §6.1 layers + their area options for the Geo popup. */
+/** All §6.1 layers + their area options for the Geo popup. Attributes carry
+ *  per-layer extras (e.g. Assembly Name + Party) when the upstream
+ *  ArcGIS feature exposes them — see `passthrough_fields` in the geo registry. */
 export async function getGeographies(): Promise<GeographiesResponse> {
   const layerIds = GEO_FILTER_LAYERS.map((l) => l.id);
   const rows = await sql<GeoAreaRow>`
-    SELECT geo_layer, area_id, label
+    SELECT geo_layer, area_id, label, attributes
     FROM geographies
     WHERE geo_layer = ANY(${layerIds}::text[])
     ORDER BY geo_layer, label NULLS LAST, area_id
@@ -337,7 +340,11 @@ export async function getGeographies(): Promise<GeographiesResponse> {
     community_district: [],
   };
   for (const r of rows) {
-    layers[r.geo_layer]?.push({ area_id: r.area_id, label: r.label ?? r.area_id });
+    layers[r.geo_layer]?.push({
+      area_id: r.area_id,
+      label: r.label ?? r.area_id,
+      attributes: r.attributes ?? {},
+    });
   }
   return { layers };
 }

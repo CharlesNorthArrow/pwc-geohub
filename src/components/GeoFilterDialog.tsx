@@ -38,6 +38,15 @@ export default function GeoFilterDialog({
   const [working, setWorking] = useState<GeoFilterMap>(initial);
   const [activeLayer, setActiveLayer] = useState<GeoFilterLayerId>('council');
   const [q, setQ] = useState('');
+  /**
+   * Sort key — defaults to district number (numerical), with a click on the
+   * "Matched Districts" column header switching to count-descending. Per-tab
+   * (`sortByLayer[activeLayer]`) so flipping between tabs preserves intent.
+   * Counties have no district number; we fall back to alphabetical-natural
+   * sort there regardless of the chosen mode.
+   */
+  const [sortByLayer, setSortByLayer] = useState<Partial<Record<GeoFilterLayerId, 'district' | 'count'>>>({});
+  const sortBy = sortByLayer[activeLayer] ?? 'district';
 
   // Per-(layer, area_id) → count of NYC schools in that area. Lets us sort
   // populated districts first + grey 0-count ones. The same crosswalk we use
@@ -110,13 +119,21 @@ export default function GeoFilterDialog({
         )
       : decoratedOptions.slice();
     list.sort((a, b) => {
-      const ca = layerCounts.get(a.opt.area_id) ?? 0;
-      const cb = layerCounts.get(b.opt.area_id) ?? 0;
-      if (ca !== cb) return cb - ca;
+      if (sortBy === 'count') {
+        const ca = layerCounts.get(a.opt.area_id) ?? 0;
+        const cb = layerCounts.get(b.opt.area_id) ?? 0;
+        if (ca !== cb) return cb - ca;
+        // count tie → fall through to district-number tiebreak
+      }
+      // Default mode (or tie-break under count mode): district number first,
+      // then natural string compare on the primary label.
+      const da = a.display.districtNum;
+      const db = b.display.districtNum;
+      if (da != null && db != null && da !== db) return da - db;
       return naturalCollator.compare(a.display.primary, b.display.primary);
     });
     return list;
-  }, [decoratedOptions, layerCounts, naturalCollator, q]);
+  }, [decoratedOptions, layerCounts, naturalCollator, q, sortBy]);
 
   if (!open) return null;
 
@@ -277,8 +294,20 @@ export default function GeoFilterDialog({
                 marginBottom: 4,
               }}
             >
-              <span>{labelOf(activeLayer)}</span>
-              <span>Matched Districts</span>
+              <SortHeader
+                label={labelOf(activeLayer)}
+                active={sortBy === 'district'}
+                onClick={() =>
+                  setSortByLayer((prev) => ({ ...prev, [activeLayer]: 'district' }))
+                }
+              />
+              <SortHeader
+                label="Matched Districts"
+                active={sortBy === 'count'}
+                onClick={() =>
+                  setSortByLayer((prev) => ({ ...prev, [activeLayer]: 'count' }))
+                }
+              />
             </div>
             <div style={{ overflowY: 'auto', minHeight: 0 }}>
               {filteredOptions.length === 0 ? (
@@ -372,39 +401,112 @@ function labelOf(id: GeoFilterLayerId): string {
   return GEO_FILTER_LAYERS.find((l) => l.id === id)?.label ?? id;
 }
 
+function SortHeader({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        font: 'inherit',
+        textTransform: 'inherit',
+        letterSpacing: 'inherit',
+        color: active ? '#027BC0' : '#467c9d',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+      }}
+      title={`Sort by ${label.toLowerCase()}`}
+    >
+      <span>{label}</span>
+      <span aria-hidden style={{ fontSize: 8, opacity: active ? 1 : 0.4 }}>▼</span>
+    </button>
+  );
+}
+
 interface AreaDisplay {
   /** Sortable primary string shown leftmost (after the checkbox). */
   primary: string;
-  /** Optional secondary string shown in a subdued middle column. */
+  /** Sortable district number for natural-numeric sort independent of the
+   *  primary string format. Null when the layer isn't district-numeric. */
+  districtNum: number | null;
+  /** Optional secondary string shown in a subdued middle column.
+   *  Currently surfaced for layers whose source carries rep info:
+   *  Congressional (label = rep), Assembly (attributes.Name + Party). */
   secondary: string | null;
 }
 
 /**
- * Per-layer display decomposition. Congressional gets a two-column treatment:
- * district number leads (so the list reads 1, 2, … 26) and the rep name sits
- * to its right as a secondary label that participates in search. Other layers
- * keep the existing label as primary and have no secondary.
- *
- * Congressional `area_id` is STFIPS+CDFIPS — e.g. NY District 13 = '3613'. We
- * peel off the leading state FIPS ('36') to reveal the district number.
+ * Per-layer display decomposition. Every numeric district layer gets a
+ * uniform "District N" primary so the list reads 1, 2, … 26 instead of the
+ * varied raw forms ("State Senate District 1", "1", "3601"). Counties keep
+ * their native label ("Bronx County"). When the source provides a rep name,
+ * it lands in the secondary column and participates in search.
  */
 function displayFor(layer: GeoFilterLayerId, opt: GeoArea): AreaDisplay {
-  if (layer === 'congressional') {
-    const districtNum = stripStateFips(opt.area_id);
-    return {
-      primary: `District ${districtNum}`,
-      secondary: opt.label && opt.label !== opt.area_id ? opt.label : null,
-    };
+  if (layer === 'county') {
+    return { primary: opt.label, districtNum: null, secondary: null };
   }
-  return { primary: opt.label, secondary: null };
+  const districtNum = districtNumberFor(layer, opt);
+  const primary = districtNum != null ? `District ${districtNum}` : opt.label;
+  const secondary = secondaryFor(layer, opt);
+  return { primary, districtNum, secondary };
 }
 
-function stripStateFips(areaId: string): string {
-  // NY congressional area_ids are 4 chars: '36' + 2-digit district. Trim and
-  // parse so '3601' becomes '1', '3613' becomes '13'.
-  const tail = areaId.length > 2 ? areaId.slice(2) : areaId;
-  const n = Number.parseInt(tail, 10);
-  return Number.isFinite(n) ? String(n) : tail;
+function districtNumberFor(layer: GeoFilterLayerId, opt: GeoArea): number | null {
+  switch (layer) {
+    case 'congressional': {
+      // STFIPS+CDFIPS — '3613' → 13.
+      const tail = opt.area_id.length > 2 ? opt.area_id.slice(2) : opt.area_id;
+      const n = Number.parseInt(tail, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    case 'senate': {
+      // Label like "State Senate District 14"; trail-parse the number.
+      const m = /(\d+)\s*$/.exec(opt.label);
+      return m ? Number.parseInt(m[1]!, 10) : null;
+    }
+    case 'assembly':
+    case 'council':
+    case 'school_district':
+    case 'community_district': {
+      // area_id is the district number as a plain digit string.
+      const n = Number.parseInt(opt.area_id, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function secondaryFor(layer: GeoFilterLayerId, opt: GeoArea): string | null {
+  if (layer === 'congressional') {
+    // Congressional source delivers rep name in `label`.
+    const num = districtNumberFor(layer, opt);
+    if (num != null && opt.label && opt.label !== opt.area_id && opt.label !== String(num)) {
+      return opt.label;
+    }
+    return null;
+  }
+  if (layer === 'assembly') {
+    const a = opt.attributes ?? {};
+    const name = a['Name']?.trim();
+    if (!name) return null;
+    const party = a['Party']?.trim();
+    return party ? `${name} (${party})` : name;
+  }
+  return null;
 }
 
 function btnStyle(kind: 'primary' | 'ghost'): React.CSSProperties {
