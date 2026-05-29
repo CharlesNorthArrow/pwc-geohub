@@ -1,7 +1,6 @@
 'use client';
 
 import IndicatorSelector from './IndicatorSelector';
-import InSchoolServicesStub from './InSchoolServicesStub';
 import Legend from './Legend';
 import Logo from './Logo';
 import YearBadge from './YearBadge';
@@ -54,45 +53,60 @@ export default function LeftPanel({
         <Logo />
       </header>
 
-      {/* Indicators */}
-      <Section title="Indicators">
-        <IndicatorSelector indicators={indicators} />
-      </Section>
-
-      {/* PWC entry-point stub */}
-      <InSchoolServicesStub />
+      {/* Indicators — no section title; the two family headers inside the
+       *  selector are already self-explanatory. */}
+      <IndicatorSelector indicators={indicators} />
 
       {/* Legend — visually separated from Indicators */}
       <SectionDivider />
-      <Section title="Legend">
-        {schoolIndicator || communityIndicator ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {schoolIndicator ? (
-              <YearBadge
-                family="school"
-                indicator={schoolIndicator}
-                displayYear={schoolYear}
-                sliderYear={sliderYear}
-              />
-            ) : null}
-            {communityIndicator ? (
-              <YearBadge
-                family="community"
-                indicator={communityIndicator}
-                displayYear={communityYear}
-                sliderYear={sliderYear}
-              />
-            ) : null}
-          </div>
-        ) : null}
-        <div style={{ marginTop: 8 }}>
-          <Legend
-            schoolIndicator={schoolNoData ? null : schoolIndicator}
-            schoolDomain={schoolDomain}
-            communityIndicator={communityNoData ? null : communityIndicator}
-            communityDomain={communityDomain}
-          />
+      <section>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: '#002040',
+            }}
+          >
+            Legend
+          </span>
+          {schoolIndicator || communityIndicator ? (
+            <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+              {schoolIndicator ? (
+                <YearBadge
+                  family="school"
+                  indicator={schoolIndicator}
+                  displayYear={schoolYear}
+                  sliderYear={sliderYear}
+                />
+              ) : null}
+              {communityIndicator ? (
+                <YearBadge
+                  family="community"
+                  indicator={communityIndicator}
+                  displayYear={communityYear}
+                  sliderYear={sliderYear}
+                />
+              ) : null}
+            </span>
+          ) : null}
         </div>
+        <Legend
+          schoolIndicator={schoolNoData ? null : schoolIndicator}
+          schoolDomain={schoolDomain}
+          communityIndicator={communityNoData ? null : communityIndicator}
+          communityDomain={communityDomain}
+        />
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {schoolNoData && schoolIndicator ? (
             <NoDataNotice
@@ -109,35 +123,8 @@ export default function LeftPanel({
             />
           ) : null}
         </div>
-      </Section>
+      </section>
     </aside>
-  );
-}
-
-/** Small consistent section wrapper — heading + body. */
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <section>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: 0.6,
-          textTransform: 'uppercase',
-          color: '#002040',
-          marginBottom: 6,
-        }}
-      >
-        {title}
-      </div>
-      {children}
-    </section>
   );
 }
 
