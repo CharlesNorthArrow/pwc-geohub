@@ -402,7 +402,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       type: 'api',
       provider: 'cdc_places',
       resource: 'cwsq-ngmh',
-      measure_id: 'HOUSING',
+      // PLACES measure id from the SDOH module: "Housing Insecurity".
+      measure_id: 'HOUSINSECU',
       geo: 'tract',
     },
     format: 'percent',

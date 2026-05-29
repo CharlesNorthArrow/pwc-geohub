@@ -1,65 +1,48 @@
 /**
  * Vercel Blob helpers — store cached GeoJSON off the function path (§11.9).
+ *
+ * @vercel/blob v2.x auto-resolves auth in this order:
+ *   1. explicit `token` option
+ *   2. process.env.BLOB_READ_WRITE_TOKEN
+ *   3. OIDC: process.env.VERCEL_OIDC_TOKEN + process.env.BLOB_STORE_ID
+ *
+ * The Marketplace Blob integration provides (3) — no manual token required.
  */
 
 import { put, list, del, type PutBlobResult } from '@vercel/blob';
 
-function requireToken(): string {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
+function ensureAuthEnv(): void {
+  if (
+    !process.env.BLOB_READ_WRITE_TOKEN &&
+    !(process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID)
+  ) {
     throw new Error(
-      'BLOB_READ_WRITE_TOKEN is not set. Provision a Vercel Blob store and run ' +
-        '`vercel env pull .env.local`.',
+      'No Vercel Blob credentials in env. Either BLOB_READ_WRITE_TOKEN or ' +
+        '(VERCEL_OIDC_TOKEN + BLOB_STORE_ID) must be set. Run `vercel env pull .env.local`.',
     );
   }
-  return token;
 }
 
-/**
- * Put a JSON object at a deterministic path. The v0.27 SDK has no
- * `allowOverwrite`, so we delete any existing blobs at this exact path first.
- */
 export async function putGeoJson(
   path: string,
   geojson: unknown,
 ): Promise<PutBlobResult> {
-  const token = requireToken();
-  await deleteExact(path, token);
+  ensureAuthEnv();
   return put(path, JSON.stringify(geojson), {
     access: 'public',
     contentType: 'application/geo+json',
-    addRandomSuffix: false,
-    token,
+    allowOverwrite: true,
   });
 }
 
-async function deleteExact(path: string, token: string): Promise<void> {
-  // The Blob list API is prefix-based; we match the exact pathname.
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix: path, cursor, token });
-    const exact = page.blobs.filter((b) => b.pathname === path);
-    if (exact.length > 0) {
-      await del(
-        exact.map((b) => b.url),
-        { token },
-      );
-    }
-    cursor = page.cursor;
-  } while (cursor);
-}
-
 export async function deleteByPrefix(prefix: string): Promise<number> {
-  const token = requireToken();
+  ensureAuthEnv();
   let total = 0;
   let cursor: string | undefined;
   do {
-    const page = await list({ prefix, cursor, token });
+    const page = await list({ prefix, cursor });
     if (page.blobs.length === 0) break;
-    await del(
-      page.blobs.map((b) => b.url),
-      { token },
-    );
+    await del(page.blobs.map((b) => b.url));
     total += page.blobs.length;
     cursor = page.cursor;
   } while (cursor);
