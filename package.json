@@ -12,6 +12,7 @@
     "etl:geos": "tsx scripts/etl/20-fetch-geographies.ts",
     "etl:crosswalks": "tsx scripts/etl/21-build-crosswalks.ts",
     "etl:tracts": "tsx scripts/etl/22-fetch-tracts.ts",
+    "etl:area-tracts": "tsx scripts/etl/23-build-area-tract-crosswalk.ts",
     "etl:acs": "tsx scripts/etl/30-fetch-acs.ts",
     "etl:cdc": "tsx scripts/etl/31-fetch-cdc-places.ts",
     "etl:report": "tsx scripts/etl/90-data-quality-report.ts",

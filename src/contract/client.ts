@@ -4,10 +4,13 @@
  */
 
 import type {
+  AggregationArea,
+  AnalyticsSeriesResponse,
   CommunityResponse,
   GeographiesResponse,
   GeoSelectionResponse,
   IndicatorsResponse,
+  PwcHistoryResponse,
   PwcResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
@@ -54,12 +57,25 @@ export function fetchPwcMembership(year: string): Promise<PwcResponse> {
   return getJson<PwcResponse>(`/api/pwc?year=${encodeURIComponent(year)}`);
 }
 
+export function fetchPwcHistory(): Promise<PwcHistoryResponse> {
+  return getJson<PwcHistoryResponse>('/api/pwc/history');
+}
+
 export function fetchSchoolsMaster(): Promise<SchoolsMasterResponse> {
   return getJson<SchoolsMasterResponse>('/api/schools-master');
 }
 
 export function fetchGeographies(): Promise<GeographiesResponse> {
   return getJson<GeographiesResponse>('/api/geographies');
+}
+
+export function fetchAnalyticsSeries(
+  indicatorId: string,
+  aggArea: AggregationArea | null,
+): Promise<AnalyticsSeriesResponse> {
+  const params = new URLSearchParams({ indicator: indicatorId });
+  if (aggArea) params.set('aggArea', aggArea);
+  return getJson<AnalyticsSeriesResponse>(`/api/analytics/series?${params.toString()}`);
 }
 
 export function fetchGeoSelection(

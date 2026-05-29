@@ -5,22 +5,27 @@ import { useEffect, useMemo, useState } from 'react';
 import HeaderBar from './HeaderBar';
 import LeftPanel from './LeftPanel';
 import MapView from './MapView';
+import RightPanel from './RightPanel';
 import SchoolDetailsStub from './SchoolDetailsStub';
 import {
+  fetchAnalyticsSeries,
   fetchCommunityValues,
   fetchGeographies,
   fetchGeoSelection,
   fetchIndicators,
+  fetchPwcHistory,
   fetchPwcMembership,
   fetchSchoolFeatures,
   fetchSchoolsMaster,
   fetchTractGeoJsonUrl,
 } from '../contract/client';
 import type {
+  AnalyticsSeriesResponse,
   CommunityResponse,
   GeographiesResponse,
   GeoSelectionResponse,
   IndicatorPublic,
+  PwcHistoryResponse,
   PwcMember,
   SchoolFeature,
   SchoolMaster,
@@ -28,7 +33,8 @@ import type {
 } from '../contract/types';
 import { useHubStore } from '../store/useHubStore';
 import { applyFilters, type FilteredUniverse } from '../store/derived';
-import { isSliderYear, toCommunityYear, type SliderYear } from '../contract/year';
+import { deriveAnalytics, type Analytics } from '../store/analytics';
+import { isSliderYear, SLIDER_YEARS, toCommunityYear, type SliderYear } from '../contract/year';
 
 interface InitialProps {
   initialIndicators: IndicatorPublic[];
@@ -56,6 +62,8 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const [schoolsMaster, setSchoolsMaster] = useState<SchoolMaster[] | null>(null);
   const [geographies, setGeographies] = useState<GeographiesResponse | null>(null);
   const [geoSelection, setGeoSelection] = useState<GeoSelectionResponse | null>(null);
+  const [analyticsSeries, setAnalyticsSeries] = useState<AnalyticsSeriesResponse | null>(null);
+  const [pwcHistory, setPwcHistory] = useState<PwcHistoryResponse | null>(null);
 
   const schoolId = useHubStore((s) => s.activeSchoolIndicator);
   const communityId = useHubStore((s) => s.activeCommunityIndicator);
@@ -66,6 +74,8 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setYear = useHubStore((s) => s.setYear);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
+  const aggregationArea = useHubStore((s) => s.aggregationArea);
+  const rightPanelCollapsed = useHubStore((s) => s.rightPanelCollapsed);
 
   // One-shot fetches.
   useEffect(() => {
@@ -81,6 +91,9 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     fetchGeographies()
       .then(setGeographies)
       .catch((err) => console.warn('[Shell] geographies fetch failed', err));
+    fetchPwcHistory()
+      .then(setPwcHistory)
+      .catch((err) => console.warn('[Shell] pwc history fetch failed', err));
   }, []);
 
   // Hydrate ?year= from URL once on mount. Preserves shareable links and the
@@ -228,6 +241,42 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     });
   }, [geoFilters, schoolType, cohort, schoolsMaster, pwcMembers, allCohorts]);
 
+  /* -------------------- Phase 5 analytics series -------------------- */
+  // Fetch when (active indicator, family, aggArea) changes. For community
+  // indicators we re-fetch when the District ↔ NTA toggle moves.
+  const analyticsIndicator: IndicatorPublic | null = schoolIndicator ?? communityIndicator;
+  const analyticsAggArea = analyticsIndicator?.family === 'community' ? aggregationArea : null;
+  useEffect(() => {
+    if (!analyticsIndicator) {
+      setAnalyticsSeries(null);
+      return;
+    }
+    let abandoned = false;
+    fetchAnalyticsSeries(analyticsIndicator.id, analyticsAggArea)
+      .then((r) => !abandoned && setAnalyticsSeries(r))
+      .catch((err) => {
+        if (!abandoned) {
+          console.warn('[Shell] analytics series fetch failed', err);
+          setAnalyticsSeries(null);
+        }
+      });
+    return () => {
+      abandoned = true;
+    };
+  }, [analyticsIndicator, analyticsAggArea]);
+
+  const analytics: Analytics | null = useMemo(() => {
+    if (!analyticsIndicator || !analyticsSeries || !pwcHistory || !schoolsMaster) return null;
+    return deriveAnalytics({
+      indicator: analyticsIndicator,
+      year,
+      series: analyticsSeries.series,
+      pwcByYear: pwcHistory.byYear,
+      universe,
+      timelineYears: SLIDER_YEARS,
+    });
+  }, [analyticsIndicator, analyticsSeries, pwcHistory, schoolsMaster, year, universe]);
+
   /* -------------------- Selected school + flyTo -------------------- */
   const selectedSchoolCoords = useMemo(() => {
     if (!selectedSchoolDbn || !enrichedSchoolData) return null;
@@ -265,7 +314,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '260px 1fr',
+        gridTemplateColumns: rightPanelCollapsed ? '260px 1fr 28px' : '260px 1fr minmax(280px, 35%)',
         height: '100dvh',
         width: '100vw',
         background: '#fff',
@@ -310,6 +359,14 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           />
         </div>
       </main>
+
+      <RightPanel
+        indicator={analyticsIndicator}
+        analytics={analytics}
+        schoolsMaster={schoolsMaster ?? []}
+        year={year}
+        showAggregationToggle={analyticsIndicator?.family === 'community'}
+      />
 
       <SchoolDetailsStub
         open={detailsOpen && selectedSchoolDbn != null}

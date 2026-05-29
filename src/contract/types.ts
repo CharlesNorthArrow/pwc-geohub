@@ -119,6 +119,12 @@ export interface PwcResponse {
   members: PwcMember[];
 }
 
+/** GET /api/pwc/history → membership per year for the timeline. */
+export interface PwcHistoryResponse {
+  /** `year → members[]`. Year keys mirror `pwc_school_program.school_year`. */
+  byYear: Record<string, PwcMember[]>;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Geo filter + schools-master (Phase 3)                                      */
 /* -------------------------------------------------------------------------- */
@@ -177,6 +183,39 @@ export interface SchoolMaster {
 /** GET /api/schools-master → ~1,779 plottable schools. */
 export interface SchoolsMasterResponse {
   schools: SchoolMaster[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 5 analytics                                                          */
+/* -------------------------------------------------------------------------- */
+
+/** Area definition for the school↔community aggregation toggle (§5.4). */
+export type AggregationArea = 'school_district' | 'nta_2020';
+
+export interface AnalyticsSeriesRow {
+  dbn: string;
+  year: string;     // school_year for school indicators, calendar year for community
+  value_num: number | null;
+  value_text: string | null;
+  label: string | null;
+}
+
+/**
+ * GET /api/analytics/series?indicator=X[&aggArea=…]
+ *
+ * - school indicator → one row per (school, year) from `school_indicator_values`.
+ * - community indicator + aggArea → per-school average of community values
+ *   across tracts intersecting the school's surrounding area (the chosen
+ *   `aggArea` polygon containing the school). Reuses Phase 0/5 crosswalks.
+ *
+ * Empty `series` is a valid response (e.g. community indicator without an
+ * `aggArea` param — the route requires it for community).
+ */
+export interface AnalyticsSeriesResponse {
+  indicator_id: string;
+  family: IndicatorFamily;
+  agg_area: AggregationArea | null;
+  series: AnalyticsSeriesRow[];
 }
 
 /* -------------------------------------------------------------------------- */

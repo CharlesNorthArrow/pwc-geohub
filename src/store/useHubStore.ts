@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { GeoFilterLayerId } from '../contract/types';
+import type { AggregationArea, GeoFilterLayerId } from '../contract/types';
 import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 
 /**
@@ -53,6 +53,13 @@ export interface HubState {
    *  flyTo + opens the School Details View stub. */
   selectedSchoolDbn: string | null;
 
+  /** Spec §5.4 — the polygon definition used for community indicator
+   *  aggregation in the right panel. Default = school_district. */
+  aggregationArea: AggregationArea;
+
+  /** Spec §2 — right panel is open by default, collapsible. */
+  rightPanelCollapsed: boolean;
+
   setSchoolIndicator: (id: string | null) => void;
   setCommunityIndicator: (id: string | null) => void;
   setYear: (year: SliderYear) => void;
@@ -61,6 +68,8 @@ export interface HubState {
   clearGeoFilters: () => void;
   setCohort: (cohort: string | null) => void;
   setSelectedSchool: (dbn: string | null) => void;
+  setAggregationArea: (a: AggregationArea) => void;
+  setRightPanelCollapsed: (collapsed: boolean) => void;
 }
 
 export const useHubStore = create<HubState>((set) => ({
@@ -71,6 +80,8 @@ export const useHubStore = create<HubState>((set) => ({
   geoFilters: {},
   cohort: null,
   selectedSchoolDbn: null,
+  aggregationArea: 'school_district',
+  rightPanelCollapsed: false,
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
   setYear: (year) => set({ year }),
@@ -79,4 +90,6 @@ export const useHubStore = create<HubState>((set) => ({
   clearGeoFilters: () => set({ geoFilters: {} }),
   setCohort: (c) => set({ cohort: c }),
   setSelectedSchool: (dbn) => set({ selectedSchoolDbn: dbn }),
+  setAggregationArea: (a) => set({ aggregationArea: a }),
+  setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
 }));

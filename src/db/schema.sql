@@ -142,6 +142,20 @@ CREATE INDEX IF NOT EXISTS sgc_layer_area_idx
   ON school_geo_crosswalk (geo_layer, area_id);
 
 -- =============================================================================
+-- area_tract_crosswalk: which tracts fall within / overlap each NYC school
+-- district or NTA. Powers the §5.4 District ↔ NTA community aggregation —
+-- precomputed once so per-request reads are simple GROUP BY queries.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS area_tract_crosswalk (
+  area_layer  TEXT NOT NULL,   -- 'school_district' | 'nta_2020'
+  area_id     TEXT NOT NULL,
+  tract_geoid TEXT NOT NULL,
+  PRIMARY KEY (area_layer, area_id, tract_geoid)
+);
+CREATE INDEX IF NOT EXISTS atc_area_idx ON area_tract_crosswalk (area_layer, area_id);
+CREATE INDEX IF NOT EXISTS atc_tract_idx ON area_tract_crosswalk (tract_geoid);
+
+-- =============================================================================
 -- community_indicator_values: ACS + CDC PLACES at tract (and future) grain
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS community_indicator_values (

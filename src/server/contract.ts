@@ -14,6 +14,9 @@ import { sql } from './db';
 import { INDICATORS, indicatorsById } from '../registry/indicators';
 import type { IndicatorRegistryEntry } from '../registry/types';
 import type {
+  AggregationArea,
+  AnalyticsSeriesResponse,
+  AnalyticsSeriesRow,
   CommunityResponse,
   GeoArea,
   GeoFilterLayerId,
@@ -22,6 +25,7 @@ import type {
   GeographiesResponse,
   IndicatorPublic,
   PwcCategory,
+  PwcHistoryResponse,
   PwcMember,
   PwcResponse,
   SchoolFeature,
@@ -365,6 +369,115 @@ export async function getGeographies(): Promise<GeographiesResponse> {
     });
   }
   return { layers };
+}
+
+/**
+ * Full per-year PWC membership map. Drives the Phase 5 timeline so historical
+ * Anchor / Healing Arts averages reflect each year's actual membership, not
+ * just the current snapshot. Same active-row rule as `getPwcMembership`.
+ */
+export async function getPwcHistory(): Promise<PwcHistoryResponse> {
+  const rows = await sql<{
+    dbn: string;
+    year: string;
+    core_school: boolean | null;
+    arts_program: boolean | null;
+    cohort: string | null;
+  }>`
+    SELECT dbn, school_year AS year, core_school, arts_program, cohort
+    FROM pwc_school_program
+    WHERE core_school IS NOT NULL
+       OR arts_program IS NOT NULL
+       OR social_work_program IS NOT NULL
+       OR community_school_program IS NOT NULL
+       OR ost_program IS NOT NULL
+       OR food_pantry IS NOT NULL
+       OR laundry IS NOT NULL
+  `;
+  const byYear: Record<string, PwcMember[]> = {};
+  for (const r of rows) {
+    const isAnchor = r.core_school === true;
+    const isArts = r.arts_program === true;
+    let category: PwcCategory;
+    if (isAnchor && isArts) category = 'both';
+    else if (isAnchor) category = 'anchor';
+    else if (isArts) category = 'healing_arts';
+    else category = 'pwc_other';
+    (byYear[r.year] ??= []).push({ dbn: r.dbn, category, cohort: r.cohort });
+  }
+  return { byYear };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase 5 analytics — series for KPI/timeline/list                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One row per (school, year) for the active indicator.
+ *
+ * - School indicator: raw school_indicator_values reads.
+ * - Community indicator: per-school AVG over tracts intersecting the school's
+ *   surrounding `aggArea` polygon. The two crosswalks pre-join the spatial
+ *   work so this is a thin GROUP BY at request time (spec §11.9).
+ *
+ * Schools without a crosswalk row for the chosen aggArea (e.g. ~85 Bronx
+ * schools missing school_district crosswalks per the Phase 3 data-quality
+ * note) silently drop out — the panel doesn't fabricate values.
+ */
+export async function getAnalyticsSeries(
+  indicatorId: string,
+  aggArea: AggregationArea | null,
+): Promise<AnalyticsSeriesResponse> {
+  const indicator = indicatorOrThrow(indicatorId);
+  if (indicator.family === 'school') {
+    const rows = await sql<AnalyticsSeriesRow>`
+      SELECT siv.dbn, siv.school_year AS year,
+             siv.value_num, siv.value_text, siv.label
+      FROM school_indicator_values siv
+      JOIN schools s ON s.dbn = siv.dbn
+      WHERE siv.indicator_id = ${indicatorId}
+        AND s.is_unplottable = false
+    `;
+    return {
+      indicator_id: indicatorId,
+      family: 'school',
+      agg_area: null,
+      series: rows,
+    };
+  }
+  // Community indicator — aggregate per school via the chosen area's tracts.
+  if (!aggArea) {
+    return {
+      indicator_id: indicatorId,
+      family: 'community',
+      agg_area: null,
+      series: [],
+    };
+  }
+  const rows = await sql<AnalyticsSeriesRow>`
+    SELECT s.dbn,
+           civ.year,
+           AVG(civ.value_num) AS value_num,
+           NULL::text AS value_text,
+           NULL::text AS label
+    FROM schools s
+    JOIN school_geo_crosswalk x1
+      ON x1.dbn = s.dbn AND x1.geo_layer = ${aggArea}
+    JOIN area_tract_crosswalk x2
+      ON x2.area_layer = ${aggArea} AND x2.area_id = x1.area_id
+    JOIN community_indicator_values civ
+      ON civ.geo_layer = 'tract'
+     AND civ.area_id = x2.tract_geoid
+     AND civ.indicator_id = ${indicatorId}
+    WHERE s.is_unplottable = false
+    GROUP BY s.dbn, civ.year
+  `;
+  return {
+    indicator_id: indicatorId,
+    family: 'community',
+    agg_area: aggArea,
+    series: rows,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
