@@ -1,0 +1,31 @@
+{
+  "name": "pwc-geohub",
+  "version": "0.0.1",
+  "private": true,
+  "description": "PWC Geospatial Intelligence Hub — internal map-centered web app for Partnership with Children. Phase 0: data foundation.",
+  "type": "module",
+  "scripts": {
+    "etl:init": "tsx scripts/etl/00-init-db.ts",
+    "etl:schools": "tsx scripts/etl/10-load-schools-master.ts",
+    "etl:indicators": "tsx scripts/etl/11-load-school-indicators.ts",
+    "etl:pwc": "tsx scripts/etl/12-load-pwc-schools.ts",
+    "etl:geos": "tsx scripts/etl/20-fetch-geographies.ts",
+    "etl:crosswalks": "tsx scripts/etl/21-build-crosswalks.ts",
+    "etl:acs": "tsx scripts/etl/30-fetch-acs.ts",
+    "etl:cdc": "tsx scripts/etl/31-fetch-cdc-places.ts",
+    "etl:report": "tsx scripts/etl/90-data-quality-report.ts",
+    "etl:all": "npm run etl:init && npm run etl:schools && npm run etl:indicators && npm run etl:pwc && npm run etl:geos && npm run etl:crosswalks && npm run etl:acs && npm run etl:cdc && npm run etl:report",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "@vercel/blob": "^0.27.0",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
