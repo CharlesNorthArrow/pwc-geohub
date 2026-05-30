@@ -7,14 +7,15 @@ import { useEffect, useRef, useState } from 'react';
  *
  * Composition:
  *  ┌───────────────────────────────────────────┐
- *  │  [PWC logo]                  [i]  [⚙]    │  ← PWC blue band
- *  └───────────────────────────────────────────┘
+ *  │  [PWC mark + text]            [i]  [⚙]   │  ← PWC blue band
+ *  └━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┘  ← orange accent line
  *
- * - PWC logo is the existing PNG, force-tinted white via CSS filter so we can
- *   stay on the dark-blue band without shipping a second asset.
+ * - The icon (4 concentric arcs + central sunburst star) is rebuilt as
+ *   inline SVG so each ring can rotate independently. Reconstructed from the
+ *   PNG by eye against the brand palette.
+ * - "Partnership with Children" renders as white HTML text alongside.
  * - Info bubble (i) opens a tiny credit popover linking to North Arrow.
- * - Admin gear (⚙) is a placeholder for a future Admin Data Update panel —
- *   it's surfaced now so the slot is visible, but it does nothing yet.
+ * - Admin gear (⚙) is a placeholder for a future Admin Data Update panel.
  */
 export default function Logo(): React.JSX.Element {
   return (
@@ -26,10 +27,14 @@ export default function Logo(): React.JSX.Element {
         padding: '10px 12px',
         background: '#027BC0',
         color: '#ffffff',
+        borderBottom: '3px solid #F0901F',
         // Lift over the scrolling content below so a fade isn't needed.
         boxShadow: '0 1px 2px rgba(0, 32, 64, 0.12)',
       }}
     >
+      {/* Keyframes scoped via class names; one declaration per mount. */}
+      <style>{KEYFRAMES_CSS}</style>
+
       <a
         href="https://partnershipwithchildren.org/"
         target="_blank"
@@ -38,27 +43,142 @@ export default function Logo(): React.JSX.Element {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
+          gap: 10,
           textDecoration: 'none',
+          color: '#ffffff',
           flex: 1,
           minWidth: 0,
         }}
       >
-        <img
-          src="/brand/PWC-Logo.png"
-          alt="Partnership with Children"
+        <PwcMark />
+        <div
           style={{
-            height: 44,
-            width: 'auto',
-            // Force the existing dark-on-light PNG to render white.
-            filter: 'brightness(0) invert(1)',
+            display: 'flex',
+            flexDirection: 'column',
+            lineHeight: 1.05,
+            minWidth: 0,
           }}
-        />
+        >
+          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.2 }}>
+            Partnership
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 500, marginTop: 1, opacity: 0.95 }}>
+            with Children
+          </span>
+        </div>
       </a>
       <CreditsButton />
       <AdminButton />
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* PWC mark — animated rings + sunburst star                                  */
+/* -------------------------------------------------------------------------- */
+
+const RING_COLORS = {
+  teal: '#00A0B0',
+  magenta: '#903090',
+  lime: '#A0B000',
+  blue: '#027BC0',
+} as const;
+const STAR_FILL = '#F0901F';
+
+function PwcMark(): React.JSX.Element {
+  return (
+    <svg
+      width={44}
+      height={44}
+      viewBox="0 0 48 48"
+      aria-hidden
+      style={{ flexShrink: 0, display: 'block' }}
+    >
+      {/* Four concentric ring arcs. Each <g> rotates around the viewBox
+       *  center via the CSS classes below. Alternating direction + slightly
+       *  different cadences keep the motion visually interesting without
+       *  being distracting. */}
+      <g className="pwc-ring pwc-ring--outer">
+        <circle
+          cx={24}
+          cy={24}
+          r={21}
+          fill="none"
+          stroke={RING_COLORS.teal}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray="78 54"
+        />
+      </g>
+      <g className="pwc-ring pwc-ring--three">
+        <circle
+          cx={24}
+          cy={24}
+          r={17}
+          fill="none"
+          stroke={RING_COLORS.magenta}
+          strokeWidth={2.8}
+          strokeLinecap="round"
+          strokeDasharray="62 45"
+        />
+      </g>
+      <g className="pwc-ring pwc-ring--two">
+        <circle
+          cx={24}
+          cy={24}
+          r={13}
+          fill="none"
+          stroke={RING_COLORS.lime}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeDasharray="48 33"
+        />
+      </g>
+      <g className="pwc-ring pwc-ring--inner">
+        <circle
+          cx={24}
+          cy={24}
+          r={9}
+          fill="none"
+          stroke={RING_COLORS.blue}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeDasharray="30 25"
+        />
+      </g>
+
+      {/* Central sunburst star — five-point star in PWC orange. Coords
+       *  derived from a 5-point star (outer r≈7, inner r≈3) centered at
+       *  the viewBox midpoint. */}
+      <path
+        d="M 24 17 L 25.76 21.57 L 30.66 21.84 L 26.85 24.93 L 28.11 29.66 L 24 27 L 19.89 29.66 L 21.15 24.93 L 17.34 21.84 L 22.24 21.57 Z"
+        fill={STAR_FILL}
+      />
+    </svg>
+  );
+}
+
+/**
+ * Keyframes + per-ring animation rules. Lives inside the component so the
+ * CSS travels with the file and there's no globals.css coupling. Respects
+ * `prefers-reduced-motion`.
+ */
+const KEYFRAMES_CSS = `
+@keyframes pwc-rotate-cw  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes pwc-rotate-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+.pwc-ring { transform-origin: 24px 24px; transform-box: view-box; }
+.pwc-ring--outer { animation: pwc-rotate-cw  22s linear infinite; }
+.pwc-ring--three { animation: pwc-rotate-ccw 17s linear infinite; }
+.pwc-ring--two   { animation: pwc-rotate-cw  13s linear infinite; }
+.pwc-ring--inner { animation: pwc-rotate-ccw 9s  linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pwc-ring { animation: none !important; }
+}
+`;
+
+/* -------------------------------------------------------------------------- */
+/* Icon buttons (credits + admin placeholder)                                 */
+/* -------------------------------------------------------------------------- */
 
 /** Round "i" button — toggles a small popover with the North Arrow credit. */
 function CreditsButton(): React.JSX.Element {
