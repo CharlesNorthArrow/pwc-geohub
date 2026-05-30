@@ -87,7 +87,10 @@ export const useHubStore = create<HubState>((set) => ({
   cohort: null,
   selectedSchoolDbn: null,
   aggregationArea: 'school_district',
-  rightPanelCollapsed: false,
+  // Collapsed by default — the panel has nothing to show until the user picks
+  // an indicator. Shell auto-expands it once `analyticsIndicator` becomes
+  // truthy and re-collapses when it goes back to null.
+  rightPanelCollapsed: true,
   analyticsFamily: 'school',
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),

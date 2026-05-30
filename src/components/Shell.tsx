@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import HeaderBar from './HeaderBar';
 import LeftPanel from './LeftPanel';
@@ -83,6 +83,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
   const aggregationArea = useHubStore((s) => s.aggregationArea);
   const rightPanelCollapsed = useHubStore((s) => s.rightPanelCollapsed);
+  const setRightPanelCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
   const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
 
   // One-shot fetches.
@@ -312,6 +313,19 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       : effectiveAnalyticsFamily === 'community'
         ? communityIndicator
         : null;
+
+  // Auto-collapse the analytics panel when there's nothing to show, and
+  // auto-expand it when an indicator first gets picked. Only acts on the
+  // truthy↔null edges of `analyticsIndicator`, so swapping between two
+  // indicators (truthy→truthy) preserves the user's manual chevron state.
+  const prevAnalyticsIndicator = useRef<IndicatorPublic | null>(null);
+  useEffect(() => {
+    const prev = prevAnalyticsIndicator.current;
+    if (!prev && analyticsIndicator) setRightPanelCollapsed(false);
+    else if (prev && !analyticsIndicator) setRightPanelCollapsed(true);
+    prevAnalyticsIndicator.current = analyticsIndicator;
+  }, [analyticsIndicator, setRightPanelCollapsed]);
+
   const analyticsAggArea = analyticsIndicator?.family === 'community' ? aggregationArea : null;
   useEffect(() => {
     if (!analyticsIndicator) {
