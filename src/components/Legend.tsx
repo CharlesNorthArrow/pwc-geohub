@@ -239,6 +239,7 @@ function SchoolLegend({
       />
       <Caption>Circle color</Caption>
       <ColorSwatches bins={bins} />
+      <NoDataRow />
       <Caption>Circle size = total enrollment</Caption>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
         {ENROLLMENT_BINS.map((b) => (
@@ -261,6 +262,28 @@ function SchoolLegend({
         ))}
       </div>
       <PwcHaloLegend />
+    </div>
+  );
+}
+
+/** Hollow ring + label — pairs with MapView's no-data treatment in
+ *  indicator mode. Brand-blue stroke at the same width the map draws (1.5px). */
+function NoDataRow(): React.JSX.Element {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+      <span
+        aria-hidden
+        style={{
+          display: 'inline-block',
+          width: 14,
+          height: 14,
+          borderRadius: '50%',
+          background: 'transparent',
+          border: '1.5px solid #467c9d',
+          boxSizing: 'border-box',
+        }}
+      />
+      <span style={{ fontSize: 11, color: '#002040' }}>No data</span>
     </div>
   );
 }

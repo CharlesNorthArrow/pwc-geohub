@@ -6,7 +6,7 @@
  */
 
 import type { IndicatorPublic } from '../contract/types';
-import { RACE_QUALITATIVE, rampFor, type Ramp } from './palettes';
+import { RACE_QUALITATIVE, rampForIndicator, type Ramp } from './palettes';
 
 /* -------------------------------------------------------------------------- */
 /* Color bins                                                                 */
@@ -50,7 +50,11 @@ export function colorBinsFor(
   if (!domain || !Number.isFinite(domain.min) || !Number.isFinite(domain.max) || domain.min === domain.max) {
     return { type: 'none' };
   }
-  const ramp = rampFor(indicator.scale.good_direction);
+  const ramp = rampForIndicator(
+    indicator.family,
+    indicator.theme,
+    indicator.scale.good_direction,
+  );
   const span = domain.max - domain.min;
   const step = span / 5;
   const edges: [number, number, number, number] = [

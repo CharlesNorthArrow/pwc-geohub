@@ -57,7 +57,9 @@ const LAYER_GEO_SELECTION_LINE = 'geo-selection-line';
 /* School-point layer stack — non-PWC paints first (bottom), then PWC halos
  * and dots on top so PWC schools are visually unobscured in dense clusters.
  * Splitting by is_pwc via per-layer filters is more reliable than
- * `circle-sort-key`, which only orders features INSIDE a single layer. */
+ * `circle-sort-key`, which only orders features INSIDE a single layer.
+ * The backdrop layer sits below everything to add a subtle shadow. */
+const LAYER_SCHOOLS_BACKDROP = 'schools-backdrop';
 const LAYER_SCHOOLS_NONPWC = 'schools-circles-nonpwc';
 const LAYER_HALO_OUTER = 'schools-halo-outer'; // Healing Arts (or both)
 const LAYER_HALO_INNER = 'schools-halo-inner'; // Anchor (or both) / pwc_other
@@ -73,6 +75,15 @@ const TRANSPARENT = 'rgba(0,0,0,0)';
  *  selected) unicolor circle fill. Same hue as the legend's enrollment
  *  size key, so the two read as one visual system. */
 const BASELINE_FILL = '#467c9d';
+
+/** Stroke used to draw "no data" schools as a hollow ring (indicator mode
+ *  only). Brand mid-blue at full strength reads as a neutral pin — clearly
+ *  different from "lowest bin of the gradient". */
+const NO_DATA_STROKE = '#467c9d';
+
+/** Subtle dark backdrop behind every visible school dot. Semi-transparent
+ *  navy + circle-blur gives a soft drop-shadow effect without dominating. */
+const BACKDROP_FILL = 'rgba(0, 32, 64, 0.22)';
 
 /**
  * PWC fill-color expression for baseline (no indicator) mode. Anchor (incl.
@@ -195,12 +206,27 @@ export default function MapView({
       });
 
       // Stack order (bottom → top):
+      //   0. backdrop       (soft dark shadow behind every visible dot)
       //   1. non-PWC dots
       //   2. PWC dots
       //   3. PWC inner hoop  (sticks to PWC dot circumference)
       //   4. PWC outer hoop  (only offset when both-category, otherwise hugs)
       // Hoops paint AFTER the PWC dot so the dot's white stroke doesn't
       // eat into the hoop's visible width.
+      map.addLayer({
+        id: LAYER_SCHOOLS_BACKDROP,
+        type: 'circle',
+        source: SOURCE_SCHOOLS,
+        paint: {
+          'circle-color': BACKDROP_FILL,
+          // Radius (data radius + 1) is set in the data effect; placeholder
+          // here so MapLibre validates the paint object.
+          'circle-radius': 5,
+          'circle-blur': 0.55,
+          'circle-stroke-width': 0,
+          'circle-opacity': 1,
+        },
+      });
       map.addLayer({
         id: LAYER_SCHOOLS_NONPWC,
         type: 'circle',
@@ -291,7 +317,7 @@ export default function MapView({
             'fill-opacity': 0.65,
           },
         },
-        LAYER_SCHOOLS_NONPWC, // beneath every school layer
+        LAYER_SCHOOLS_BACKDROP, // beneath every school layer (incl. backdrop)
       );
       map.addLayer(
         {
@@ -300,7 +326,7 @@ export default function MapView({
           source: SOURCE_TRACTS,
           paint: { 'line-color': 'rgba(0,0,0,0.15)', 'line-width': 0.3 },
         },
-        LAYER_SCHOOLS_NONPWC,
+        LAYER_SCHOOLS_BACKDROP,
       );
     };
 
@@ -326,9 +352,10 @@ export default function MapView({
           map.setPaintProperty(id, 'circle-stroke-color', '#ffffff');
           map.setPaintProperty(id, 'circle-stroke-width', 1);
         }
-        // Hide halos when no points.
+        // Hide halos + backdrop when no points.
         map.setPaintProperty(LAYER_HALO_INNER, 'circle-stroke-width', 0);
         map.setPaintProperty(LAYER_HALO_OUTER, 'circle-stroke-width', 0);
+        map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 0);
         return;
       }
       source.setData(schoolPoints);
@@ -339,6 +366,14 @@ export default function MapView({
       for (const id of [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC]) {
         map.setPaintProperty(id, 'circle-radius', dataRadius as never);
       }
+
+      // Backdrop radius is always 1px wider than the data dot so a soft
+      // shadow peeks out from behind the circle.
+      map.setPaintProperty(
+        LAYER_SCHOOLS_BACKDROP,
+        'circle-radius',
+        ['+', dataRadius, 1] as never,
+      );
 
       if (!schoolIndicator) {
         // BASELINE mode: non-PWC = unicolor brand blue, PWC = category color
@@ -360,27 +395,57 @@ export default function MapView({
           PWC_BASELINE_STROKE_WIDTH_EXPR as never,
         );
 
-        // Halos OFF in baseline mode.
+        // Halos OFF in baseline mode. Backdrop ON for every visible dot.
         map.setPaintProperty(LAYER_HALO_INNER, 'circle-stroke-width', 0);
         map.setPaintProperty(LAYER_HALO_OUTER, 'circle-stroke-width', 0);
+        map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 1);
         return;
       }
 
       // INDICATOR mode: both PWC and non-PWC dots share the gradient so
       // values are comparable; PWC schools are flagged by halos sitting
-      // above the non-PWC layer.
+      // above the non-PWC layer. Schools with `value_num == null` render
+      // as a hollow ring (no fill, brand-blue stroke) so they're clearly
+      // distinguishable from "lowest-bin gradient color".
       const bins = colorBinsFor(schoolIndicator, schoolPoints.domain);
-      const colorExpr = colorExpression(
+      const baseColorExpr = colorExpression(
         bins,
         schoolIndicator.scale.type === 'categorical'
           ? ['get', 'value_text']
           : ['get', 'value_num'],
       );
+      const colorExpr: unknown = [
+        'case',
+        ['==', ['get', 'value_num'], null], TRANSPARENT,
+        baseColorExpr,
+      ];
+      const strokeColorExpr: unknown = [
+        'case',
+        ['==', ['get', 'value_num'], null], NO_DATA_STROKE,
+        '#ffffff',
+      ];
+      const strokeWidthExpr: unknown = [
+        'case',
+        ['==', ['get', 'value_num'], null], 1.5,
+        1,
+      ];
       for (const id of [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC]) {
         map.setPaintProperty(id, 'circle-color', colorExpr as never);
-        map.setPaintProperty(id, 'circle-stroke-color', '#ffffff');
-        map.setPaintProperty(id, 'circle-stroke-width', 1);
+        map.setPaintProperty(id, 'circle-stroke-color', strokeColorExpr as never);
+        map.setPaintProperty(id, 'circle-stroke-width', strokeWidthExpr as never);
       }
+
+      // Backdrop hidden for hollow no-data dots (otherwise the dark shadow
+      // would show THROUGH the hollow center and they'd read as filled).
+      map.setPaintProperty(
+        LAYER_SCHOOLS_BACKDROP,
+        'circle-opacity',
+        [
+          'case',
+          ['==', ['get', 'value_num'], null], 0,
+          1,
+        ] as never,
+      );
 
       // Hoops sit on the circle circumference (no floating halo offset):
       //   inner hoop  → radius = R  (stroke draws outward from R)
@@ -468,6 +533,11 @@ export default function MapView({
       // their respective Z-stacks). Intersect cascade with that predicate.
       const nonPwcFilter = ['all', cascade, ['!=', ['get', 'is_pwc'], true]];
       const pwcFilter = ['all', cascade, ['==', ['get', 'is_pwc'], true]];
+      // Backdrop has no PWC predicate — every visible school dot gets a
+      // shadow, regardless of family.
+      if (map.getLayer(LAYER_SCHOOLS_BACKDROP)) {
+        map.setFilter(LAYER_SCHOOLS_BACKDROP, cascade as never);
+      }
       if (map.getLayer(LAYER_SCHOOLS_NONPWC)) {
         map.setFilter(LAYER_SCHOOLS_NONPWC, nonPwcFilter as never);
       }

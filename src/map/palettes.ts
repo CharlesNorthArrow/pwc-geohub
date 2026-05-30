@@ -16,6 +16,41 @@
 export const VIRIDIS_5 = ['#440154', '#3b528b', '#21908d', '#5dc863', '#fde725'] as const;
 export const ROCKET_R_5 = ['#fbe7c6', '#f1a07a', '#dd5f5f', '#a82255', '#43012e'] as const;
 
+/* -------------------------------------------------------------------------- */
+/* Theme-keyed diverging palettes (muted, by request)                         */
+/*                                                                            */
+/* Each pair is bin0 → bin4 (worst → best for the "good" direction). All     */
+/* arrays read low-to-high index = low-to-high *value*. The `rampForIndicator` */
+/* helper handles the high-good vs low-good flip.                             */
+/* -------------------------------------------------------------------------- */
+
+/** Student outcomes — muted red↔blue. Low-value end = red (bad when good=high). */
+export const DIVERGING_RDBU_MUTED = [
+  '#b85b6e', // bad
+  '#dba3ab',
+  '#ebebeb', // neutral
+  '#a3bcd1',
+  '#5d83a8', // good
+] as const;
+
+/** Student experience — muted purple↔green. */
+export const DIVERGING_PUGN_MUTED = [
+  '#8e5a8e', // bad (purple)
+  '#cdaecd',
+  '#ebebeb',
+  '#a8cca0',
+  '#5d8e60', // good (green)
+] as const;
+
+/** Staff & school culture — muted dark grey↔teal. */
+export const DIVERGING_GREYTEAL_MUTED = [
+  '#4a4a4a', // bad (dark grey)
+  '#a8a8a8',
+  '#dedede',
+  '#9cc5c4',
+  '#3a8a8a', // good (teal)
+] as const;
+
 /** Stable category → color map for the 4 race categories the registry ships. */
 export const RACE_QUALITATIVE: Readonly<Record<string, string>> = {
   White: '#1f77b4',
@@ -31,4 +66,44 @@ export function rampFor(goodDirection: 'high' | 'low' | 'none'): Ramp {
   if (goodDirection === 'low') return ROCKET_R_5;
   // `high` and `none` both use viridis — neutral perceptually-uniform default.
   return VIRIDIS_5;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Theme-aware ramp dispatch                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * School themes that use muted diverging palettes (per UX request). Each
+ * theme maps to a base ramp; the ramp is reversed when `good_direction` is
+ * low, so the "bad" color always lands on the value-axis end where bad
+ * lives. Themes not in this map (and all community indicators) fall back
+ * to the original sequential `rampFor` behavior.
+ */
+const SCHOOL_THEME_DIVERGING: Readonly<Record<string, Ramp>> = {
+  'Student outcomes': DIVERGING_RDBU_MUTED,
+  'Student experience': DIVERGING_PUGN_MUTED,
+  'Staff & school culture': DIVERGING_GREYTEAL_MUTED,
+};
+
+/**
+ * Theme-aware ramp picker. Returns a 5-stop ramp ordered bin0 → bin4:
+ *  - high-good: low value → bad color, high value → good color
+ *  - low-good:  low value → good color, high value → bad color
+ *
+ * The base palettes above are written low-to-high = bad-to-good (i.e.
+ * intuitive when good=high). For low-good indicators we reverse so the
+ * lowest-value bin reads "good".
+ */
+export function rampForIndicator(
+  family: 'school' | 'community',
+  theme: string,
+  goodDirection: 'high' | 'low' | 'none',
+): Ramp {
+  if (family === 'school') {
+    const base = SCHOOL_THEME_DIVERGING[theme];
+    if (base) {
+      return goodDirection === 'low' ? [...base].reverse() : base;
+    }
+  }
+  return rampFor(goodDirection);
 }
