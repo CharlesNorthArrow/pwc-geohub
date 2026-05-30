@@ -71,10 +71,11 @@ const PWC_ORANGE = '#F0901F'; // Healing Arts
 const PWC_BLUE = '#027BC0';   // pwc_other (program-active, not anchor/arts)
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
-/** Mid-blue from the brand palette — used for the baseline (no indicator
- *  selected) unicolor circle fill. Same hue as the legend's enrollment
- *  size key, so the two read as one visual system. */
-const BASELINE_FILL = '#467c9d';
+/** Muted slate-blue for non-PWC schools in baseline mode — clearly blue
+ *  but soft enough to recede behind the colored PWC dots. Paired with
+ *  `BASELINE_NONPWC_OPACITY` below for the final on-map look. */
+const BASELINE_FILL = '#7BA7C9';
+const BASELINE_NONPWC_OPACITY = 0.4;
 
 /** Stroke used to draw "no data" schools as a hollow ring (indicator mode
  *  only). Brand mid-blue at full strength reads as a neutral pin — clearly
@@ -382,6 +383,8 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', BASELINE_FILL);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', '#ffffff');
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', 1);
+        // Non-PWC dots fade back so PWC schools clearly dominate the baseline.
+        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', BASELINE_NONPWC_OPACITY);
 
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', PWC_BASELINE_FILL_EXPR as never);
         map.setPaintProperty(
@@ -433,6 +436,9 @@ export default function MapView({
         map.setPaintProperty(id, 'circle-color', colorExpr as never);
         map.setPaintProperty(id, 'circle-stroke-color', strokeColorExpr as never);
         map.setPaintProperty(id, 'circle-stroke-width', strokeWidthExpr as never);
+        // Restore full opacity — the baseline mode fades non-PWC dots, so we
+        // need to undo that when switching back into a gradient view.
+        map.setPaintProperty(id, 'circle-opacity', 0.85);
       }
 
       // Backdrop hidden for hollow no-data dots (otherwise the dark shadow

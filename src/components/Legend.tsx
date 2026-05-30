@@ -60,10 +60,12 @@ export default function Legend({
 
 /* PWC brand palette — sourced from CLAUDE.md and `MapView`. Kept here so the
  * legend stays in lockstep with what the map actually paints. */
-const BASELINE_FILL = '#467c9d';
+/** Muted slate-blue (paired with 0.4 opacity) — matches the map's
+ *  baseline non-PWC dots. */
+const BASELINE_FILL = '#7BA7C9';
+const BASELINE_NONPWC_OPACITY = 0.4;
 const PWC_MAGENTA = '#903090';
 const PWC_ORANGE = '#F0901F';
-const PWC_BLUE = '#027BC0';
 
 /** Tiny ALL-CAPS family label (School / Community). */
 function FamilyTag({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -151,7 +153,11 @@ function BaselineSchoolLegend(): React.JSX.Element {
       </div>
       <Caption>Circle color</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <BaselineDotRow color={BASELINE_FILL} label="Other NYC school" />
+        <BaselineDotRow
+          color={BASELINE_FILL}
+          opacity={BASELINE_NONPWC_OPACITY}
+          label="Other NYC school"
+        />
         <BaselineDotRow color={PWC_MAGENTA} label="PWC Anchor school" />
         <BaselineDotRow color={PWC_ORANGE} label="PWC Healing Arts school" />
         <BaselineDotRow
@@ -160,7 +166,6 @@ function BaselineSchoolLegend(): React.JSX.Element {
           strokeWidth={2}
           label="Both (Anchor + Healing Arts)"
         />
-        <BaselineDotRow color={PWC_BLUE} label="Other PWC program school" />
       </div>
       <Caption>Circle size = total enrollment</Caption>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -176,7 +181,7 @@ function BaselineSchoolLegend(): React.JSX.Element {
                 height: b.radius * 2,
                 borderRadius: '50%',
                 background: BASELINE_FILL,
-                opacity: 0.85,
+                opacity: BASELINE_NONPWC_OPACITY,
               }}
             />
             <span style={{ fontSize: 9, color: '#002040' }}>{b.label}</span>
@@ -189,11 +194,15 @@ function BaselineSchoolLegend(): React.JSX.Element {
 
 function BaselineDotRow({
   color,
+  opacity = 1,
   strokeColor,
   strokeWidth = 0,
   label,
 }: {
   color: string;
+  /** Swatch fill opacity — defaults to 1; the baseline non-PWC row uses
+   *  0.4 to mirror the map. */
+  opacity?: number;
   strokeColor?: string;
   strokeWidth?: number;
   label: string;
@@ -208,6 +217,7 @@ function BaselineDotRow({
           height: 14,
           borderRadius: '50%',
           background: color,
+          opacity,
           border: strokeWidth > 0 && strokeColor ? `${strokeWidth}px solid ${strokeColor}` : 'none',
           boxSizing: 'content-box',
         }}
