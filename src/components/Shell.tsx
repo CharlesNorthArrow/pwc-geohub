@@ -86,6 +86,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const setRightPanelCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
   const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
   const schoolsHidden = useHubStore((s) => s.schoolsHidden);
+  const communityHidden = useHubStore((s) => s.communityHidden);
 
   // One-shot fetches.
   useEffect(() => {
@@ -480,7 +481,9 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
                   : baselineSchoolData
             }
             communityIndicator={communityIndicator}
-            communityValues={communityNoData ? null : communityData}
+            communityValues={
+              communityHidden ? null : communityNoData ? null : communityData
+            }
             tractGeoJsonUrl={tractUrl}
             schoolType={schoolType}
             filteredSchoolDbns={universe.schoolDbns}

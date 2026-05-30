@@ -23,6 +23,8 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
   const setCommunity = useHubStore((s) => s.setCommunityIndicator);
   const schoolsHidden = useHubStore((s) => s.schoolsHidden);
   const setSchoolsHidden = useHubStore((s) => s.setSchoolsHidden);
+  const communityHidden = useHubStore((s) => s.communityHidden);
+  const setCommunityHidden = useHubStore((s) => s.setCommunityHidden);
 
   const school = useMemo(() => indicators.filter((i) => i.family === 'school'), [indicators]);
   const community = useMemo(() => indicators.filter((i) => i.family === 'community'), [indicators]);
@@ -36,8 +38,9 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         themeOrder={SCHOOL_THEME_ORDER}
         onPick={(id) => setSchool(activeSchool === id ? null : id)}
         titleAction={
-          <HideSchoolsToggle
+          <HideFamilyToggle
             hidden={schoolsHidden}
+            family="schools"
             onToggle={() => setSchoolsHidden(!schoolsHidden)}
           />
         }
@@ -48,28 +51,38 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         activeId={activeCommunity}
         flat
         onPick={(id) => setCommunity(activeCommunity === id ? null : id)}
+        titleAction={
+          <HideFamilyToggle
+            hidden={communityHidden}
+            family="community layer"
+            onToggle={() => setCommunityHidden(!communityHidden)}
+          />
+        }
       />
     </div>
   );
 }
 
-/** Small eye toggle that sits in the "School indicators" title row.
- *  Hides every school dot + halo on the map without clearing the active
- *  indicator — flip back on and the gradient returns immediately. */
-function HideSchoolsToggle({
+/** Small eye toggle that sits inside a family title row. Hides every layer
+ *  for that family on the map without clearing the active indicator — flip
+ *  back on and the colored layer returns instantly. */
+function HideFamilyToggle({
   hidden,
+  family,
   onToggle,
 }: {
   hidden: boolean;
+  family: string;
   onToggle: () => void;
 }): React.JSX.Element {
+  const label = hidden ? `Show ${family} on map` : `Hide ${family} on map`;
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={!hidden}
-      aria-label={hidden ? 'Show schools on map' : 'Hide schools on map'}
-      title={hidden ? 'Show schools on map' : 'Hide schools on map'}
+      aria-label={label}
+      title={label}
       style={{
         background: 'transparent',
         border: 'none',
