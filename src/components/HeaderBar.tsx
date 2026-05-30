@@ -8,6 +8,7 @@ import {
   GEO_FILTER_LAYERS,
   type GeographiesResponse,
   type GeoFilterLayerId,
+  type IndicatorPublic,
   type PwcHistoryResponse,
   type PwcMember,
   type SchoolMaster,
@@ -20,6 +21,10 @@ interface Props {
   schoolsMaster: SchoolMaster[];
   universe: FilteredUniverse;
   pwcHistory: PwcHistoryResponse | null;
+  /** Active indicators — forwarded to TimeSlider for the availability dot
+   *  rows above each tick. */
+  schoolIndicator: IndicatorPublic | null;
+  communityIndicator: IndicatorPublic | null;
 }
 
 const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> = [
@@ -34,7 +39,14 @@ const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> =
  * Geo → School Type → Cohort → School; every dropdown reads its options
  * from the same `applyFilters` selector so the pre-filter notes stay honest.
  */
-export default function HeaderBar({ geographies, schoolsMaster, universe, pwcHistory }: Props): React.JSX.Element {
+export default function HeaderBar({
+  geographies,
+  schoolsMaster,
+  universe,
+  pwcHistory,
+  schoolIndicator,
+  communityIndicator,
+}: Props): React.JSX.Element {
   const geoFilters = useHubStore((s) => s.geoFilters);
   const setGeoFilters = useHubStore((s) => s.setGeoFilters);
   const clearGeoFilters = useHubStore((s) => s.clearGeoFilters);
@@ -189,7 +201,7 @@ export default function HeaderBar({ geographies, schoolsMaster, universe, pwcHis
       />
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <TimeSlider />
+        <TimeSlider schoolIndicator={schoolIndicator} communityIndicator={communityIndicator} />
 
         {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
         schoolType !== 'all' ||

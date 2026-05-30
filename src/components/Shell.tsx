@@ -448,11 +448,9 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
         schoolIndicator={schoolIndicator}
         schoolYear={schoolYear}
         schoolDomain={schoolData?.domain ?? null}
-        schoolNoData={schoolNoData}
         communityIndicator={communityIndicator}
         communityYear={communityYear}
         communityDomain={communityData?.domain ?? null}
-        communityNoData={communityNoData}
       />
       <main
         style={{
@@ -467,6 +465,8 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           schoolsMaster={schoolsMaster ?? []}
           universe={universe}
           pwcHistory={pwcHistory}
+          schoolIndicator={schoolIndicator}
+          communityIndicator={communityIndicator}
         />
         <div style={{ position: 'relative', minHeight: 0 }}>
           <MapView

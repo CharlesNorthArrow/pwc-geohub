@@ -1,7 +1,9 @@
 'use client';
 
 import type { IndicatorPublic } from '../contract/types';
+import type { SliderYear } from '../contract/year';
 import { colorBinsFor, ENROLLMENT_BINS, type ColorBins } from '../map/encoding';
+import { useHubStore } from '../store/useHubStore';
 import YearBadge from './YearBadge';
 
 interface Props {
@@ -14,7 +16,7 @@ interface Props {
   /** Resolved community year (or null = no data for slider year). */
   communityYear: string | null;
   /** Current slider position — drives "no YYYY-YY data" copy when missing. */
-  sliderYear: string;
+  sliderYear: SliderYear;
 }
 
 /**
@@ -31,6 +33,9 @@ export default function Legend({
   communityYear,
   sliderYear,
 }: Props): React.JSX.Element {
+  // Pulled from the store so YearBadge can offer one-click "jump to nearest
+  // available year" without prop-drilling through every legend section.
+  const setYear = useHubStore((s) => s.setYear);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {schoolIndicator ? (
@@ -39,6 +44,7 @@ export default function Legend({
           bins={colorBinsFor(schoolIndicator, schoolDomain)}
           displayYear={schoolYear}
           sliderYear={sliderYear}
+          onJump={setYear}
         />
       ) : (
         // No school indicator picked → the map renders the baseline (unicolor
@@ -52,6 +58,7 @@ export default function Legend({
           bins={colorBinsFor(communityIndicator, communityDomain)}
           displayYear={communityYear}
           sliderYear={sliderYear}
+          onJump={setYear}
         />
       ) : null}
     </div>
@@ -91,11 +98,13 @@ function IndicatorTitleRow({
   indicator,
   displayYear,
   sliderYear,
+  onJump,
 }: {
   family: 'school' | 'community';
   indicator: IndicatorPublic;
   displayYear: string | null;
-  sliderYear: string;
+  sliderYear: SliderYear;
+  onJump?: (year: SliderYear) => void;
 }): React.JSX.Element {
   return (
     <div
@@ -122,6 +131,7 @@ function IndicatorTitleRow({
         indicator={indicator}
         displayYear={displayYear}
         sliderYear={sliderYear}
+        onJump={onJump}
       />
     </div>
   );
@@ -232,11 +242,13 @@ function SchoolLegend({
   bins,
   displayYear,
   sliderYear,
+  onJump,
 }: {
   indicator: IndicatorPublic;
   bins: ColorBins;
   displayYear: string | null;
-  sliderYear: string;
+  sliderYear: SliderYear;
+  onJump?: (year: SliderYear) => void;
 }): React.JSX.Element {
   return (
     <div>
@@ -246,6 +258,7 @@ function SchoolLegend({
         indicator={indicator}
         displayYear={displayYear}
         sliderYear={sliderYear}
+        onJump={onJump}
       />
       <Caption>Circle color</Caption>
       <ColorSwatches bins={bins} />
@@ -366,11 +379,13 @@ function CommunityLegend({
   bins,
   displayYear,
   sliderYear,
+  onJump,
 }: {
   indicator: IndicatorPublic;
   bins: ColorBins;
   displayYear: string | null;
-  sliderYear: string;
+  sliderYear: SliderYear;
+  onJump?: (year: SliderYear) => void;
 }): React.JSX.Element {
   return (
     <div>
@@ -380,6 +395,7 @@ function CommunityLegend({
         indicator={indicator}
         displayYear={displayYear}
         sliderYear={sliderYear}
+        onJump={onJump}
       />
       <Caption>Tract color</Caption>
       <ColorSwatches bins={bins} />

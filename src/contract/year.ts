@@ -56,3 +56,50 @@ export function fromCommunityYear(communityYear: string): SliderYear | null {
 export function isSliderYear(s: string): s is SliderYear {
   return (SLIDER_YEARS as readonly string[]).includes(s);
 }
+
+/**
+ * Project the years an indicator has data for back into the slider's
+ * SliderYear space. Used by the time-slider availability dots and the
+ * nearest-year jump affordance in YearBadge.
+ *  - school indicators speak school_year directly; rows outside `SLIDER_YEARS`
+ *    are dropped (the slider can't reach them anyway).
+ *  - community indicators speak calendar year; we map via `fromCommunityYear`.
+ */
+export function indicatorSliderYears(
+  family: 'school' | 'community',
+  years: readonly string[],
+): SliderYear[] {
+  const out: SliderYear[] = [];
+  for (const y of years) {
+    if (family === 'school') {
+      if (isSliderYear(y)) out.push(y as SliderYear);
+    } else {
+      const sy = fromCommunityYear(y);
+      if (sy) out.push(sy);
+    }
+  }
+  return out;
+}
+
+/**
+ * Nearest SliderYear in `availableYears` to `target`, measured by index
+ * distance in `SLIDER_YEARS`. Ties break toward the earlier year. Returns
+ * null when `availableYears` is empty.
+ */
+export function nearestSliderYear(
+  target: SliderYear,
+  availableYears: readonly SliderYear[],
+): SliderYear | null {
+  if (availableYears.length === 0) return null;
+  const targetIdx = SLIDER_YEARS.indexOf(target);
+  let best: SliderYear | null = null;
+  let bestDist = Infinity;
+  for (const y of availableYears) {
+    const dist = Math.abs(SLIDER_YEARS.indexOf(y) - targetIdx);
+    if (dist < bestDist) {
+      best = y;
+      bestDist = dist;
+    }
+  }
+  return best;
+}

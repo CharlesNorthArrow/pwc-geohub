@@ -3,23 +3,21 @@
 import IndicatorSelector from './IndicatorSelector';
 import Legend from './Legend';
 import Logo from './Logo';
-import NoDataNotice from './NoDataNotice';
 import type { IndicatorPublic } from '../contract/types';
+import type { SliderYear } from '../contract/year';
 
 interface Props {
   indicators: IndicatorPublic[];
   /** Current slider position (always set; spec §6.5 default = 2024-25). */
-  sliderYear: string;
+  sliderYear: SliderYear;
   schoolIndicator: IndicatorPublic | null;
   /** School layer's resolved year, or null when the slider year has no school data. */
   schoolYear: string | null;
   schoolDomain: { min: number; max: number } | null;
-  schoolNoData: boolean;
   communityIndicator: IndicatorPublic | null;
   /** Community layer's resolved year (calendar year), or null when missing. */
   communityYear: string | null;
   communityDomain: { min: number; max: number } | null;
-  communityNoData: boolean;
 }
 
 export default function LeftPanel({
@@ -28,11 +26,9 @@ export default function LeftPanel({
   schoolIndicator,
   schoolYear,
   schoolDomain,
-  schoolNoData,
   communityIndicator,
   communityYear,
   communityDomain,
-  communityNoData,
 }: Props): React.JSX.Element {
   return (
     <aside
@@ -78,10 +74,9 @@ export default function LeftPanel({
             Legend
           </div>
           <Legend
-            // Always pass the indicator itself — the legend renders the title
-            // and falls back to "No values in range" when the domain is null
-            // (the no-data case). The NoDataNotice below the legend is the
-            // explicit surface for "no YYYY-YY data".
+            // The YearBadge pill at the top of each family's legend section
+            // is the explicit surface for "no YYYY-YY data" and offers the
+            // jump-to-nearest affordance.
             schoolIndicator={schoolIndicator}
             schoolDomain={schoolDomain}
             schoolYear={schoolYear}
@@ -90,22 +85,6 @@ export default function LeftPanel({
             communityYear={communityYear}
             sliderYear={sliderYear}
           />
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {schoolNoData && schoolIndicator ? (
-              <NoDataNotice
-                family="school"
-                indicatorLabel={schoolIndicator.label}
-                year={sliderYear}
-              />
-            ) : null}
-            {communityNoData && communityIndicator ? (
-              <NoDataNotice
-                family="community"
-                indicatorLabel={communityIndicator.label}
-                year={sliderYear}
-              />
-            ) : null}
-          </div>
         </section>
       </div>
     </aside>
