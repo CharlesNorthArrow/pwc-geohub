@@ -34,6 +34,25 @@ export function toCommunityYear(schoolYear: string): string | null {
   return String(startYear + 1);
 }
 
+/**
+ * Inverse of `toCommunityYear`. Maps a community calendar year back to the
+ * slider's school_year by subtracting one from the start year:
+ *   "2021" → "2020-21", "2022" → "2021-22", … "2025" → "2024-25".
+ *
+ * Returns null when the calendar year falls outside `SLIDER_YEARS` (e.g.
+ * "2020" would be "2019-20" — pre-slider). Used by Shell to remap community
+ * analytics series rows into the slider's year space so `deriveAnalytics`
+ * stays family-agnostic.
+ */
+export function fromCommunityYear(communityYear: string): SliderYear | null {
+  const n = Number.parseInt(communityYear, 10);
+  if (!Number.isFinite(n)) return null;
+  const start = n - 1;
+  const tail = String((start + 1) % 100).padStart(2, '0');
+  const candidate = `${start}-${tail}`;
+  return isSliderYear(candidate) ? (candidate as SliderYear) : null;
+}
+
 export function isSliderYear(s: string): s is SliderYear {
   return (SLIDER_YEARS as readonly string[]).includes(s);
 }

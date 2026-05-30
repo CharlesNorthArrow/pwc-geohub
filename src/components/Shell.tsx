@@ -21,6 +21,7 @@ import {
 } from '../contract/client';
 import type {
   AnalyticsSeriesResponse,
+  AnalyticsSeriesRow,
   CommunityResponse,
   GeographiesResponse,
   GeoSelectionResponse,
@@ -34,7 +35,13 @@ import type {
 import { useHubStore } from '../store/useHubStore';
 import { applyFilters, type FilteredUniverse } from '../store/derived';
 import { deriveAnalytics, type Analytics } from '../store/analytics';
-import { isSliderYear, SLIDER_YEARS, toCommunityYear, type SliderYear } from '../contract/year';
+import {
+  fromCommunityYear,
+  isSliderYear,
+  SLIDER_YEARS,
+  toCommunityYear,
+  type SliderYear,
+} from '../contract/year';
 
 interface InitialProps {
   initialIndicators: IndicatorPublic[];
@@ -325,17 +332,56 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     };
   }, [analyticsIndicator, analyticsAggArea]);
 
+  /**
+   * Community series rows speak calendar year ("2024"); the slider and
+   * `deriveAnalytics` speak school_year ("2024-25"). Remap upfront so the
+   * derivation stays family-agnostic. Rows whose calendar year falls outside
+   * the slider window (e.g. "2020" → "2019-20") get dropped — those slider
+   * positions don't exist anyway.
+   */
+  const normalizedAnalyticsSeries: AnalyticsSeriesRow[] | null = useMemo(() => {
+    if (!analyticsSeries || !analyticsIndicator) return null;
+    if (analyticsIndicator.family === 'school') return analyticsSeries.series;
+    const out: AnalyticsSeriesRow[] = [];
+    for (const r of analyticsSeries.series) {
+      const sy = fromCommunityYear(r.year);
+      if (!sy) continue;
+      out.push({ ...r, year: sy });
+    }
+    return out;
+  }, [analyticsSeries, analyticsIndicator]);
+
+  /** Numeric analytics aren't computable for categorical indicators (the
+   *  server averages NULL value_num). RightPanel shows a notice instead. */
+  const analyticsUnavailable =
+    analyticsIndicator?.scale.type === 'categorical';
+
   const analytics: Analytics | null = useMemo(() => {
-    if (!analyticsIndicator || !analyticsSeries || !pwcHistory || !schoolsMaster) return null;
+    if (
+      !analyticsIndicator ||
+      !normalizedAnalyticsSeries ||
+      !pwcHistory ||
+      !schoolsMaster ||
+      analyticsUnavailable
+    )
+      return null;
     return deriveAnalytics({
       indicator: analyticsIndicator,
       year,
-      series: analyticsSeries.series,
+      series: normalizedAnalyticsSeries,
       pwcByYear: pwcHistory.byYear,
       universe,
       timelineYears: SLIDER_YEARS,
     });
-  }, [analyticsIndicator, analyticsSeries, pwcHistory, schoolsMaster, year, universe]);
+  }, [
+    analyticsIndicator,
+    normalizedAnalyticsSeries,
+    pwcHistory,
+    schoolsMaster,
+    year,
+    universe,
+    analyticsUnavailable,
+  ]);
 
   /* -------------------- Selected school + flyTo -------------------- */
   const selectedSchoolCoords = useMemo(() => {
@@ -430,6 +476,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       <RightPanel
         indicator={analyticsIndicator}
         analytics={analytics}
+        analyticsUnavailable={analyticsUnavailable}
         schoolsMaster={schoolsMaster ?? []}
         year={year}
         showAggregationToggle={analyticsIndicator?.family === 'community'}

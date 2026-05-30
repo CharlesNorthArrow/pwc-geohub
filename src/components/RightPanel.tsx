@@ -14,6 +14,10 @@ import type { Analytics } from '../store/analytics';
 interface Props {
   indicator: IndicatorPublic | null;
   analytics: Analytics | null;
+  /** True when the indicator's scale is categorical — the server averages
+   *  a NULL `value_num` for those, so numeric KPIs/timeline/list aren't
+   *  meaningful. RightPanel shows a friendly notice instead. */
+  analyticsUnavailable: boolean;
   schoolsMaster: SchoolMaster[];
   year: string;
   /** True when the active indicator is community → show aggregation toggle. */
@@ -39,6 +43,7 @@ interface Props {
 export default function RightPanel({
   indicator,
   analytics,
+  analyticsUnavailable,
   schoolsMaster,
   year,
   showAggregationToggle,
@@ -150,7 +155,9 @@ export default function RightPanel({
 
       {showAggregationToggle ? <AggregationToggle /> : null}
 
-      {indicator && analytics ? (
+      {indicator && analyticsUnavailable ? (
+        <CategoricalNotice />
+      ) : indicator && analytics ? (
         <>
           <KpiCards indicator={indicator} kpis={analytics.kpis} year={year} />
           <section>
@@ -195,6 +202,34 @@ export default function RightPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+/** Shown for categorical indicators (e.g. racial_predominance) where the
+ *  server-side AVG(value_num) returns NULL, so numeric KPIs/timeline/list
+ *  aren't computable. Points users at the map for the per-tract category. */
+function CategoricalNotice(): React.JSX.Element {
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        padding: 12,
+        border: '1px solid #dde4ea',
+        borderRadius: 6,
+        background: '#fbfcfe',
+        fontSize: 12,
+        color: '#002040',
+        lineHeight: 1.4,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+        Numeric analytics not available
+      </div>
+      <div style={{ color: '#467c9d' }}>
+        This is a categorical indicator. The map shows the per-tract category;
+        per-school averages aren't meaningful here.
+      </div>
+    </div>
   );
 }
 
