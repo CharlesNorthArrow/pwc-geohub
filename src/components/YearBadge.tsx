@@ -40,7 +40,7 @@ export default function YearBadge({
   const familyLabel = family === 'school' ? 'School' : 'Community';
   if (displayYear) {
     return (
-      <span style={pillStyle({ tone: 'ok' })}>
+      <span style={pillStyle({ tone: 'ok', family })}>
         <span style={{ opacity: 0.75 }}>{familyLabel}</span>
         <span style={separatorStyle}>·</span>
         <span style={{ fontWeight: 700 }}>{displayYear}</span>
@@ -52,7 +52,7 @@ export default function YearBadge({
   const available = indicatorSliderYears(family, indicator.years);
   const nearest = nearestSliderYear(sliderYear, available);
   return (
-    <span style={pillStyle({ tone: 'warn' })}>
+    <span style={pillStyle({ tone: 'warn', family })}>
       <span aria-hidden style={{ fontSize: 11, lineHeight: 1 }}>
         🗓️
       </span>
@@ -81,34 +81,48 @@ const separatorStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-function pillStyle({ tone }: { tone: 'ok' | 'warn' }): React.CSSProperties {
-  if (tone === 'warn') {
-    return {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      padding: '2px 8px',
-      borderRadius: 999,
-      background: '#fff1e3',
-      border: '1px solid #f3c89a',
-      color: '#9a4a08',
-      fontSize: 11,
-      lineHeight: 1.4,
-      whiteSpace: 'nowrap',
-    };
-  }
-  return {
+function pillStyle({
+  tone,
+  family,
+}: {
+  tone: 'ok' | 'warn';
+  family: 'school' | 'community';
+}): React.CSSProperties {
+  const base: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 5,
     padding: '2px 8px',
     borderRadius: 999,
-    background: '#eef4f8',
-    border: '1px solid #cbd9e3',
-    color: '#1a4a73',
     fontSize: 11,
     lineHeight: 1.4,
     whiteSpace: 'nowrap',
+  };
+  if (tone === 'warn') {
+    // Warning stays amber regardless of family — the missing-data signal
+    // should read the same way for school and community.
+    return {
+      ...base,
+      background: '#fff1e3',
+      border: '1px solid #f3c89a',
+      color: '#9a4a08',
+    };
+  }
+  // OK pill — community gets a soft orange tint so it visually echoes the
+  // per-family slider dots above. School keeps the muted blue.
+  if (family === 'community') {
+    return {
+      ...base,
+      background: '#fdf1e2',
+      border: '1px solid #f5d4a8',
+      color: '#7a4106',
+    };
+  }
+  return {
+    ...base,
+    background: '#eef4f8',
+    border: '1px solid #cbd9e3',
+    color: '#1a4a73',
   };
 }
 

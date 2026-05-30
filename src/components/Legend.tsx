@@ -74,8 +74,15 @@ const BASELINE_NONPWC_OPACITY = 0.4;
 const PWC_MAGENTA = '#903090';
 const PWC_ORANGE = '#F0901F';
 
-/** Tiny ALL-CAPS family label (School / Community). */
-function FamilyTag({ children }: { children: React.ReactNode }): React.JSX.Element {
+/** Tiny ALL-CAPS family label (School / Community). Colored per family so
+ *  the legend's accent matches the per-family slider dots above. */
+function FamilyTag({
+  children,
+  family = 'school',
+}: {
+  children: React.ReactNode;
+  family?: 'school' | 'community';
+}): React.JSX.Element {
   return (
     <div
       style={{
@@ -83,7 +90,7 @@ function FamilyTag({ children }: { children: React.ReactNode }): React.JSX.Eleme
         fontWeight: 700,
         letterSpacing: 0.6,
         textTransform: 'uppercase',
-        color: '#467c9d',
+        color: family === 'community' ? PWC_ORANGE : '#467c9d',
         marginBottom: 2,
       }}
     >
@@ -389,7 +396,7 @@ function CommunityLegend({
 }): React.JSX.Element {
   return (
     <div>
-      <FamilyTag>Community</FamilyTag>
+      <FamilyTag family="community">Community</FamilyTag>
       <IndicatorTitleRow
         family="community"
         indicator={indicator}

@@ -293,7 +293,7 @@ function FamilyToggleButton({
       onClick={onClick}
       aria-pressed={active}
       style={{
-        background: active ? '#027BC0' : 'transparent',
+        background: active ? (family === 'community' ? '#F0901F' : '#027BC0') : 'transparent',
         color: active ? 'white' : '#002040',
         border: 'none',
         padding: '6px 8px',

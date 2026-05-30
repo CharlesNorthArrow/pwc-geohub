@@ -36,6 +36,7 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         items={school}
         activeId={activeSchool}
         themeOrder={SCHOOL_THEME_ORDER}
+        family="school"
         onPick={(id) => setSchool(activeSchool === id ? null : id)}
         titleAction={
           <HideFamilyToggle
@@ -50,6 +51,7 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         items={community}
         activeId={activeCommunity}
         flat
+        family="community"
         onPick={(id) => setCommunity(activeCommunity === id ? null : id)}
         titleAction={
           <HideFamilyToggle
@@ -62,6 +64,13 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
     </div>
   );
 }
+
+/* Family accent colors — match the per-family slider dots so picking a
+ * community indicator surfaces the same orange across the panel. */
+const FAMILY_ACCENT: Record<'school' | 'community', string> = {
+  school: '#027BC0',
+  community: '#F0901F',
+};
 
 /** Small eye toggle that sits inside a family title row. Hides every layer
  *  for that family on the map without clearing the active indicator — flip
@@ -132,6 +141,7 @@ function FamilyGroup({
   activeId,
   themeOrder,
   flat = false,
+  family,
   onPick,
   titleAction,
 }: {
@@ -142,10 +152,13 @@ function FamilyGroup({
   flat?: boolean;
   /** When set, render themes in this order; otherwise registry order. */
   themeOrder?: readonly string[];
+  /** Drives the accent color used for the active row + theme highlight. */
+  family: 'school' | 'community';
   onPick: (id: string) => void;
   /** Optional right-aligned element rendered inside the title row. */
   titleAction?: React.ReactNode;
 }): React.JSX.Element {
+  const accent = FAMILY_ACCENT[family];
   // Group by theme, then apply an explicit order when one is provided. Themes
   // not listed in `themeOrder` are appended (alphabetical) so a new theme
   // doesn't quietly disappear before the order constant is updated.
@@ -236,6 +249,7 @@ function FamilyGroup({
               key={i.id}
               indicator={i}
               selected={i.id === activeId}
+              accent={accent}
               onPick={() => onPick(i.id)}
             />
           ))}
@@ -259,7 +273,7 @@ function FamilyGroup({
                   padding: '2px 0',
                   fontSize: 11,
                   cursor: 'pointer',
-                  color: hasActive ? '#027BC0' : '#467c9d',
+                  color: hasActive ? accent : '#467c9d',
                   fontWeight: hasActive ? 700 : 500,
                   display: 'flex',
                   alignItems: 'center',
@@ -278,6 +292,7 @@ function FamilyGroup({
                       key={i.id}
                       indicator={i}
                       selected={i.id === activeId}
+                      accent={accent}
                       onPick={() => onPick(i.id)}
                     />
                   ))}
@@ -295,10 +310,13 @@ function FamilyGroup({
 function IndicatorRow({
   indicator,
   selected,
+  accent,
   onPick,
 }: {
   indicator: IndicatorPublic;
   selected: boolean;
+  /** Family accent color for the selected-row background. */
+  accent: string;
   onPick: () => void;
 }): React.JSX.Element {
   const short = indicator.short_label ?? indicator.label;
@@ -324,7 +342,7 @@ function IndicatorRow({
         gap: 4,
         padding: '2px 4px',
         borderRadius: 4,
-        background: selected ? '#027BC0' : 'transparent',
+        background: selected ? accent : 'transparent',
         color: selected ? 'white' : '#002040',
       }}
     >
