@@ -21,6 +21,8 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
   const activeCommunity = useHubStore((s) => s.activeCommunityIndicator);
   const setSchool = useHubStore((s) => s.setSchoolIndicator);
   const setCommunity = useHubStore((s) => s.setCommunityIndicator);
+  const schoolsHidden = useHubStore((s) => s.schoolsHidden);
+  const setSchoolsHidden = useHubStore((s) => s.setSchoolsHidden);
 
   const school = useMemo(() => indicators.filter((i) => i.family === 'school'), [indicators]);
   const community = useMemo(() => indicators.filter((i) => i.family === 'community'), [indicators]);
@@ -33,6 +35,12 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
         activeId={activeSchool}
         themeOrder={SCHOOL_THEME_ORDER}
         onPick={(id) => setSchool(activeSchool === id ? null : id)}
+        titleAction={
+          <HideSchoolsToggle
+            hidden={schoolsHidden}
+            onToggle={() => setSchoolsHidden(!schoolsHidden)}
+          />
+        }
       />
       <FamilyGroup
         title="Community indicators"
@@ -45,6 +53,66 @@ export default function IndicatorSelector({ indicators }: Props): React.JSX.Elem
   );
 }
 
+/** Small eye toggle that sits in the "School indicators" title row.
+ *  Hides every school dot + halo on the map without clearing the active
+ *  indicator — flip back on and the gradient returns immediately. */
+function HideSchoolsToggle({
+  hidden,
+  onToggle,
+}: {
+  hidden: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!hidden}
+      aria-label={hidden ? 'Show schools on map' : 'Hide schools on map'}
+      title={hidden ? 'Show schools on map' : 'Hide schools on map'}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 2,
+        display: 'inline-flex',
+        alignItems: 'center',
+        color: hidden ? '#a8b3bf' : '#027BC0',
+        textTransform: 'none',
+        letterSpacing: 0,
+      }}
+    >
+      <EyeIcon hidden={hidden} />
+    </button>
+  );
+}
+
+/** 14×14 eye SVG with an optional diagonal "off" slash. */
+function EyeIcon({ hidden }: { hidden: boolean }): React.JSX.Element {
+  return (
+    <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden>
+      <path
+        d="M1.5 8 C 3.5 4.5, 5.8 3, 8 3 S 12.5 4.5, 14.5 8 C 12.5 11.5, 10.2 13, 8 13 S 3.5 11.5, 1.5 8 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.4}
+      />
+      <circle cx={8} cy={8} r={2.2} fill="currentColor" />
+      {hidden ? (
+        <line
+          x1={2}
+          y1={14}
+          x2={14}
+          y2={2}
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 function FamilyGroup({
   title,
   items,
@@ -52,6 +120,7 @@ function FamilyGroup({
   themeOrder,
   flat = false,
   onPick,
+  titleAction,
 }: {
   title: string;
   items: IndicatorPublic[];
@@ -61,6 +130,8 @@ function FamilyGroup({
   /** When set, render themes in this order; otherwise registry order. */
   themeOrder?: readonly string[];
   onPick: (id: string) => void;
+  /** Optional right-aligned element rendered inside the title row. */
+  titleAction?: React.ReactNode;
 }): React.JSX.Element {
   // Group by theme, then apply an explicit order when one is provided. Themes
   // not listed in `themeOrder` are appended (alphabetical) so a new theme
@@ -129,6 +200,10 @@ function FamilyGroup({
     <div>
       <div
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6,
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: 0.5,
@@ -137,7 +212,8 @@ function FamilyGroup({
           marginBottom: 4,
         }}
       >
-        {title}
+        <span>{title}</span>
+        {titleAction}
       </div>
       {flat ? (
         // Community indicators render as a flat list — no theme headers.

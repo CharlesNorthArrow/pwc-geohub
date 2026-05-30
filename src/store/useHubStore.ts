@@ -65,6 +65,11 @@ export interface HubState {
    *  preference is ignored (effective family is forced to whichever exists). */
   analyticsFamily: 'school' | 'community';
 
+  /** When true, every school dot (incl. PWC halos) is hidden from the map.
+   *  Indicators stay selectable so the user can flip schools back on without
+   *  losing context. */
+  schoolsHidden: boolean;
+
   setSchoolIndicator: (id: string | null) => void;
   setCommunityIndicator: (id: string | null) => void;
   setYear: (year: SliderYear) => void;
@@ -76,6 +81,7 @@ export interface HubState {
   setAggregationArea: (a: AggregationArea) => void;
   setRightPanelCollapsed: (collapsed: boolean) => void;
   setAnalyticsFamily: (f: 'school' | 'community') => void;
+  setSchoolsHidden: (hidden: boolean) => void;
 }
 
 export const useHubStore = create<HubState>((set) => ({
@@ -92,6 +98,7 @@ export const useHubStore = create<HubState>((set) => ({
   // truthy and re-collapses when it goes back to null.
   rightPanelCollapsed: true,
   analyticsFamily: 'school',
+  schoolsHidden: false,
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
   setYear: (year) => set({ year }),
@@ -103,4 +110,5 @@ export const useHubStore = create<HubState>((set) => ({
   setAggregationArea: (a) => set({ aggregationArea: a }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),
   setAnalyticsFamily: (f) => set({ analyticsFamily: f }),
+  setSchoolsHidden: (hidden) => set({ schoolsHidden: hidden }),
 }));

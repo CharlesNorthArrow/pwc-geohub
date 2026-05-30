@@ -85,6 +85,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const rightPanelCollapsed = useHubStore((s) => s.rightPanelCollapsed);
   const setRightPanelCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
   const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
+  const schoolsHidden = useHubStore((s) => s.schoolsHidden);
 
   // One-shot fetches.
   useEffect(() => {
@@ -470,11 +471,13 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           <MapView
             schoolIndicator={schoolIndicator}
             schoolPoints={
-              schoolIndicator
-                ? schoolNoData
-                  ? null
-                  : enrichedSchoolData
-                : baselineSchoolData
+              schoolsHidden
+                ? null
+                : schoolIndicator
+                  ? schoolNoData
+                    ? null
+                    : enrichedSchoolData
+                  : baselineSchoolData
             }
             communityIndicator={communityIndicator}
             communityValues={communityNoData ? null : communityData}
