@@ -28,8 +28,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'arts_ed_score',
     family: 'school',
     theme: 'Student experience',
-    label: 'Arts education access (# disciplines, 0–4)',
-    short_label: 'Arts education',
+    label: 'Art Education Access',
+    short_label: 'Art Education',
+    description: '# of artistic disciplines taught',
     data_source: 'NYC DOE Annual Arts in Schools Report',
     data_source_url:
       'https://sites.google.com/schools.nyc.gov/nycdoe-oasp/nycps-arts-data',

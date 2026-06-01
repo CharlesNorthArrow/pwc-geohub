@@ -113,8 +113,10 @@ export function colorExpression(bins: ColorBins, valueAccessor: unknown[]): unkn
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fixed 5-bin radii driven by total_enrollment. Stable across indicators so
- * size is comparable when switching the active indicator (spec §4.2).
+ * Reference radii (in CSS pixels) driven by total_enrollment. These are the
+ * sizes at the LEGEND zoom — the on-map size scales up/down with zoom via
+ * `radiusExpression`'s interpolation (see below). Stable across indicators
+ * so size is comparable when switching the active indicator (spec §4.2).
  */
 export const ENROLLMENT_BINS = [
   { upTo: 200, radius: 3, label: '≤200' },
@@ -124,8 +126,8 @@ export const ENROLLMENT_BINS = [
   { upTo: Infinity, radius: 12, label: '>1,200' },
 ] as const;
 
-export function radiusExpression(): unknown {
-  // MapLibre `step` on properties.total_enrollment. Missing → smallest dot.
+/** Internal: the enrollment-driven reference radius (no zoom scaling). */
+function baseRadiusExpression(): unknown {
   const fallback = 2;
   return [
     'case',
@@ -139,4 +141,59 @@ export function radiusExpression(): unknown {
       ENROLLMENT_BINS[3].upTo, ENROLLMENT_BINS[4].radius,
     ],
   ];
+}
+
+/**
+ * Build a zoom-interpolated `circle-radius` expression with a per-stop offset
+ * baked in. MapLibre requires `['zoom']` at the TOP LEVEL of a `step` or
+ * `interpolate` — so the offset (backdrop +2 px, halo-outer "+2 px if both")
+ * is added inside each stop's output rather than wrapping the whole thing.
+ *
+ * Zoom factor never drops below 1.0 — at city-overview zoom dots sit at
+ * their enrollment-driven reference size (preserving the size→enrollment
+ * encoding) and grow as the user zooms in so they stay proportionate to
+ * streets and buildings.
+ *
+ *   z ≤ 11  → 1.0× (reference)
+ *   z 13   → 1.4×  (NTA / Detail Panel zoom)
+ *   z 15   → 2.0×
+ *   z 18   → 3.2×
+ */
+function zoomScaledRadius(offsetExpr: number | unknown): unknown {
+  const base = baseRadiusExpression();
+  const factored = (factor: number): unknown =>
+    typeof offsetExpr === 'number' && offsetExpr === 0
+      ? ['*', base, factor]
+      : ['+', ['*', base, factor], offsetExpr];
+  return [
+    'interpolate', ['exponential', 1.6], ['zoom'],
+    11, factored(1.0),
+    13, factored(1.4),
+    15, factored(2.0),
+    18, factored(3.2),
+  ];
+}
+
+/** Radius for the school-dot layers + halo inner. */
+export function radiusExpression(): unknown {
+  return zoomScaledRadius(0);
+}
+
+/** Radius for the soft drop-shadow backdrop — same zoom curve, plus a 2 px
+ *  offset so the shadow always peeks out around the dot. */
+export function backdropRadiusExpression(): unknown {
+  return zoomScaledRadius(2);
+}
+
+/** Radius for the halo OUTER ring — same zoom curve, plus a 2 px offset
+ *  ONLY for both-category PWC schools (anchor + healing arts). Anchor-only
+ *  and HA-only schools get a single ring hugging the dot circumference. */
+export function haloOuterRadiusExpression(): unknown {
+  const bothOffset: unknown = [
+    'case',
+    ['all', ['==', ['get', 'is_anchor'], true], ['==', ['get', 'is_arts'], true]],
+    2,
+    0,
+  ];
+  return zoomScaledRadius(bothOffset);
 }

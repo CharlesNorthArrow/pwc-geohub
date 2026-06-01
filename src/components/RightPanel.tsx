@@ -30,6 +30,10 @@ interface Props {
   /** Labels for the toggle buttons (skipped when the family isn't active). */
   schoolIndicatorLabel: string | null;
   communityIndicatorLabel: string | null;
+  /** Label for the third timeline series (the one drawn over universe.afterSchoolType).
+   *  "Citywide" when no Geo/School Type filter is active; otherwise describes
+   *  the filter so the legend stays honest. */
+  comparisonLabel: string;
 }
 
 /**
@@ -51,6 +55,7 @@ export default function RightPanel({
   familyToggleValue,
   schoolIndicatorLabel,
   communityIndicatorLabel,
+  comparisonLabel,
 }: Props): React.JSX.Element {
   const collapsed = useHubStore((s) => s.rightPanelCollapsed);
   const setCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
@@ -173,7 +178,12 @@ export default function RightPanel({
             >
               5-year trend
             </div>
-            <Timeline indicator={indicator} points={analytics.timeline} activeYear={year} />
+            <Timeline
+              indicator={indicator}
+              points={analytics.timeline}
+              activeYear={year}
+              comparisonLabel={comparisonLabel}
+            />
           </section>
           <section>
             <div

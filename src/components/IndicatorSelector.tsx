@@ -328,6 +328,7 @@ function IndicatorRow({
         : `${indicator.years[0]} – ${indicator.years[indicator.years.length - 1]}`;
   const tooltip = [
     indicator.label,
+    indicator.description ?? null,
     `Source: ${indicator.source_description}`,
     indicator.source_url ?? null,
     yearSpan ? `Years: ${yearSpan}` : null,

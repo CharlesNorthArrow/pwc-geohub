@@ -8,6 +8,10 @@ interface Props {
   points: TimelinePoint[];
   /** Slider year — drawn as a vertical marker. */
   activeYear: string;
+  /** Legend label for the reference (third) series. "Citywide" when no
+   *  Geo/School Type filter is active; under filters it describes the
+   *  actual comparison cohort. */
+  comparisonLabel: string;
 }
 
 const SERIES_COLORS = {
@@ -18,7 +22,12 @@ const SERIES_COLORS = {
 
 /** Spec §5.2 — 3 series + vertical marker at the selected year.
  *  Custom SVG, no chart library. */
-export default function Timeline({ indicator, points, activeYear }: Props): React.JSX.Element {
+export default function Timeline({
+  indicator,
+  points,
+  activeYear,
+  comparisonLabel,
+}: Props): React.JSX.Element {
   const width = 320;
   const height = 130;
   const padL = 36;
@@ -135,11 +144,13 @@ export default function Timeline({ indicator, points, activeYear }: Props): Reac
           </text>
         ))}
       </svg>
-      {/* Legend strip */}
-      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#467c9d', marginTop: 4 }}>
+      {/* Legend strip — the third series's label is dynamic ("Citywide" when
+       *  the user has no Geo/School Type filter active, otherwise reflects
+       *  the actual cohort that line is averaged over). */}
+      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#467c9d', marginTop: 4, flexWrap: 'wrap' }}>
         <LegendDot color={SERIES_COLORS.anchor} label="Anchor" />
         <LegendDot color={SERIES_COLORS.healing_arts} label="Healing Arts" />
-        <LegendDot color={SERIES_COLORS.citywide} label="Citywide" />
+        <LegendDot color={SERIES_COLORS.citywide} label={comparisonLabel} />
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 /**
  * "Top Logo Corner" — pinned above the left panel, never scrolls.
@@ -24,7 +26,11 @@ export default function Logo(): React.JSX.Element {
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        padding: '10px 12px',
+        padding: '0 12px',
+        // Locked to the same height as the dashboard's filter HeaderBar so
+        // the orange bottom border reads as one continuous line across both
+        // containers at the top of the dashboard.
+        minHeight: 64,
         background: '#027BC0',
         color: '#ffffff',
         borderBottom: '3px solid #F0901F',
@@ -68,7 +74,12 @@ export default function Logo(): React.JSX.Element {
         </div>
       </a>
       <CreditsButton />
+      <ScorecardButton />
       <AdminButton />
+      {/* Back-to-dashboard pill — only on the Scorecard route. Sits to the
+       *  right of the three icon buttons so users always have a prominent
+       *  return path. */}
+      <BackToDashboardButton />
     </div>
   );
 }
@@ -238,6 +249,106 @@ function CreditsButton(): React.JSX.Element {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * View switcher → Indicator Scorecard. When already on /scorecard the button
+ * is rendered in its active style AND its href flips to "/" so a second
+ * click takes the user back to the dashboard. Same idea works for the
+ * future Admin route.
+ */
+function ScorecardButton(): React.JSX.Element {
+  const pathname = usePathname();
+  const isActive = pathname === '/scorecard';
+  const href = isActive ? '/' : '/scorecard';
+  const label = isActive ? 'Back to dashboard' : 'Open Indicator Scorecard';
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      style={{
+        ...iconBtnStyle(isActive),
+        textDecoration: 'none',
+      }}
+    >
+      <ScorecardIcon />
+    </Link>
+  );
+}
+
+/** 14×14 horizontal-bar-chart icon — three bars of decreasing length. Visual
+ *  shorthand for a scorecard / leaderboard. Drawn at 16×16 inside a 24×24
+ *  pill so it stays optically centered with the round "i" + gear glyphs. */
+function ScorecardIcon(): React.JSX.Element {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    >
+      {/* axis */}
+      <line x1={2.5} y1={2} x2={2.5} y2={14} />
+      <line x1={2.5} y1={14} x2={14.5} y2={14} />
+      {/* bars */}
+      <line x1={5} y1={4.5} x2={13.5} y2={4.5} />
+      <line x1={5} y1={8} x2={11} y2={8} />
+      <line x1={5} y1={11.5} x2={9} y2={11.5} />
+    </svg>
+  );
+}
+
+/**
+ * Prominent "← Back to dashboard" pill — only rendered on /scorecard so the
+ * dashboard's header bar stays uncluttered. Sits at the rightmost slot of
+ * the Logo bar, after the three icon buttons.
+ */
+function BackToDashboardButton(): React.JSX.Element | null {
+  const pathname = usePathname();
+  if (pathname !== '/scorecard') return null;
+  return (
+    <Link
+      href="/"
+      aria-label="Back to dashboard"
+      title="Back to dashboard"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '5px 12px',
+        background: 'white',
+        color: '#027BC0',
+        border: '1px solid rgba(255,255,255,0.6)',
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+        marginLeft: 4,
+      }}
+    >
+      <svg
+        width={12}
+        height={12}
+        viewBox="0 0 12 12"
+        aria-hidden
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <polyline points="7,2 3,6 7,10" />
+        <line x1={3} y1={6} x2={10} y2={6} />
+      </svg>
+      Back to dashboard
+    </Link>
   );
 }
 

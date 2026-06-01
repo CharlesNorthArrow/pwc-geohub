@@ -147,8 +147,12 @@ export default function HeaderBar({
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        padding: '8px 12px',
-        borderBottom: '1px solid #e5e9ee',
+        padding: '0 12px',
+        // Match the Logo container exactly so the orange bottom border reads
+        // as one continuous line across the dashboard's top edge.
+        minHeight: 64,
+        borderBottom: '3px solid #F0901F',
+        boxShadow: '0 1px 2px rgba(0, 32, 64, 0.12)',
         background: '#ffffff',
         flexWrap: 'wrap',
       }}

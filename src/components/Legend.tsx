@@ -296,8 +296,8 @@ function SchoolLegend({
   );
 }
 
-/** Hollow ring + label — pairs with MapView's no-data treatment in
- *  indicator mode. Brand-blue stroke at the same width the map draws (1.5px). */
+/** Hollow ring + label — mirrors MapView's no-data treatment in indicator
+ *  mode (grey stroke, transparent fill, 1.5px width). */
 function NoDataRow(): React.JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -309,7 +309,7 @@ function NoDataRow(): React.JSX.Element {
           height: 14,
           borderRadius: '50%',
           background: 'transparent',
-          border: '1.5px solid #467c9d',
+          border: '1.5px solid #7a8896',
           boxSizing: 'border-box',
         }}
       />

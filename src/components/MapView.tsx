@@ -14,8 +14,10 @@ import type {
   SchoolsResponse,
 } from '../contract/types';
 import {
+  backdropRadiusExpression,
   colorBinsFor,
   colorExpression,
+  haloOuterRadiusExpression,
   radiusExpression,
 } from '../map/encoding';
 import type { SchoolType } from '../store/useHubStore';
@@ -97,14 +99,16 @@ const TRANSPARENT = 'rgba(0,0,0,0)';
 const BASELINE_FILL = '#7BA7C9';
 const BASELINE_NONPWC_OPACITY = 0.4;
 
-/** Stroke used to draw "no data" schools as a hollow ring (indicator mode
- *  only). Brand mid-blue at full strength reads as a neutral pin — clearly
- *  different from "lowest bin of the gradient". */
-const NO_DATA_STROKE = '#467c9d';
+/** Stroke for "no data" schools (indicator mode) — medium neutral grey on a
+ *  transparent fill, so the absence-of-fill is the only "no data" cue. Same
+ *  grey appears in the legend's NoDataRow. Circles WITH data keep the white
+ *  stroke that reads cleanly against any indicator color. */
+const NO_DATA_STROKE = '#7a8896';
 
-/** Subtle dark backdrop behind every visible school dot. Semi-transparent
- *  navy + circle-blur gives a soft drop-shadow effect without dominating. */
-const BACKDROP_FILL = 'rgba(0, 32, 64, 0.22)';
+/** Drop shadow behind every visible school dot — bumped from the prior
+ *  0.22 alpha to make the shadow legible against light basemap tiles.
+ *  Paired with circle-blur 0.7 + a +2 px radius offset below. */
+const BACKDROP_FILL = 'rgba(0, 32, 64, 0.45)';
 
 /**
  * PWC fill-color expression for baseline (no indicator) mode. Anchor (incl.
@@ -124,8 +128,8 @@ const PWC_BASELINE_FILL_EXPR: unknown = [
 /**
  * In baseline mode we replace halos with a single solid stroke around the
  * PWC dot. Both-category schools (anchor + healing-arts) read as a magenta
- * fill with orange stroke; anchor-only / pwc_other get a faint white stroke
- * to keep them readable on dense backgrounds.
+ * fill with orange stroke; anchor-only / pwc_other get a white stroke to
+ * keep them readable on dense backgrounds.
  */
 const PWC_BASELINE_STROKE_COLOR_EXPR: unknown = [
   'case',
@@ -244,10 +248,10 @@ export default function MapView({
         source: SOURCE_SCHOOLS,
         paint: {
           'circle-color': BACKDROP_FILL,
-          // Radius (data radius + 1) is set in the data effect; placeholder
+          // Radius (data radius + 2) is set in the data effect; placeholder
           // here so MapLibre validates the paint object.
-          'circle-radius': 5,
-          'circle-blur': 0.55,
+          'circle-radius': 6,
+          'circle-blur': 0.7,
           'circle-stroke-width': 0,
           'circle-opacity': 1,
         },
@@ -392,12 +396,15 @@ export default function MapView({
         map.setPaintProperty(id, 'circle-radius', dataRadius as never);
       }
 
-      // Backdrop radius is always 1px wider than the data dot so a soft
-      // shadow peeks out from behind the circle.
+      // Backdrop radius is 2 px wider than the data dot so a soft drop
+      // shadow peeks out from behind the circle (paired with the bumped
+      // BACKDROP_FILL alpha + circle-blur on the layer itself). Built as a
+      // sibling interpolate-zoom expression — `['+', dataRadius, 2]` would
+      // wrap zoom in arithmetic, which MapLibre rejects.
       map.setPaintProperty(
         LAYER_SCHOOLS_BACKDROP,
         'circle-radius',
-        ['+', dataRadius, 1] as never,
+        backdropRadiusExpression() as never,
       );
 
       if (!schoolIndicator) {
@@ -432,7 +439,7 @@ export default function MapView({
       // INDICATOR mode: both PWC and non-PWC dots share the gradient so
       // values are comparable; PWC schools are flagged by halos sitting
       // above the non-PWC layer. Schools with `value_num == null` render
-      // as a hollow ring (no fill, brand-blue stroke) so they're clearly
+      // as a hollow ring (no fill, grey stroke) so they're clearly
       // distinguishable from "lowest-bin gradient color".
       const bins = colorBinsFor(schoolIndicator, schoolPoints.domain);
       const baseColorExpr = colorExpression(
@@ -446,6 +453,9 @@ export default function MapView({
         ['==', ['get', 'value_num'], null], TRANSPARENT,
         baseColorExpr,
       ];
+      // Dots WITH data → white stroke (reads cleanly on any indicator color).
+      // Dots without data → grey stroke + transparent fill (NO_DATA_STROKE),
+      // matching the legend's no-data swatch.
       const strokeColorExpr: unknown = [
         'case',
         ['==', ['get', 'value_num'], null], NO_DATA_STROKE,
@@ -489,21 +499,13 @@ export default function MapView({
         0,
       ];
       map.setPaintProperty(LAYER_HALO_INNER, 'circle-radius', dataRadius as never);
+      // Halo outer = same zoom curve as the dot + a 2 px offset ONLY for
+      // both-category schools. Lives in encoding.ts so zoom stays at the top
+      // level of the paint expression.
       map.setPaintProperty(
         LAYER_HALO_OUTER,
         'circle-radius',
-        [
-          '+',
-          dataRadius,
-          // 2 only when this school is BOTH (anchor & arts); otherwise 0 so
-          // arts-only hoops hug the dot directly.
-          [
-            'case',
-            ['all', ['==', ['get', 'is_anchor'], true], ['==', ['get', 'is_arts'], true]],
-            2,
-            0,
-          ],
-        ] as never,
+        haloOuterRadiusExpression() as never,
       );
 
       // Inner hoop stroke: Anchor / Both = magenta 2px; pwc_other = blue 1.5px.
