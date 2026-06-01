@@ -81,7 +81,7 @@ const ALL_COHORTS = ['Brownsville', 'East Harlem', 'Fort Greene', 'Morrisania'];
 const math: IndicatorPublic = {
   id: 'math_proficiency',
   family: 'school',
-  theme: 'Student outcomes',
+  theme: 'Student Outcomes',
   label: 'Math proficiency',
   format: 'percent',
   scale: { type: 'diverging', good_direction: 'high' },
@@ -92,7 +92,7 @@ const math: IndicatorPublic = {
 const suspensions: IndicatorPublic = {
   id: 'suspension_rate',
   family: 'school',
-  theme: 'Student experience',
+  theme: 'Student Experience',
   label: 'Suspension rate',
   format: 'rate_per_100',
   scale: { type: 'diverging', good_direction: 'low' },
@@ -103,7 +103,7 @@ const suspensions: IndicatorPublic = {
 const artsEd: IndicatorPublic = {
   id: 'arts_ed_score',
   family: 'school',
-  theme: 'Student experience',
+  theme: 'Student Experience',
   label: 'Arts education',
   format: 'integer',
   scale: { type: 'diverging', good_direction: 'high' },

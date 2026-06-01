@@ -424,6 +424,21 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
    *  it straight through; null = no filters active → "Citywide". */
   const comparisonLabel = universe.prefilterSummary.forCohort ?? 'Citywide';
 
+  /**
+   * Year the analytics panel computes its KPIs / timeline marker / ranked
+   * list AT. In normal mode this is the slider year; in Latest mode it's
+   * the focused family's OWN latest registry year (so toggling Latest on
+   * makes the right panel snap each indicator to its freshest year, not
+   * just the map). Falls back to the slider year when no family is active.
+   */
+  const focusedLayerState =
+    effectiveAnalyticsFamily === 'school'
+      ? layers.school
+      : effectiveAnalyticsFamily === 'community'
+        ? layers.community
+        : null;
+  const analyticsYear: SliderYear = focusedLayerState?.cohortYear ?? year;
+
   const analytics: Analytics | null = useMemo(() => {
     if (
       !analyticsIndicator ||
@@ -435,7 +450,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       return null;
     return deriveAnalytics({
       indicator: analyticsIndicator,
-      year,
+      year: analyticsYear,
       series: focusedNormalizedSeries,
       pwcByYear: pwcHistory.byYear,
       universe,
@@ -446,7 +461,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     focusedNormalizedSeries,
     pwcHistory,
     schoolsMaster,
-    year,
+    analyticsYear,
     universe,
     analyticsUnavailable,
   ]);
@@ -626,7 +641,10 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           analytics={analytics}
           analyticsUnavailable={analyticsUnavailable}
           schoolsMaster={schoolsMaster ?? []}
-          year={year}
+          // `analyticsYear` honors the Latest-Year toggle — when on, each
+          // family's panel snaps to its OWN latest registry year. Falls back
+          // to the slider year otherwise.
+          year={analyticsYear}
           showAggregationToggle={analyticsIndicator?.family === 'community'}
           showFamilyToggle={bothFamiliesActive}
           familyToggleValue={effectiveAnalyticsFamily ?? 'school'}

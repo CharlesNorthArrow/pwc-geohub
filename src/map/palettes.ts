@@ -24,7 +24,7 @@ export const ROCKET_R_5 = ['#fbe7c6', '#f1a07a', '#dd5f5f', '#a82255', '#43012e'
 /* helper handles the high-good vs low-good flip.                             */
 /* -------------------------------------------------------------------------- */
 
-/** Student outcomes — muted red↔blue. Low-value end = red (bad when good=high). */
+/** Student Outcomes — muted red↔blue. Low-value end = red (bad when good=high). */
 export const DIVERGING_RDBU_MUTED = [
   '#b85b6e', // bad
   '#dba3ab',
@@ -33,7 +33,7 @@ export const DIVERGING_RDBU_MUTED = [
   '#5d83a8', // good
 ] as const;
 
-/** Student experience — muted purple↔green. */
+/** Student Experience — muted purple↔green. */
 export const DIVERGING_PUGN_MUTED = [
   '#8e5a8e', // bad (purple)
   '#cdaecd',
@@ -42,7 +42,7 @@ export const DIVERGING_PUGN_MUTED = [
   '#5d8e60', // good (green)
 ] as const;
 
-/** Staff & school culture — muted dark grey↔teal. */
+/** Staff & School Culture — muted dark grey↔teal. */
 export const DIVERGING_GREYTEAL_MUTED = [
   '#4a4a4a', // bad (dark grey)
   '#a8a8a8',
@@ -80,9 +80,9 @@ export function rampFor(goodDirection: 'high' | 'low' | 'none'): Ramp {
  * to the original sequential `rampFor` behavior.
  */
 const SCHOOL_THEME_DIVERGING: Readonly<Record<string, Ramp>> = {
-  'Student outcomes': DIVERGING_RDBU_MUTED,
-  'Student experience': DIVERGING_PUGN_MUTED,
-  'Staff & school culture': DIVERGING_GREYTEAL_MUTED,
+  'Student Outcomes': DIVERGING_RDBU_MUTED,
+  'Student Experience': DIVERGING_PUGN_MUTED,
+  'Staff & School Culture': DIVERGING_GREYTEAL_MUTED,
 };
 
 /**

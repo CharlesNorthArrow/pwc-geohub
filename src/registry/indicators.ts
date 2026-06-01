@@ -27,9 +27,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'arts_ed_score',
     family: 'school',
-    theme: 'Student experience',
+    theme: 'Student Experience',
     label: 'Art Education Access',
-    short_label: 'Art Education',
+    short_label: 'Art Education Access',
     description: '# of artistic disciplines taught',
     data_source: 'NYC DOE Annual Arts in Schools Report',
     data_source_url:
@@ -53,9 +53,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'suspension_rate',
     family: 'school',
-    theme: 'Student experience',
-    label: 'Suspension / disciplinary rate (per 100)',
-    short_label: 'Suspension rate',
+    theme: 'Student Experience',
+    label: 'Suspension / Disciplinary Rate (per 100)',
+    short_label: 'Suspension Rate',
     data_source: 'NYC DOE Suspension Reports (Local Law 93)',
     data_source_url:
       'https://infohub.nyced.org/reports/government-reports/suspension-reports',
@@ -77,9 +77,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'temp_housing_rate',
     family: 'school',
-    theme: 'Student need',
-    label: '% students in temporary housing',
-    short_label: 'Temp housing',
+    theme: 'Student Need',
+    label: '% Students in Temporary Housing',
+    short_label: 'Temp Housing',
     data_source: 'NYC DOE Students in Temporary Housing Reports',
     data_source_url:
       'https://infohub.nyced.org/reports/government-reports/students-in-temporary-housing-reports',
@@ -100,9 +100,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'math_proficiency',
     family: 'school',
-    theme: 'Student outcomes',
-    label: 'Math proficiency (gr 3–8, % L3+4)',
-    short_label: 'Math proficiency',
+    theme: 'Student Outcomes',
+    label: 'Math Proficiency (Gr 3–8, % L3+4)',
+    short_label: 'Math Proficiency',
     data_source: 'NYC DOE / NYSED — state test results',
     data_source_url: 'https://infohub.nyced.org/reports/academics/test-results',
     source: {
@@ -123,9 +123,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'ela_proficiency',
     family: 'school',
-    theme: 'Student outcomes',
-    label: 'ELA proficiency (gr 3–8, % L3+4)',
-    short_label: 'ELA proficiency',
+    theme: 'Student Outcomes',
+    label: 'ELA Proficiency (Gr 3–8, % L3+4)',
+    short_label: 'ELA Proficiency',
     data_source: 'NYC DOE / NYSED — state test results',
     data_source_url: 'https://infohub.nyced.org/reports/academics/test-results',
     source: {
@@ -145,9 +145,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'chronic_absent_rate',
     family: 'school',
-    theme: 'Student outcomes',
-    label: 'Chronic absenteeism rate',
-    short_label: 'Chronic absenteeism',
+    theme: 'Student Outcomes',
+    label: 'Chronic Absenteeism Rate',
+    short_label: 'Chronic Absenteeism',
     data_source: 'NYC DOE — End-of-Year Attendance & Chronic Absenteeism',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/information-and-data-overview/end-of-year-attendance-and-chronic-absenteeism-data',
@@ -168,9 +168,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'graduation_rate',
     family: 'school',
-    theme: 'Student outcomes',
-    label: '4-yr HS graduation rate',
-    short_label: 'HS graduation',
+    theme: 'Student Outcomes',
+    label: '4-Yr HS Graduation Rate',
+    short_label: 'HS Graduation',
     data_source: 'NYC DOE Graduation Results',
     data_source_url:
       'https://infohub.nyced.org/reports/academics/graduation-results',
@@ -194,9 +194,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'safety_climate',
     family: 'school',
-    theme: 'Student experience',
-    label: 'Safety & school climate (% positive)',
-    short_label: 'Safety & climate',
+    theme: 'Student Experience',
+    label: 'Safety & School Climate (% Positive)',
+    short_label: 'Safety & Climate',
     data_source: 'NYC DOE School Quality Reports — Citywide Results',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources/school-quality-reports-citywide-results',
@@ -221,9 +221,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'family_q36_satisfied',
     family: 'school',
-    theme: 'Staff & school culture',
-    label: 'Family satisfaction with education (q36)',
-    short_label: 'Family satisfaction',
+    theme: 'Staff & School Culture',
+    label: 'Family Satisfaction with Education (q36)',
+    short_label: 'Family Satisfaction',
     data_source: 'NYC School Survey — Family Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -244,9 +244,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q120_supports',
     family: 'school',
-    theme: 'Staff & school culture',
-    label: 'Teacher: access to behavioral supports (q120)',
-    short_label: 'Teacher: supports access',
+    theme: 'Staff & School Culture',
+    label: 'Teacher: Access to Behavioral Supports (q120)',
+    short_label: 'Teacher: Supports Access',
     data_source: 'NYC School Survey — Teacher Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -267,9 +267,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'student_q20_mental_health',
     family: 'school',
-    theme: 'Student experience',
-    label: 'Student: knows where to go for mental-health support (q20)',
-    short_label: 'Student: MH support',
+    theme: 'Student Experience',
+    label: 'Student: Knows Where to Go for Mental-Health Support (q20)',
+    short_label: 'Student: MH Support',
     data_source: 'NYC School Survey — Student Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -290,9 +290,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'student_q22_felt_happy',
     family: 'school',
-    theme: 'Student experience',
-    label: 'Student: felt happy at school (q22)',
-    short_label: 'Student: felt happy',
+    theme: 'Student Experience',
+    label: 'Student: Felt Happy at School (q22)',
+    short_label: 'Student: Felt Happy',
     data_source: 'NYC School Survey — Student Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -315,9 +315,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q119_disruptive_sel',
     family: 'school',
-    theme: 'Staff & school culture',
-    label: 'Teacher: recognizes disruptive behavior as SEL opportunity (q119)',
-    short_label: 'Teacher: SEL view',
+    theme: 'Staff & School Culture',
+    label: 'Teacher: Recognizes Disruptive Behavior as SEL Opportunity (q119)',
+    short_label: 'Teacher: SEL View',
     data_source: 'NYC School Survey — Teacher Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -377,8 +377,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'adult_mental_health',
     family: 'community',
     theme: 'Health',
-    label: 'Adult mental-health distress (≥14 days, age 18+)',
-    short_label: 'Adult mental health',
+    label: 'Adult Mental-Health Distress (≥14 Days, Age 18+)',
+    short_label: 'Adult Mental Health',
     source: {
       type: 'api',
       provider: 'cdc_places',
@@ -396,8 +396,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'child_poverty',
     family: 'community',
     theme: 'Economic Conditions',
-    label: 'Child poverty rate (<18 below poverty)',
-    short_label: 'Child poverty',
+    label: 'Child Poverty Rate (<18 Below Poverty)',
+    short_label: 'Child Poverty',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -424,8 +424,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'unemployment_hh_children',
     family: 'community',
     theme: 'Economic Conditions',
-    label: 'Adult unemployment (proxy: civilian unemployment rate)',
-    short_label: 'Adult unemployment',
+    label: 'Adult Unemployment (Proxy: Civilian Unemployment Rate)',
+    short_label: 'Adult Unemployment',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -448,8 +448,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'single_parent_hh',
     family: 'community',
     theme: 'Family Type',
-    label: 'Single-parent household rate (own children <18)',
-    short_label: 'Single-parent HH',
+    label: 'Single-Parent Household Rate (Own Children <18)',
+    short_label: 'Single-Parent HH',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -469,8 +469,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'housing_insecurity',
     family: 'community',
     theme: 'Housing & Stability',
-    label: 'Housing insecurity (past 12 mo, age 18+)',
-    short_label: 'Housing insecurity',
+    label: 'Housing Insecurity (Past 12 Mo, Age 18+)',
+    short_label: 'Housing Insecurity',
     source: {
       type: 'api',
       provider: 'cdc_places',
@@ -489,8 +489,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'overcrowded_units',
     family: 'community',
     theme: 'Housing & Stability',
-    label: 'Overcrowded household units (1.51+ occupants/room)',
-    short_label: 'Overcrowded units',
+    label: 'Overcrowded Household Units (1.51+ Occupants/Room)',
+    short_label: 'Overcrowded Units',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -510,8 +510,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'children_immigrant_families',
     family: 'community',
     theme: 'Immigration & Language',
-    label: 'Children in immigrant families (foreign-born)',
-    short_label: 'Immigrant family kids',
+    label: 'Children in Immigrant Families (Foreign-Born)',
+    short_label: 'Children in Immigrant Families',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -533,8 +533,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'racial_predominance',
     family: 'community',
     theme: 'Demographics',
-    label: 'Racial predominance (argmax of Black/White/Asian/Hispanic)',
-    short_label: 'Racial predominance',
+    label: 'Racial Predominance (Argmax of Black/White/Asian/Hispanic)',
+    short_label: 'Racial Predominance',
     source: {
       type: 'api',
       provider: 'acs5',
@@ -560,8 +560,8 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'crime_near_schools',
     family: 'community',
     theme: 'Safety',
-    label: 'Violent incidents near schools (deferred)',
-    short_label: 'Crime near schools',
+    label: 'Violent Incidents Near Schools (Deferred)',
+    short_label: 'Crime Near Schools',
     source: {
       type: 'deferred',
       planned_method:
@@ -588,10 +588,10 @@ export const INDICATORS: readonly IndicatorRegistryEntry[] = [
  * at the end. Edit here to reorder the panel without touching component code.
  */
 export const SCHOOL_THEME_ORDER: readonly string[] = [
-  'Student outcomes',
-  'Student experience',
-  'Student need',
-  'Staff & school culture',
+  'Student Outcomes',
+  'Student Experience',
+  'Student Need',
+  'Staff & School Culture',
 ];
 
 export const indicatorsById: ReadonlyMap<string, IndicatorRegistryEntry> = new Map(

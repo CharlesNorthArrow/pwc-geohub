@@ -245,6 +245,7 @@ export default function Scorecard({ initialIndicators }: InitialProps): React.JS
               communityIndicators={communityIndicators}
               valuesByIndicator={valuesByIndicator}
               groupDbns={groupDbns!}
+              scope={scope}
             />
           )}
         </div>
@@ -419,11 +420,13 @@ function ScorecardTable({
   communityIndicators,
   valuesByIndicator,
   groupDbns,
+  scope,
 }: {
   schoolByTheme: Array<[string, IndicatorPublic[]]>;
   communityIndicators: IndicatorPublic[];
   valuesByIndicator: Record<string, Map<string, number>>;
   groupDbns: GroupDbns;
+  scope: Scope;
 }): React.JSX.Element {
   return (
     <div
@@ -434,7 +437,7 @@ function ScorecardTable({
         overflow: 'hidden',
       }}
     >
-      <TableHeader />
+      <TableHeader scope={scope} />
 
       {/* ───── School Indicators (top-level group) ───── */}
       <FamilyHeader label="School Indicators" />
@@ -465,19 +468,34 @@ function ScorecardTable({
   );
 }
 
-/** 7-column grid template, shared by header + rows so they line up exactly.
- *  Column 7 is reserved for a future "Open in dashboard" / "Download row"
- *  action seam (per the goal's "leave a clean seam"); currently empty. */
-const GRID_TEMPLATE = '1.6fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr 28px';
+/** 7-column grid, shared by header + rows so they line up exactly.
+ *  Order: Indicator | Anchor avg | Δ Anchor | HA avg | Δ HA | Benchmark | seam.
+ *  Each Δ column sits IMMEDIATELY after the group it compares so the eye can
+ *  read "value → delta" without crossing the table. Δ columns are tinted to
+ *  reinforce the grouping. Column 7 is the future "open in dashboard /
+ *  download row" action seam (currently empty per the goal's clean-seam rule). */
+const GRID_TEMPLATE = '1.6fr 0.95fr 0.7fr 0.95fr 0.7fr 1.0fr 28px';
 
-function TableHeader(): React.JSX.Element {
+/** Subtle tint applied to the two Δ columns (header + every cell) so the
+ *  "value → delta" pairing reads at a glance. Very light brand-blue so it
+ *  doesn't fight the indicator name's prominence. */
+const DELTA_BG = '#f0f6fb';
+
+/** What the benchmark column averages over, in plain English. Citywide =
+ *  all in-scope schools (no county filter). For boroughs, label as such so
+ *  the header reads honestly. */
+function benchmarkLabel(scope: Scope): string {
+  return scope === 'citywide' ? 'Citywide avg' : `${SCOPE_LABELS[scope]} avg`;
+}
+
+function TableHeader({ scope }: { scope: Scope }): React.JSX.Element {
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: GRID_TEMPLATE,
-        gap: 12,
-        padding: '8px 16px',
+        gap: 0,
+        padding: '0 16px',
         background: '#eef4f8',
         borderBottom: '1px solid #c5cdd6',
         fontSize: 10,
@@ -487,19 +505,35 @@ function TableHeader(): React.JSX.Element {
         color: '#467c9d',
       }}
     >
-      <span>Indicator</span>
+      <span style={{ padding: '8px 0' }}>Indicator</span>
       <HeadCell>Anchor avg</HeadCell>
+      <HeadCell tint>Δ Anchor</HeadCell>
       <HeadCell>Healing Arts avg</HeadCell>
-      <HeadCell>Benchmark avg</HeadCell>
-      <HeadCell>Δ Anchor</HeadCell>
-      <HeadCell>Δ Healing Arts</HeadCell>
+      <HeadCell tint>Δ Healing Arts</HeadCell>
+      <HeadCell>{benchmarkLabel(scope)}</HeadCell>
       <span />
     </div>
   );
 }
 
-function HeadCell({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return <span style={{ textAlign: 'right' }}>{children}</span>;
+function HeadCell({
+  children,
+  tint,
+}: {
+  children: React.ReactNode;
+  tint?: boolean;
+}): React.JSX.Element {
+  return (
+    <span
+      style={{
+        textAlign: 'right',
+        padding: '8px 8px',
+        background: tint ? DELTA_BG : undefined,
+      }}
+    >
+      {children}
+    </span>
+  );
 }
 
 function FamilyHeader({
@@ -606,23 +640,28 @@ function ScorecardRow({
     );
   }
 
+  // Column order: Anchor avg · Δ Anchor · HA avg · Δ HA · Benchmark · seam.
+  // Δ cells sit right next to the group they compare so the eye reads
+  // value → delta as a pair. Δ cells carry a subtle tint (DELTA_BG).
   return (
     <RowShell indicator={indicator} latest={latest}>
       <ValueCell value={anchorAvg} n={anchorVals.length} format={indicator.format} />
-      <ValueCell value={healingAvg} n={healingVals.length} format={indicator.format} />
-      <ValueCell value={benchAvg} n={benchVals.length} format={indicator.format} isBenchmark />
       <DeltaCell
         groupAvg={anchorAvg}
         benchAvg={benchAvg}
         format={indicator.format}
         goodDirection={indicator.scale.good_direction}
+        tint
       />
+      <ValueCell value={healingAvg} n={healingVals.length} format={indicator.format} />
       <DeltaCell
         groupAvg={healingAvg}
         benchAvg={benchAvg}
         format={indicator.format}
         goodDirection={indicator.scale.good_direction}
+        tint
       />
+      <ValueCell value={benchAvg} n={benchVals.length} format={indicator.format} isBenchmark />
       <span />
     </RowShell>
   );
@@ -643,13 +682,16 @@ function RowShell({
       style={{
         display: 'grid',
         gridTemplateColumns: GRID_TEMPLATE,
-        gap: 12,
-        padding: '10px 16px',
+        // No grid gap and no vertical row padding — each numeric cell owns
+        // its own vertical + horizontal padding so the tinted Δ columns
+        // extend full row height, top to bottom, forming a continuous band.
+        gap: 0,
+        padding: '0 16px',
         borderTop: '1px solid #f5f7fa',
-        alignItems: 'center',
+        alignItems: 'stretch',
       }}
     >
-      <div style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0, paddingRight: 12, paddingTop: 10, paddingBottom: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div
           style={{
             fontSize: 13,
@@ -689,16 +731,23 @@ function ValueCell({
   // `n` here is the number of cohort schools with a VALUE for this indicator-
   // year (i.e. contributing to the avg) — that's what honestly contextualizes
   // the mean. Per the goal: "show the group's school count (e.g. Anchor (n=3))".
+  // Cells own their padding so the row's grid stretches every cell to the
+  // same height. The Δ cells use the same vertical padding so their tint
+  // bands match the value-cell heights for a clean column-strip look.
+  const cellStyle: React.CSSProperties = {
+    padding: '10px 8px',
+    textAlign: 'right',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  };
   if (n === 0 || value == null) {
-    return (
-      <div style={{ textAlign: 'right', color: '#a8b3bf', fontSize: 13 }}>
-        n/a
-      </div>
-    );
+    return <div style={{ ...cellStyle, color: '#a8b3bf', fontSize: 13 }}>n/a</div>;
   }
   const smallN = !isBenchmark && n <= 3;
   return (
-    <div style={{ textAlign: 'right' }}>
+    <div style={cellStyle}>
       <div style={{ fontSize: 14, fontWeight: 600, color: '#002040', lineHeight: 1.1 }}>
         {formatValue(value, format)}
       </div>
@@ -722,14 +771,31 @@ function DeltaCell({
   benchAvg,
   format,
   goodDirection,
+  tint,
 }: {
   groupAvg: number | null;
   benchAvg: number | null;
   format: Format;
   goodDirection: GoodDirection;
+  /** Apply the column tint background so Δ cells read as a tinted band. */
+  tint?: boolean;
 }): React.JSX.Element {
+  // Matches ValueCell's 10 px vertical padding so the tinted Δ band lines
+  // up exactly with the adjacent value cell on every row.
+  const cellPad: React.CSSProperties = {
+    padding: '10px 8px',
+    background: tint ? DELTA_BG : undefined,
+    alignSelf: 'stretch',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+  };
   if (groupAvg == null || benchAvg == null) {
-    return <div style={{ textAlign: 'right', color: '#a8b3bf', fontSize: 13 }}>n/a</div>;
+    return (
+      <div style={{ ...cellPad, textAlign: 'right', color: '#a8b3bf', fontSize: 13 }}>
+        n/a
+      </div>
+    );
   }
   const delta = groupAvg - benchAvg;
   // Reuses the same status function as the dashboard KPI cards — color
@@ -738,9 +804,11 @@ function DeltaCell({
   const color = status === 'better' ? '#1a7a3d' : status === 'worse' ? '#a82255' : '#467c9d';
   const arrow = status === 'better' ? '↑' : status === 'worse' ? '↓' : '';
   return (
-    <div style={{ textAlign: 'right', color, fontSize: 13, fontWeight: 600 }}>
-      {formatDelta(delta, format)}
-      {arrow ? <span style={{ marginLeft: 4, fontSize: 11 }}>{arrow}</span> : null}
+    <div style={{ ...cellPad, textAlign: 'right', color, fontSize: 13, fontWeight: 600 }}>
+      <div>
+        {formatDelta(delta, format)}
+        {arrow ? <span style={{ marginLeft: 4, fontSize: 11 }}>{arrow}</span> : null}
+      </div>
     </div>
   );
 }
