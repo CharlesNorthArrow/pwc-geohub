@@ -9,10 +9,14 @@ import YearBadge from './YearBadge';
 interface Props {
   schoolIndicator: IndicatorPublic | null;
   schoolDomain: { min: number; max: number } | null;
+  /** Full numeric value distribution — fed to `colorBinsFor` so quantile bins
+   *  in the legend match the map. */
+  schoolValues: ReadonlyArray<number>;
   /** Resolved school year (or null = no data for slider year). */
   schoolYear: string | null;
   communityIndicator: IndicatorPublic | null;
   communityDomain: { min: number; max: number } | null;
+  communityValues: ReadonlyArray<number>;
   /** Resolved community year (or null = no data for slider year). */
   communityYear: string | null;
   /** Current slider position — drives "no YYYY-YY data" copy when missing. */
@@ -27,9 +31,11 @@ interface Props {
 export default function Legend({
   schoolIndicator,
   schoolDomain,
+  schoolValues,
   schoolYear,
   communityIndicator,
   communityDomain,
+  communityValues,
   communityYear,
   sliderYear,
 }: Props): React.JSX.Element {
@@ -41,7 +47,7 @@ export default function Legend({
       {schoolIndicator ? (
         <SchoolLegend
           indicator={schoolIndicator}
-          bins={colorBinsFor(schoolIndicator, schoolDomain)}
+          bins={colorBinsFor(schoolIndicator, schoolDomain, schoolValues)}
           displayYear={schoolYear}
           sliderYear={sliderYear}
           onJump={setYear}
@@ -55,7 +61,7 @@ export default function Legend({
       {communityIndicator ? (
         <CommunityLegend
           indicator={communityIndicator}
-          bins={colorBinsFor(communityIndicator, communityDomain)}
+          bins={colorBinsFor(communityIndicator, communityDomain, communityValues)}
           displayYear={communityYear}
           sliderYear={sliderYear}
           onJump={setYear}
@@ -406,6 +412,12 @@ function CommunityLegend({
       />
       <Caption>Tract color</Caption>
       <ColorSwatches bins={bins} />
+      {bins.type === 'categorical' ? (
+        <div style={{ fontSize: 10, color: '#467c9d', marginTop: 4, lineHeight: 1.35 }}>
+          Color saturation reflects the predominant group's share of the
+          tract — stronger color = larger majority.
+        </div>
+      ) : null}
     </div>
   );
 }

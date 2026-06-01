@@ -14,10 +14,16 @@ interface Props {
   /** School layer's resolved year, or null when the slider year has no school data. */
   schoolYear: string | null;
   schoolDomain: { min: number; max: number } | null;
+  /** Full numeric value distribution for the active school layer — fed to
+   *  `colorBinsFor` so quantile-flagged indicators produce the same edges in
+   *  the legend as on the map. Empty array when no school data. */
+  schoolValues: ReadonlyArray<number>;
   communityIndicator: IndicatorPublic | null;
   /** Community layer's resolved year (calendar year), or null when missing. */
   communityYear: string | null;
   communityDomain: { min: number; max: number } | null;
+  /** Full numeric value distribution for the active community layer. */
+  communityValues: ReadonlyArray<number>;
 }
 
 export default function LeftPanel({
@@ -26,9 +32,11 @@ export default function LeftPanel({
   schoolIndicator,
   schoolYear,
   schoolDomain,
+  schoolValues,
   communityIndicator,
   communityYear,
   communityDomain,
+  communityValues,
 }: Props): React.JSX.Element {
   return (
     <aside
@@ -79,9 +87,11 @@ export default function LeftPanel({
             // jump-to-nearest affordance.
             schoolIndicator={schoolIndicator}
             schoolDomain={schoolDomain}
+            schoolValues={schoolValues}
             schoolYear={schoolYear}
             communityIndicator={communityIndicator}
             communityDomain={communityDomain}
+            communityValues={communityValues}
             communityYear={communityYear}
             sliderYear={sliderYear}
           />

@@ -66,12 +66,21 @@ export type IndicatorSource =
   | CdcPlacesSource
   | DeferredSource;
 
+export type BinMethod = 'equal' | 'quantile';
+
 export interface IndicatorScale {
   type: ScaleType;
   good_direction: GoodDirection;
   /** Placeholder ramp name; final ramps picked at Phase 1. */
   ramp: string;
   categories?: string[];
+  /**
+   * How to slice the value range into legend bins. Default 'equal' = equal
+   * intervals over min/max (works when values are spread evenly). Set
+   * 'quantile' for skewed distributions so each bin holds ~the same number
+   * of tracts — better visual contrast across the choropleth.
+   */
+  bin_method?: BinMethod;
 }
 
 export interface IndicatorRegistryEntry {

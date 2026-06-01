@@ -32,12 +32,21 @@ export type ColorBins = SequentialBins | CategoricalBins | { type: 'none' };
 
 /**
  * Build the bin scale for an indicator + its observed domain. Sequential
- * indicators use **equal-interval** bins over the observed min/max — fine
- * for Phase 1; quantile bins arrive when the spec asks for them.
+ * indicators default to **equal-interval** bins over the observed min/max.
+ * Indicators flagged with `scale.bin_method === 'quantile'` use **quintile**
+ * edges (20/40/60/80 percentiles) instead — better for skewed distributions
+ * where equal-interval lumps most tracts in one bin.
+ *
+ * `allValues` is required for quantile binning (we need the full distribution
+ * to compute percentiles); when absent, quantile-flagged indicators fall back
+ * to equal-interval so this stays a pure function. Both the Legend and the
+ * MapView path the same value list down so legend swatches and tract colors
+ * never disagree (spec §11.4).
  */
 export function colorBinsFor(
   indicator: IndicatorPublic,
   domain: { min: number; max: number } | null,
+  allValues?: ReadonlyArray<number>,
 ): ColorBins {
   if (indicator.scale.type === 'categorical') {
     const categories = indicator.scale.categories ?? [];
@@ -55,15 +64,47 @@ export function colorBinsFor(
     indicator.theme,
     indicator.scale.good_direction,
   );
+  const wantsQuantile = indicator.scale.bin_method === 'quantile';
+  const quantileEdges =
+    wantsQuantile && allValues && allValues.length > 0
+      ? quintileEdges(allValues)
+      : null;
+  const edges: [number, number, number, number] = quantileEdges ?? equalIntervalEdges(domain);
+  return { type: 'sequential', ramp, edges, format: formatterFor(indicator) };
+}
+
+function equalIntervalEdges(domain: { min: number; max: number }): [number, number, number, number] {
   const span = domain.max - domain.min;
   const step = span / 5;
-  const edges: [number, number, number, number] = [
+  return [
     domain.min + step,
     domain.min + 2 * step,
     domain.min + 3 * step,
     domain.min + 4 * step,
   ];
-  return { type: 'sequential', ramp, edges, format: formatterFor(indicator) };
+}
+
+/**
+ * Quintile (20/40/60/80 percentile) edges over the full value distribution.
+ * Returns null when the data is too degenerate to compute distinct edges
+ * (e.g. >80% of values identical) — caller falls back to equal-interval.
+ */
+function quintileEdges(values: ReadonlyArray<number>): [number, number, number, number] | null {
+  const sorted = values.filter((v) => Number.isFinite(v)).slice().sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const at = (p: number): number => {
+    // Linear-interpolation between two nearest ranks (standard "type 7" quantile).
+    const idx = p * (sorted.length - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    const w = idx - lo;
+    return sorted[lo]! * (1 - w) + sorted[hi]! * w;
+  };
+  const e: [number, number, number, number] = [at(0.2), at(0.4), at(0.6), at(0.8)];
+  // Strictly increasing? If not, distribution is too clumped — bail to
+  // equal-interval so the legend isn't degenerate.
+  if (!(e[0] < e[1] && e[1] < e[2] && e[2] < e[3])) return null;
+  return e;
 }
 
 /** Strip a trailing `.0` so legend brackets read `12%` not `12.0%`, while

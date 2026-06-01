@@ -124,15 +124,37 @@ function computeAcsValue(
       };
     }
     case 'children_immigrant_families': {
-      // Placeholder pass-through; B05009 decomposition resolved later.
+      // % of own children under 18 with at least one foreign-born parent.
+      // Numerator: two-parent "one or both foreign born" + single-parent
+      // "foreign-born parent", summed across the <6 and 6-17 age groups.
       const total = acsNum(r['B05009_001E']);
+      const numeratorCells = ['B05009_005E', 'B05009_012E', 'B05009_016E', 'B05009_023E'];
+      let numerator: number | null = 0;
+      for (const cell of numeratorCells) {
+        const v = acsNum(r[cell]);
+        if (v == null) {
+          numerator = null;
+          break;
+        }
+        numerator = (numerator ?? 0) + v;
+      }
+      const pct =
+        numerator != null && total != null && total > 0 ? (numerator / total) * 100 : null;
       return {
-        value_num: total,
+        value_num: pct,
         value_text: null,
-        label: total == null ? null : `${total.toFixed(0)} own children under 18 (B05009 total)`,
+        label:
+          pct == null
+            ? null
+            : `${pct.toFixed(1)}% of children <18 with at least one foreign-born parent`,
       };
     }
     case 'racial_predominance': {
+      // Store value_num = share of population in the predominant group (0–100),
+      // value_text = category label. The map's choropleth uses the category for
+      // color and the share for opacity, so tracts with a strong majority read
+      // more saturated than mixed tracts.
+      const total = acsNum(r['B03002_001E']);
       const groups: Array<{ label: string; n: number | null }> = [
         { label: 'White', n: acsNum(r['B03002_003E']) },
         { label: 'Black', n: acsNum(r['B03002_004E']) },
@@ -142,10 +164,14 @@ function computeAcsValue(
       const valid = groups.filter((g) => g.n != null) as Array<{ label: string; n: number }>;
       if (valid.length === 0) return { value_num: null, value_text: null, label: null };
       const top = valid.reduce((best, g) => (g.n > best.n ? g : best));
+      const ratio = total != null && total > 0 ? (top.n / total) * 100 : null;
       return {
-        value_num: top.n,
+        value_num: ratio,
         value_text: top.label,
-        label: `${top.label} predominance`,
+        label:
+          ratio == null
+            ? `${top.label} predominance`
+            : `${top.label} predominance (${ratio.toFixed(0)}% of population)`,
       };
     }
     default:

@@ -343,7 +343,14 @@ export default function MapView({
               ['==', ['feature-state', 'v'], null], 'rgba(0,0,0,0)',
               ['coalesce', ['feature-state', 'color'], 'rgba(0,0,0,0)'],
             ],
-            'fill-opacity': 0.65,
+            // Categorical indicators with `intensities` (racial_predominance)
+            // set a per-feature opacity in [0.3, 0.85]; sequential indicators
+            // leave it unset and fall back to the default 0.65.
+            'fill-opacity': [
+              'case',
+              ['==', ['feature-state', 'v'], null], 0,
+              ['coalesce', ['feature-state', 'opacity'], 0.65],
+            ],
           },
         },
         LAYER_SCHOOLS_BACKDROP, // beneath every school layer (incl. backdrop)
@@ -441,7 +448,12 @@ export default function MapView({
       // above the non-PWC layer. Schools with `value_num == null` render
       // as a hollow ring (no fill, grey stroke) so they're clearly
       // distinguishable from "lowest-bin gradient color".
-      const bins = colorBinsFor(schoolIndicator, schoolPoints.domain);
+      const schoolValueList: number[] = [];
+      for (const f of schoolPoints.features) {
+        const v = f.properties.value_num;
+        if (typeof v === 'number' && Number.isFinite(v)) schoolValueList.push(v);
+      }
+      const bins = colorBinsFor(schoolIndicator, schoolPoints.domain, schoolValueList);
       const baseColorExpr = colorExpression(
         bins,
         schoolIndicator.scale.type === 'categorical'
@@ -737,12 +749,29 @@ export default function MapView({
       // MapLibre's removeFeatureState resets all states for the source.
       map.removeFeatureState({ source: SOURCE_TRACTS });
       if (!communityIndicator || !communityValues) return;
-      const bins = colorBinsFor(communityIndicator, communityValues.domain);
+      const communityValueList: number[] = [];
+      for (const raw of Object.values(communityValues.values)) {
+        if (typeof raw === 'number' && Number.isFinite(raw)) communityValueList.push(raw);
+      }
+      const bins = colorBinsFor(communityIndicator, communityValues.domain, communityValueList);
+      const intensities = communityValues.intensities;
 
       for (const [geoid, raw] of Object.entries(communityValues.values)) {
         const color = colorFor(bins, raw);
         if (color == null) continue;
-        map.setFeatureState({ source: SOURCE_TRACTS, id: geoid }, { v: raw, color });
+        const state: { v: number | string | null; color: string; opacity?: number } = {
+          v: raw,
+          color,
+        };
+        const intensity = intensities?.[geoid];
+        if (typeof intensity === 'number' && Number.isFinite(intensity)) {
+          // Map [25, 100] → [0.3, 0.85]. With 4 categories the predominant
+          // share is mathematically ≥ 25%, so this anchors weak majorities
+          // near the floor and strong majorities near the ceiling.
+          const clamped = Math.max(25, Math.min(100, intensity));
+          state.opacity = 0.3 + ((clamped - 25) / 75) * 0.55;
+        }
+        map.setFeatureState({ source: SOURCE_TRACTS, id: geoid }, state);
       }
     };
 

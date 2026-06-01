@@ -436,7 +436,14 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
+    scale: {
+      type: 'sequential',
+      good_direction: 'low',
+      ramp: 'rocket_r',
+      // NYC unemployment is right-skewed (most tracts cluster <10%); quantile
+      // binning gives each color ~the same number of tracts.
+      bin_method: 'quantile',
+    },
     geometry: 'polygon',
     years: [...ACS_YEARS],
     status: 'active',
@@ -501,7 +508,14 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
+    scale: {
+      type: 'sequential',
+      good_direction: 'low',
+      ramp: 'rocket_r',
+      // Severe overcrowding is rare (most tracts at ~0%); quantile binning
+      // surfaces the relative gradient that's invisible under equal-interval.
+      bin_method: 'quantile',
+    },
     geometry: 'polygon',
     years: [...ACS_YEARS],
     status: 'active',
@@ -517,17 +531,29 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       provider: 'acs5',
       endpoint: 'acs5',
       table: 'B05009',
-      // ETL computes (children in foreign-born-parent households) / (total own children <18).
-      // Specific cells resolved at fetch time after schema introspection — kept conservative here.
-      fields: ['B05009_001E'],
+      // Numerator: own children under 18 with at least one foreign-born parent.
+      //   _005E = under 6, two-parent, one or both foreign born
+      //   _012E = under 6, single-parent, foreign-born parent
+      //   _016E = 6-17,    two-parent, one or both foreign born
+      //   _023E = 6-17,    single-parent, foreign-born parent
+      // Denominator: _001E = total own children under 18.
+      // Pct = (sum numerator / denominator) * 100. ETL handles missing cells.
+      fields: ['B05009_001E', 'B05009_005E', 'B05009_012E', 'B05009_016E', 'B05009_023E'],
       geo: 'tract',
     },
     format: 'percent',
-    scale: { type: 'sequential', good_direction: 'none', ramp: 'viridis' },
+    scale: {
+      type: 'sequential',
+      good_direction: 'none',
+      ramp: 'viridis',
+      bin_method: 'quantile',
+    },
     geometry: 'polygon',
     years: [...ACS_YEARS],
     status: 'active',
-    notes: 'ETL resolves the exact B05009 cell decomposition at fetch time.',
+    notes:
+      'Numerator = B05009 cells _005E + _012E + _016E + _023E (children with ≥1 ' +
+      'foreign-born parent across both age groups + parent structures). Denom = _001E.',
   },
   {
     id: 'racial_predominance',

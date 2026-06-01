@@ -73,6 +73,7 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
       type: i.scale.type,
       good_direction: i.scale.good_direction,
       categories: i.scale.categories,
+      bin_method: i.scale.bin_method,
     },
     // Phase 1 only renders point + polygon families. Site (deferred crime) is filtered out.
     geometry: i.geometry === 'point' ? 'point' : 'polygon',
@@ -204,16 +205,20 @@ export async function getCommunityValues(
   `;
 
   // Categorical indicators (e.g. racial_predominance) populate BOTH columns at
-  // ETL time — value_num holds the argmax count, value_text holds the category
-  // label. The legend/painting needs the label, so we prefer it for
-  // categorical scales and fall back to the numeric column otherwise.
+  // ETL time — value_num holds the strength score (e.g. share of population in
+  // the predominant group), value_text holds the category label. The map
+  // paints color from the label and opacity from the strength; legend reads
+  // the label, so we send the label as the value and ship strength on the
+  // side as `intensities`.
   const isCategorical = indicator.scale.type === 'categorical';
   const values: Record<string, number | string | null> = {};
+  const intensities: Record<string, number> = {};
   let min = Infinity;
   let max = -Infinity;
   for (const r of rows) {
     if (isCategorical) {
       values[r.area_id] = r.value_text ?? null;
+      if (r.value_num != null) intensities[r.area_id] = r.value_num;
       continue;
     }
     if (r.value_num != null) {
@@ -233,6 +238,7 @@ export async function getCommunityValues(
     values,
     domain: isCategorical || !Number.isFinite(min) ? null : { min, max },
     categories: indicator.scale.categories,
+    intensities: isCategorical && Object.keys(intensities).length > 0 ? intensities : undefined,
   };
 }
 

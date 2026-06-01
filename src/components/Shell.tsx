@@ -529,6 +529,30 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     return () => window.clearTimeout(id);
   }, [flyToView]);
 
+  /* -------------------- Value lists for quantile binning --------------------
+   * Both the Legend and MapView call into `colorBinsFor` — quantile-flagged
+   * indicators need the full distribution to compute percentile edges, so we
+   * derive the lists once at this level and pass to both. Keeping them in sync
+   * is the §11.4 anti-debt rule (legend can never disagree with the map).
+   */
+  const schoolValueList = useMemo<number[]>(() => {
+    const out: number[] = [];
+    if (!schoolData) return out;
+    for (const f of schoolData.features) {
+      const v = f.properties.value_num;
+      if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
+    }
+    return out;
+  }, [schoolData]);
+  const communityValueList = useMemo<number[]>(() => {
+    const out: number[] = [];
+    if (!communityData) return out;
+    for (const raw of Object.values(communityData.values)) {
+      if (typeof raw === 'number' && Number.isFinite(raw)) out.push(raw);
+    }
+    return out;
+  }, [communityData]);
+
   /* -------------------- No-data flags (per-layer, independent) --------------------
    * `resolveActiveLayers` already merged the registry-coverage check with the
    * fetched-and-empty check. Each layer fires its 🗓️ branch independently —
@@ -536,6 +560,44 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
    */
   const schoolNoData = layers.school?.noData ?? false;
   const communityNoData = layers.community?.noData ?? false;
+
+  /**
+   * The school-points feature collection MapView paints. Three modes:
+   *  - school indicator + slider year has data → enrichedSchoolData
+   *  - school indicator + no-data branch       → null (legend handles the 🗓️)
+   *  - no school indicator                     → baselineSchoolData (unicolor)
+   * When `schoolsHidden` is on, the layer is suppressed — but we still want
+   * the user-selected school visible so its pulse marker has something to ring
+   * around. In that case fall back to a one-feature FC containing just that
+   * school, sourced from whichever data set normally would have rendered it.
+   */
+  const schoolPointsToRender: SchoolsResponse | null = useMemo(() => {
+    const fullSet: SchoolsResponse | null = schoolIndicator
+      ? schoolNoData
+        ? null
+        : enrichedSchoolData
+      : baselineSchoolData;
+    if (!schoolsHidden) return fullSet;
+    if (!selectedSchoolDbn) return null;
+    // Schools hidden but one is selected — find it in whichever data set
+    // would have rendered it (indicator-enriched first, baseline as fallback
+    // when no indicator is active or the school is missing from the indicator
+    // response).
+    const source =
+      enrichedSchoolData?.features.find((f) => f.properties.dbn === selectedSchoolDbn)
+        ? enrichedSchoolData
+        : baselineSchoolData;
+    const feature = source?.features.find((f) => f.properties.dbn === selectedSchoolDbn);
+    if (!source || !feature) return null;
+    return { ...source, features: [feature] };
+  }, [
+    schoolsHidden,
+    selectedSchoolDbn,
+    schoolIndicator,
+    schoolNoData,
+    enrichedSchoolData,
+    baselineSchoolData,
+  ]);
 
   return (
     <div
@@ -559,9 +621,11 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
         schoolIndicator={schoolIndicator}
         schoolYear={schoolYear}
         schoolDomain={schoolData?.domain ?? null}
+        schoolValues={schoolValueList}
         communityIndicator={communityIndicator}
         communityYear={communityYear}
         communityDomain={communityData?.domain ?? null}
+        communityValues={communityValueList}
       />
       <main
         style={{
@@ -590,15 +654,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           />
           <MapView
             schoolIndicator={schoolIndicator}
-            schoolPoints={
-              schoolsHidden
-                ? null
-                : schoolIndicator
-                  ? schoolNoData
-                    ? null
-                    : enrichedSchoolData
-                  : baselineSchoolData
-            }
+            schoolPoints={schoolPointsToRender}
             communityIndicator={communityIndicator}
             communityValues={
               communityHidden ? null : communityNoData ? null : communityData

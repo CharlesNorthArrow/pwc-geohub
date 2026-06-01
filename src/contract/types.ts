@@ -28,6 +28,8 @@ export interface IndicatorPublic {
     type: ScaleType;
     good_direction: GoodDirection;
     categories?: string[];
+    /** 'equal' (default) or 'quantile'. Drives `colorBinsFor` bin placement. */
+    bin_method?: 'equal' | 'quantile';
   };
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
@@ -89,6 +91,14 @@ export interface CommunityResponse {
   values: Record<string, number | string | null>;
   domain: { min: number; max: number } | null;
   categories?: string[];
+  /**
+   * Optional per-geoid intensity score (0–100). Only populated for categorical
+   * indicators where the strength of the category matters (e.g.
+   * racial_predominance — share of population in the predominant group). The
+   * map paints opacity from this so tracts with a clear majority read
+   * stronger than mixed tracts.
+   */
+  intensities?: Record<string, number>;
 }
 
 /* -------------------------------------------------------------------------- */

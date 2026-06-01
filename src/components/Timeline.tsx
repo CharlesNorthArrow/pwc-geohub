@@ -80,6 +80,18 @@ export default function Timeline({
     return path;
   };
 
+  // Dots at every defined point, drawn on top of lines. Single-year indicators
+  // (e.g. CDC PLACES 2023-only) have no line at all — the dots are the chart.
+  const dotsFor = (key: 'anchor' | 'healing_arts' | 'citywide'): Array<{ x: number; y: number }> => {
+    const out: Array<{ x: number; y: number }> = [];
+    points.forEach((p, i) => {
+      const v = p[key].avg;
+      if (v == null) return;
+      out.push({ x: xAt(i), y: yAt(v) });
+    });
+    return out;
+  };
+
   const activeIdx = points.findIndex((p) => p.year === activeYear);
 
   const fmt = formatterFor(indicator);
@@ -128,6 +140,17 @@ export default function Timeline({
         <path d={linePath('citywide')} stroke={SERIES_COLORS.citywide} fill="none" strokeWidth={1.6} />
         <path d={linePath('healing_arts')} stroke={SERIES_COLORS.healing_arts} fill="none" strokeWidth={1.6} />
         <path d={linePath('anchor')} stroke={SERIES_COLORS.anchor} fill="none" strokeWidth={1.6} />
+
+        {/* Dots — drawn after lines so they sit on top. */}
+        {dotsFor('citywide').map((d, i) => (
+          <circle key={`c${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.citywide} />
+        ))}
+        {dotsFor('healing_arts').map((d, i) => (
+          <circle key={`h${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.healing_arts} />
+        ))}
+        {dotsFor('anchor').map((d, i) => (
+          <circle key={`a${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.anchor} />
+        ))}
 
         {/* X-axis labels */}
         {points.map((p, i) => (
