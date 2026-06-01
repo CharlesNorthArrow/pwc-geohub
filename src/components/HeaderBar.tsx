@@ -56,6 +56,8 @@ export default function HeaderBar({
   const setCohort = useHubStore((s) => s.setCohort);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
+  const latestPerLayer = useHubStore((s) => s.latestPerLayer);
+  const setLatestPerLayer = useHubStore((s) => s.setLatestPerLayer);
 
   const [geoOpen, setGeoOpen] = useState(false);
 
@@ -81,11 +83,23 @@ export default function HeaderBar({
   }, [pwcHistory]);
 
   /* -------------------- Geo summary -------------------- */
-  const geoSummary = useMemo(() => {
+  // Total pick count across all layers — drives the count badge on the Geo
+  // pill (label + badge only — never a long inline summary that pushes the
+  // time slider sideways).
+  const geoCount = useMemo(() => {
     let total = 0;
     for (const l of GEO_FILTER_LAYERS) total += geoFilters[l.id]?.length ?? 0;
-    return total === 0 ? 'All' : `${total} selected`;
+    return total;
   }, [geoFilters]);
+  const geoTooltip = useMemo(() => {
+    if (geoCount === 0) return 'Geographic filter';
+    const parts: string[] = [];
+    for (const l of GEO_FILTER_LAYERS) {
+      const n = geoFilters[l.id]?.length ?? 0;
+      if (n > 0) parts.push(`${l.label}: ${n}`);
+    }
+    return parts.join(' · ');
+  }, [geoFilters, geoCount]);
 
   /* -------------------- School Type options ---------- */
   // Counts per option = how many schools in the Geo-filtered universe match
@@ -139,14 +153,16 @@ export default function HeaderBar({
         flexWrap: 'wrap',
       }}
     >
-      {/* Geo */}
+      {/* Geo — label + count badge only (no inline summary). */}
       <button
         type="button"
         onClick={() => setGeoOpen(true)}
+        title={geoTooltip}
+        aria-label={geoTooltip}
         style={{
           padding: '4px 10px',
-          background: geoSummary === 'All' ? '#ffffff' : '#027BC0',
-          color: geoSummary === 'All' ? '#002040' : 'white',
+          background: geoCount === 0 ? '#ffffff' : '#027BC0',
+          color: geoCount === 0 ? '#002040' : 'white',
           border: '1px solid #c5cdd6',
           borderRadius: 4,
           fontSize: 12,
@@ -155,12 +171,29 @@ export default function HeaderBar({
           display: 'inline-flex',
           alignItems: 'center',
           gap: 6,
+          whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ opacity: 0.7, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
           Geo
         </span>
-        <span>{geoSummary}</span>
+        {geoCount > 0 ? (
+          <span
+            style={{
+              background: 'white',
+              color: '#027BC0',
+              borderRadius: 999,
+              padding: '0 6px',
+              fontSize: 10,
+              fontWeight: 700,
+              minWidth: 16,
+              textAlign: 'center',
+              lineHeight: '14px',
+            }}
+          >
+            {geoCount}
+          </span>
+        ) : null}
         <span aria-hidden style={{ opacity: 0.6 }}>▾</span>
       </button>
 
@@ -200,34 +233,74 @@ export default function HeaderBar({
         onPick={(v) => setSelectedSchool(v)}
       />
 
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <TimeSlider schoolIndicator={schoolIndicator} communityIndicator={communityIndicator} />
+      {/* Reset button sits BEFORE the time slider so its appearance doesn't
+       *  shift the slider's horizontal anchor. Icon-only, bright-yellow chip
+       *  so it's discoverable without taking up a label's worth of space. */}
+      {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
+      schoolType !== 'all' ||
+      cohort != null ||
+      selectedSchoolDbn != null ? (
+        <button
+          type="button"
+          onClick={() => {
+            clearGeoFilters();
+            setSchoolType('all');
+            setCohort(null);
+            setSelectedSchool(null);
+          }}
+          title="Reset all filters"
+          aria-label="Reset all filters"
+          style={{
+            background: '#f5c400',
+            border: '1px solid #d9b000',
+            color: 'white',
+            borderRadius: 4,
+            padding: '4px 8px',
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            minWidth: 28,
+            height: 26,
+            fontWeight: 700,
+          }}
+        >
+          ↺
+        </button>
+      ) : null}
 
-        {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
-        schoolType !== 'all' ||
-        cohort != null ||
-        selectedSchoolDbn != null ? (
-          <button
-            type="button"
-            onClick={() => {
-              clearGeoFilters();
-              setSchoolType('all');
-              setCohort(null);
-              setSelectedSchool(null);
-            }}
-            style={{
-              background: 'transparent',
-              border: '1px solid #c5cdd6',
-              color: '#467c9d',
-              borderRadius: 4,
-              padding: '4px 10px',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            ↺ Reset filters
-          </button>
-        ) : null}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* "Latest" pill — when on, each layer ignores the slider and shows
+         *  its own latest available year. The slider stays visible but
+         *  visually dimmed so the relationship is obvious. */}
+        <button
+          type="button"
+          onClick={() => setLatestPerLayer(!latestPerLayer)}
+          aria-pressed={latestPerLayer}
+          title={
+            latestPerLayer
+              ? 'Latest mode ON — each layer shows its own latest year'
+              : 'Latest mode OFF — slider drives the year'
+          }
+          style={{
+            padding: '4px 10px',
+            background: latestPerLayer ? '#027BC0' : '#ffffff',
+            color: latestPerLayer ? 'white' : '#002040',
+            border: '1px solid #c5cdd6',
+            borderRadius: 4,
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {latestPerLayer ? '✓ Latest' : 'Latest'}
+        </button>
+        <div style={{ opacity: latestPerLayer ? 0.4 : 1, transition: 'opacity 120ms' }}>
+          <TimeSlider schoolIndicator={schoolIndicator} communityIndicator={communityIndicator} />
+        </div>
       </div>
 
       <GeoFilterDialog

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import maplibregl, {
   type GeoJSONSource,
   type Map as MapLibreMap,
@@ -35,12 +35,32 @@ interface Props {
   /** Phase 3 — DBNs that pass Geo + School Type + Cohort cascade. The map's
    *  school-layer filter is intersected with the PWC filter via 'all'. */
   filteredSchoolDbns: Set<string>;
-  /** Phase 3 — when set, flyTo these coordinates (school filter pick). */
+  /** Phase 3 — when set, flyTo these coordinates (school filter pick / detail
+   *  panel open). The zoom level is fixed at `SELECTION_ZOOM` (NTA-level)
+   *  for both surfaces so the framing stays consistent. */
   flyToCoords: number[] | null;
+  /** School Detail Panel close — when set, flyTo({center, zoom}) restores the
+   *  exact camera state captured on open. Set to null afterward. */
+  flyToView: { center: [number, number]; zoom: number } | null;
+  /** Latest camera observed by `idle` — Shell holds a ref for capture/restore.
+   *  Fires once on init and on every settle. */
+  onViewChange?: (view: { center: [number, number]; zoom: number }) => void;
+  /** Click on any school dot (PWC or non-PWC, indicator or baseline) — fires
+   *  with the school's DBN. Shell wires this to `setSelectedSchool`, which
+   *  is the same path the School filter + ranked list use. */
+  onSchoolClick?: (dbn: string) => void;
+  /** Currently-selected school's coords + DBN — drives the pulsing marker.
+   *  Null when no school is selected or the selected one is unplottable. */
+  selectedSchool?: { dbn: string; coords: [number, number] } | null;
   /** Phase 3 polish — polygons of the currently-selected Geo filter areas.
    *  Drawn as a line-only outline above tracts, below the school layers. */
   geoSelection: GeoSelectionResponse | null;
 }
+
+/** NTA-level zoom — frames the surrounding neighborhood. Used by both the
+ *  School filter pick and the School Detail Panel open path so the framing
+ *  stays consistent. */
+const SELECTION_ZOOM = 13;
 
 const NYC_BOUNDS: [number, number, number, number] = [-74.27, 40.49, -73.68, 40.92];
 
@@ -157,6 +177,10 @@ export default function MapView({
   schoolType,
   filteredSchoolDbns,
   flyToCoords,
+  flyToView,
+  onViewChange,
+  onSchoolClick,
+  selectedSchool,
   geoSelection,
 }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -591,15 +615,114 @@ export default function MapView({
   }, [geoSelection]);
 
   // --- flyTo when the user picks a school (spec §6.4) -------------------
+  // SELECTION_ZOOM = 13 (NTA level) for both the School filter pick AND the
+  // Detail Panel open path — same framing for both selection surfaces.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyToCoords) return;
     map.flyTo({
       center: [flyToCoords[0]!, flyToCoords[1]!],
-      zoom: 15,
+      zoom: SELECTION_ZOOM,
       essential: true,
     });
   }, [flyToCoords]);
+
+  // --- flyToView: restore a captured camera (Detail Panel X) ------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !flyToView) return;
+    map.flyTo({
+      center: flyToView.center,
+      zoom: flyToView.zoom,
+      essential: true,
+    });
+  }, [flyToView]);
+
+  // --- Report camera up on idle + once after init ----------------------
+  // Shell holds the latest view in a ref so the Detail Panel can capture
+  // "where the user was looking" right before they opened the panel.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onViewChange) return;
+    const report = (): void => {
+      const c = map.getCenter();
+      onViewChange({ center: [c.lng, c.lat], zoom: map.getZoom() });
+    };
+    const onIdle = (): void => report();
+    map.on('idle', onIdle);
+    // Initial sync once the style is up so Shell has a baseline before the
+    // user does anything.
+    if (styleReadyRef.current) report();
+    else map.once('phase1-style-ready', report);
+    return () => {
+      map.off('idle', onIdle);
+    };
+  }, [onViewChange]);
+
+  // --- Click handlers on school dots → open the Detail Panel ------------
+  // All four school layers (backdrop, non-PWC, PWC dots, both hoops) carry
+  // the same `dbn` property, but click handlers are bound only to the dot
+  // layers since the hoops are pure decoration sitting on the same point.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onSchoolClick) return;
+    const SCHOOL_HIT_LAYERS = [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC];
+    const onClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }): void => {
+      const f = e.features?.[0];
+      const dbn = (f?.properties?.dbn as string | undefined) ?? null;
+      if (dbn) onSchoolClick(dbn);
+    };
+    const onEnter = (): void => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+    const onLeave = (): void => {
+      map.getCanvas().style.cursor = '';
+    };
+    const bind = (): void => {
+      for (const id of SCHOOL_HIT_LAYERS) {
+        if (!map.getLayer(id)) continue;
+        map.on('click', id, onClick);
+        map.on('mouseenter', id, onEnter);
+        map.on('mouseleave', id, onLeave);
+      }
+    };
+    if (styleReadyRef.current) bind();
+    else map.once('phase1-style-ready', bind);
+    return () => {
+      for (const id of SCHOOL_HIT_LAYERS) {
+        map.off('click', id, onClick);
+        map.off('mouseenter', id, onEnter);
+        map.off('mouseleave', id, onLeave);
+      }
+    };
+  }, [onSchoolClick]);
+
+  // --- Pulsing marker for the selected school ---------------------------
+  // Uses a maplibregl.Marker so the breathing div stays anchored to the
+  // school's geo coords as the user pans/zooms. The CSS keyframes live in
+  // app/globals.css (.pwc-pulse).
+  const pulseMarkerRef = useRef<maplibregl.Marker | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Tear down the prior marker on every change — cheap, no double markers.
+    if (pulseMarkerRef.current) {
+      pulseMarkerRef.current.remove();
+      pulseMarkerRef.current = null;
+    }
+    if (!selectedSchool) return;
+    const el = document.createElement('div');
+    el.className = 'pwc-pulse';
+    el.setAttribute('aria-hidden', 'true');
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat(selectedSchool.coords)
+      .addTo(map);
+    pulseMarkerRef.current = marker;
+    return () => {
+      marker.remove();
+      if (pulseMarkerRef.current === marker) pulseMarkerRef.current = null;
+    };
+  }, [selectedSchool]);
 
   // --- Community values: paint via feature-state, no source reload --------
   useEffect(() => {
@@ -625,200 +748,12 @@ export default function MapView({
     else map.once('phase1-style-ready', apply);
   }, [communityIndicator, communityValues]);
 
-  /* -------------------- PWC schools-in-view counter --------------------
-   * Counts the PWC features actually rendered in the current viewport,
-   * AFTER every filter (Geo cascade, School Type, etc.). Updated on
-   * `idle` so it only fires once panning/zooming settles, and on the
-   * filter-effect deps via a `tick` bump so cascade changes refresh too.
-   */
-  const [pwcCounts, setPwcCounts] = useState<PwcInViewCounts>(EMPTY_COUNTS);
-  const recomputePwcCounts = useCallback((): void => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (!map.getLayer(LAYER_SCHOOLS_PWC)) {
-      setPwcCounts(EMPTY_COUNTS);
-      return;
-    }
-    const feats = map.queryRenderedFeatures(undefined, {
-      layers: [LAYER_SCHOOLS_PWC],
-    });
-    // Dedupe by DBN — the same feature can appear multiple times in
-    // queryRenderedFeatures when a viewport spans tile boundaries.
-    const seen = new Set<string>();
-    let anchor = 0;
-    let arts = 0;
-    let both = 0;
-    let other = 0;
-    for (const f of feats) {
-      const dbn = (f.properties?.dbn as string | undefined) ?? null;
-      if (!dbn || seen.has(dbn)) continue;
-      seen.add(dbn);
-      const isAnchor = f.properties?.is_anchor === true;
-      const isArts = f.properties?.is_arts === true;
-      const pwcOther = f.properties?.pwc_other === true;
-      if (isAnchor && isArts) both += 1;
-      else if (isAnchor) anchor += 1;
-      else if (isArts) arts += 1;
-      else if (pwcOther) other += 1;
-    }
-    setPwcCounts({ anchor, arts, both, other, total: seen.size });
-  }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const onIdle = (): void => recomputePwcCounts();
-    map.on('idle', onIdle);
-    return () => {
-      map.off('idle', onIdle);
-    };
-  }, [recomputePwcCounts]);
-
-  // Also recompute whenever the underlying data or filters change — the
-  // `idle` listener catches viewport changes, but a cascade-only change
-  // (no pan/zoom) wouldn't fire `idle` reliably.
-  useEffect(() => {
-    // Defer one frame so MapLibre has applied the new filter/data before
-    // queryRenderedFeatures is asked.
-    const id = requestAnimationFrame(recomputePwcCounts);
-    return () => cancelAnimationFrame(id);
-  }, [schoolPoints, schoolType, filteredSchoolDbns, recomputePwcCounts]);
-
   return (
     <div
       style={{ position: 'absolute', inset: 0, background: '#f5f7fa' }}
       aria-label="Map of NYC"
     >
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
-      <PwcInViewBadge counts={pwcCounts} />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* PWC-in-view overlay                                                        */
-/* -------------------------------------------------------------------------- */
-
-interface PwcInViewCounts {
-  anchor: number;
-  arts: number;
-  both: number;
-  other: number;
-  total: number;
-}
-
-const EMPTY_COUNTS: PwcInViewCounts = {
-  anchor: 0,
-  arts: 0,
-  both: 0,
-  other: 0,
-  total: 0,
-};
-
-/**
- * Floating top-left badge — counts PWC schools currently rendered in the
- * viewport plus a 2-row breakdown by category. Both-category schools count
- * in BOTH Anchor and Healing Arts (spec §12 Q1 "both-rule").
- */
-function PwcInViewBadge({ counts }: { counts: PwcInViewCounts }): React.JSX.Element | null {
-  // Hide entirely when there are no PWC schools in view — nothing useful
-  // to surface, and one less floating element in the way of the map.
-  if (counts.total === 0) return null;
-  // Both-category schools appear in both buckets (spec "both-rule").
-  const anchorTotal = counts.anchor + counts.both;
-  const artsTotal = counts.arts + counts.both;
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        background: 'rgba(255,255,255,0.96)',
-        border: '1px solid #dde4ea',
-        borderRadius: 6,
-        boxShadow: '0 2px 6px rgba(0,32,64,0.12)',
-        padding: '8px 10px',
-        fontSize: 11,
-        color: '#002040',
-        minWidth: 168,
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
-        zIndex: 5,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: 0.6,
-          textTransform: 'uppercase',
-          color: '#467c9d',
-          marginBottom: 4,
-        }}
-      >
-        PWC schools in view
-      </div>
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: 700,
-          color: '#002040',
-          lineHeight: 1,
-          marginBottom: 6,
-        }}
-      >
-        {counts.total}
-      </div>
-      <PwcCountRow color={PWC_MAGENTA} label="Anchor" count={anchorTotal} />
-      <PwcCountRow color={PWC_ORANGE} label="Healing Arts" count={artsTotal} />
-      {counts.both > 0 ? (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 9,
-            color: '#a8b3bf',
-            fontStyle: 'italic',
-          }}
-        >
-          {counts.both} counted in both
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function PwcCountRow({
-  color,
-  label,
-  count,
-}: {
-  color: string;
-  label: string;
-  count: number;
-}): React.JSX.Element {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '2px 0',
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          display: 'inline-block',
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: color,
-        }}
-      />
-      <span style={{ flex: 1, color: '#002040' }}>{label}</span>
-      <span style={{ fontWeight: 700, color: '#002040' }}>{count}</span>
     </div>
   );
 }

@@ -74,6 +74,16 @@ export interface HubState {
    *  community indicator stays selected so flipping back on is instant. */
   communityHidden: boolean;
 
+  /**
+   * "Latest year for all" mode. When true, each active layer resolves its
+   * displayYear to ITS OWN latest available year — independent of the
+   * slider's position. School + community can end up showing different
+   * years simultaneously (e.g. school 2024-25 while community shows 2023),
+   * which is exactly the point: every layer at its freshest data without
+   * forcing a single shared year. Slider becomes a visual reference only.
+   */
+  latestPerLayer: boolean;
+
   setSchoolIndicator: (id: string | null) => void;
   setCommunityIndicator: (id: string | null) => void;
   setYear: (year: SliderYear) => void;
@@ -87,6 +97,7 @@ export interface HubState {
   setAnalyticsFamily: (f: 'school' | 'community') => void;
   setSchoolsHidden: (hidden: boolean) => void;
   setCommunityHidden: (hidden: boolean) => void;
+  setLatestPerLayer: (latest: boolean) => void;
 }
 
 export const useHubStore = create<HubState>((set) => ({
@@ -105,6 +116,7 @@ export const useHubStore = create<HubState>((set) => ({
   analyticsFamily: 'school',
   schoolsHidden: false,
   communityHidden: false,
+  latestPerLayer: false,
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
   setYear: (year) => set({ year }),
@@ -118,4 +130,5 @@ export const useHubStore = create<HubState>((set) => ({
   setAnalyticsFamily: (f) => set({ analyticsFamily: f }),
   setSchoolsHidden: (hidden) => set({ schoolsHidden: hidden }),
   setCommunityHidden: (hidden) => set({ communityHidden: hidden }),
+  setLatestPerLayer: (latest) => set({ latestPerLayer: latest }),
 }));

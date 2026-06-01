@@ -229,6 +229,81 @@ export interface AnalyticsSeriesResponse {
 }
 
 /* -------------------------------------------------------------------------- */
+/* School Detail Panel                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Per-school identity + latest-year demographics. Section 1.b of the Detail
+ * Panel — pinned to the school's most-recent `schools_year` row regardless of
+ * the slider, since the panel itself notes we lack historical demographics for
+ * every school.
+ *
+ * `profile_year` is the school_year of the row we returned. The race + need
+ * breakdowns come straight from `schools_year`; any field missing in the
+ * source CSV stays null.
+ */
+export interface SchoolProfile {
+  dbn: string;
+  school_name: string | null;
+  borough: string | null;
+  grades: string | null;
+  /** Whether the schools table flagged this DBN as unplottable (no lat/lng).
+   *  The Detail Panel surfaces a "Not shown on map" note for these. */
+  is_unplottable: boolean;
+  /** school_year of the row whose values populate the rest of this object.
+   *  Null when there isn't a single non-null demographic row in `schools_year`
+   *  (e.g. an entry that exists only in `pwc_school_program`). */
+  profile_year: string | null;
+  total_enrollment: number | null;
+  pct_students_with_disabilities: number | null;
+  pct_english_language_learners: number | null;
+  pct_poverty: number | null;
+  economic_need_index: number | null;
+  pct_asian: number | null;
+  pct_black: number | null;
+  pct_hispanic: number | null;
+  pct_white: number | null;
+  pct_multi_racial: number | null;
+}
+
+/** GET /api/schools/profile?dbn= */
+export interface SchoolProfileResponse {
+  profile: SchoolProfile | null;
+}
+
+/**
+ * One row of `pwc_school_program` for a (dbn, year) — only the columns the
+ * Detail Panel surfaces (§1.c): group flags via the derived `category`, plus
+ * cohort, program statuses, and the two boolean services.
+ *
+ * `active = false` means all program fields are null for this year (per spec
+ * §3.5 — a placeholder row that means "no active program that year"). The
+ * panel still renders a row saying as much, so the year-by-year pulse is
+ * visible from inside the panel.
+ */
+export interface PwcProgram {
+  dbn: string;
+  year: string;
+  /** Same Q1-default category model the rest of the app uses; null when
+   *  `active=false`. */
+  category: PwcCategory | null;
+  cohort: string | null;
+  active: boolean;
+  community_school_program_status: string | null;
+  arts_program_type: string | null;
+  ost_program_type: string | null;
+  food_pantry: boolean | null;
+  laundry: boolean | null;
+}
+
+/** GET /api/pwc/program?dbn=&year= */
+export interface PwcProgramResponse {
+  /** Null when the school isn't in pwc_school_program at all (= not a PWC
+   *  school in ANY year). */
+  program: PwcProgram | null;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Selected geographies overlay (Phase 3 polish)                              */
 /* -------------------------------------------------------------------------- */
 

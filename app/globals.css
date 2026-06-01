@@ -18,3 +18,30 @@ html, body {
 button {
   font-family: inherit;
 }
+
+/* School Detail Panel — pulsing ring marker that highlights the currently-
+   selected school on the map. Lives on a maplibregl.Marker so it stays
+   anchored to the school's geo coords as the map pans/zooms. Ring-only
+   (no center fill) so the underlying school symbology — indicator color,
+   PWC halo, enrollment-sized circle — remains visible through the middle. */
+.pwc-pulse {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.pwc-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #027BC0;
+  opacity: 0.8;
+  animation: pwc-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes pwc-pulse-ring {
+  0%   { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(2.0); opacity: 0;   }
+}

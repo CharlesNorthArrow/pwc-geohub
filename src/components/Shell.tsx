@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import HeaderBar from './HeaderBar';
 import LeftPanel from './LeftPanel';
 import MapView from './MapView';
+import PwcCounter from './PwcCounter';
 import RightPanel from './RightPanel';
-import SchoolDetailsStub from './SchoolDetailsStub';
+import SchoolDetailPanel from './SchoolDetailPanel';
 import {
   fetchAnalyticsSeries,
   fetchCommunityValues,
@@ -35,11 +36,11 @@ import type {
 import { useHubStore } from '../store/useHubStore';
 import { applyFilters, type FilteredUniverse } from '../store/derived';
 import { deriveAnalytics, type Analytics } from '../store/analytics';
+import { resolveActiveLayers } from '../store/activeLayers';
 import {
   fromCommunityYear,
   isSliderYear,
   SLIDER_YEARS,
-  toCommunityYear,
   type SliderYear,
 } from '../contract/year';
 
@@ -69,7 +70,11 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const [schoolsMaster, setSchoolsMaster] = useState<SchoolMaster[] | null>(null);
   const [geographies, setGeographies] = useState<GeographiesResponse | null>(null);
   const [geoSelection, setGeoSelection] = useState<GeoSelectionResponse | null>(null);
-  const [analyticsSeries, setAnalyticsSeries] = useState<AnalyticsSeriesResponse | null>(null);
+  // Two independent analytics series — one per family. When BOTH a school and
+  // a community indicator are active, both fetch in parallel so the Detail
+  // Panel can render its two stacked percentile strips simultaneously.
+  const [schoolSeries, setSchoolSeries] = useState<AnalyticsSeriesResponse | null>(null);
+  const [communitySeries, setCommunitySeries] = useState<AnalyticsSeriesResponse | null>(null);
   const [pwcHistory, setPwcHistory] = useState<PwcHistoryResponse | null>(null);
 
   const schoolId = useHubStore((s) => s.activeSchoolIndicator);
@@ -87,6 +92,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
   const schoolsHidden = useHubStore((s) => s.schoolsHidden);
   const communityHidden = useHubStore((s) => s.communityHidden);
+  const latestPerLayer = useHubStore((s) => s.latestPerLayer);
 
   // One-shot fetches.
   useEffect(() => {
@@ -116,18 +122,40 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     if (y && isSliderYear(y)) setYear(y as SliderYear);
   }, [setYear]);
 
-  const schoolIndicator = indicators.find((i) => i.id === schoolId) ?? null;
-  const communityIndicator = indicators.find((i) => i.id === communityId) ?? null;
+  const schoolIndicatorPick = indicators.find((i) => i.id === schoolId) ?? null;
+  const communityIndicatorPick = indicators.find((i) => i.id === communityId) ?? null;
 
-  // Independent per-layer year resolution (acceptance test #3): each layer
-  // either has data for the chosen year or shows 🗓️ — without breaking the
-  // other layer.
-  const schoolYear = schoolIndicator && schoolIndicator.years.includes(year) ? year : null;
-  const communityCalYear = toCommunityYear(year);
-  const communityYear =
-    communityIndicator && communityCalYear && communityIndicator.years.includes(communityCalYear)
-      ? communityCalYear
-      : null;
+  /**
+   * Single source for "what's active + what year is each layer showing + is
+   * each layer in the missing-year branch?" — see `store/activeLayers.ts`.
+   * Per-layer independence is the §6.6 acceptance test #3 contract.
+   */
+  const layers = useMemo(
+    () =>
+      resolveActiveLayers({
+        schoolIndicator: schoolIndicatorPick,
+        communityIndicator: communityIndicatorPick,
+        sliderYear: year,
+        analyticsFamilyPref,
+        schoolFeatureCount: schoolData ? schoolData.features.length : null,
+        communityValueCount: communityData ? Object.keys(communityData.values).length : null,
+        latestPerLayer,
+      }),
+    [
+      schoolIndicatorPick,
+      communityIndicatorPick,
+      year,
+      analyticsFamilyPref,
+      schoolData,
+      communityData,
+      latestPerLayer,
+    ],
+  );
+
+  const schoolIndicator = layers.school?.indicator ?? null;
+  const communityIndicator = layers.community?.indicator ?? null;
+  const schoolYear = layers.school?.displayYear ?? null;
+  const communityYear = layers.community?.displayYear ?? null;
 
   // School + PWC + Community fetches (unchanged from Phase 2).
   useEffect(() => {
@@ -296,25 +324,11 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   }, [geoFilters, schoolType, cohort, schoolsMaster, pwcMembers, allCohorts]);
 
   /* -------------------- Phase 5 analytics series -------------------- */
-  // Fetch when (active indicator, family, aggArea) changes. For community
-  // indicators we re-fetch when the District ↔ NTA toggle moves.
-  // When BOTH families are active, honor the user's analytics preference;
-  // otherwise force the family that's actually present so the panel never
-  // ends up "focused" on a family that has no indicator.
-  const bothFamiliesActive = !!schoolIndicator && !!communityIndicator;
-  const effectiveAnalyticsFamily: 'school' | 'community' | null = bothFamiliesActive
-    ? analyticsFamilyPref
-    : schoolIndicator
-      ? 'school'
-      : communityIndicator
-        ? 'community'
-        : null;
-  const analyticsIndicator: IndicatorPublic | null =
-    effectiveAnalyticsFamily === 'school'
-      ? schoolIndicator
-      : effectiveAnalyticsFamily === 'community'
-        ? communityIndicator
-        : null;
+  // `layers.analytics` already encodes the family-preference fallback when
+  // only one family is active. `layers.bothFamiliesActive` drives the toggle.
+  const bothFamiliesActive = layers.bothFamiliesActive;
+  const effectiveAnalyticsFamily: 'school' | 'community' | null = layers.analytics?.family ?? null;
+  const analyticsIndicator: IndicatorPublic | null = layers.analytics?.indicator ?? null;
 
   // Auto-collapse the analytics panel when there's nothing to show, and
   // auto-expand it when an indicator first gets picked. Only acts on the
@@ -328,25 +342,46 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     prevAnalyticsIndicator.current = analyticsIndicator;
   }, [analyticsIndicator, setRightPanelCollapsed]);
 
-  const analyticsAggArea = analyticsIndicator?.family === 'community' ? aggregationArea : null;
+  // Independent per-family fetches. The school series doesn't depend on
+  // `aggregationArea`; the community one does (the District ↔ NTA toggle
+  // chooses which crosswalk drives the per-school aggregation upstream).
   useEffect(() => {
-    if (!analyticsIndicator) {
-      setAnalyticsSeries(null);
+    if (!schoolIndicator) {
+      setSchoolSeries(null);
       return;
     }
     let abandoned = false;
-    fetchAnalyticsSeries(analyticsIndicator.id, analyticsAggArea)
-      .then((r) => !abandoned && setAnalyticsSeries(r))
+    fetchAnalyticsSeries(schoolIndicator.id, null)
+      .then((r) => !abandoned && setSchoolSeries(r))
       .catch((err) => {
         if (!abandoned) {
-          console.warn('[Shell] analytics series fetch failed', err);
-          setAnalyticsSeries(null);
+          console.warn('[Shell] school analytics series fetch failed', err);
+          setSchoolSeries(null);
         }
       });
     return () => {
       abandoned = true;
     };
-  }, [analyticsIndicator, analyticsAggArea]);
+  }, [schoolIndicator]);
+
+  useEffect(() => {
+    if (!communityIndicator) {
+      setCommunitySeries(null);
+      return;
+    }
+    let abandoned = false;
+    fetchAnalyticsSeries(communityIndicator.id, aggregationArea)
+      .then((r) => !abandoned && setCommunitySeries(r))
+      .catch((err) => {
+        if (!abandoned) {
+          console.warn('[Shell] community analytics series fetch failed', err);
+          setCommunitySeries(null);
+        }
+      });
+    return () => {
+      abandoned = true;
+    };
+  }, [communityIndicator, aggregationArea]);
 
   /**
    * Community series rows speak calendar year ("2024"); the slider and
@@ -355,27 +390,38 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
    * the slider window (e.g. "2020" → "2019-20") get dropped — those slider
    * positions don't exist anyway.
    */
-  const normalizedAnalyticsSeries: AnalyticsSeriesRow[] | null = useMemo(() => {
-    if (!analyticsSeries || !analyticsIndicator) return null;
-    if (analyticsIndicator.family === 'school') return analyticsSeries.series;
+  const schoolNormalizedSeries: AnalyticsSeriesRow[] | null = useMemo(
+    () => schoolSeries?.series ?? null,
+    [schoolSeries],
+  );
+  const communityNormalizedSeries: AnalyticsSeriesRow[] | null = useMemo(() => {
+    if (!communitySeries) return null;
     const out: AnalyticsSeriesRow[] = [];
-    for (const r of analyticsSeries.series) {
+    for (const r of communitySeries.series) {
       const sy = fromCommunityYear(r.year);
       if (!sy) continue;
       out.push({ ...r, year: sy });
     }
     return out;
-  }, [analyticsSeries, analyticsIndicator]);
+  }, [communitySeries]);
 
   /** Numeric analytics aren't computable for categorical indicators (the
    *  server averages NULL value_num). RightPanel shows a notice instead. */
   const analyticsUnavailable =
     analyticsIndicator?.scale.type === 'categorical';
 
+  // Pick the series matching the right panel's focused family.
+  const focusedNormalizedSeries: AnalyticsSeriesRow[] | null =
+    effectiveAnalyticsFamily === 'school'
+      ? schoolNormalizedSeries
+      : effectiveAnalyticsFamily === 'community'
+        ? communityNormalizedSeries
+        : null;
+
   const analytics: Analytics | null = useMemo(() => {
     if (
       !analyticsIndicator ||
-      !normalizedAnalyticsSeries ||
+      !focusedNormalizedSeries ||
       !pwcHistory ||
       !schoolsMaster ||
       analyticsUnavailable
@@ -384,14 +430,14 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     return deriveAnalytics({
       indicator: analyticsIndicator,
       year,
-      series: normalizedAnalyticsSeries,
+      series: focusedNormalizedSeries,
       pwcByYear: pwcHistory.byYear,
       universe,
       timelineYears: SLIDER_YEARS,
     });
   }, [
     analyticsIndicator,
-    normalizedAnalyticsSeries,
+    focusedNormalizedSeries,
     pwcHistory,
     schoolsMaster,
     year,
@@ -400,43 +446,87 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   ]);
 
   /* -------------------- Selected school + flyTo -------------------- */
-  const selectedSchoolCoords = useMemo(() => {
-    if (!selectedSchoolDbn || !enrichedSchoolData) return null;
-    const f = enrichedSchoolData.features.find((x) => x.properties.dbn === selectedSchoolDbn);
-    return f ? f.geometry.coordinates : null;
-  }, [selectedSchoolDbn, enrichedSchoolData]);
+  // Prefer coords from schoolsMaster so the Detail Panel opens reliably even
+  // when no school indicator is active (and `enrichedSchoolData` is null).
+  // Falls back to the rendered feature when present. Returns null for
+  // unplottable schools — Detail Panel then skips the zoom and shows the
+  // "not shown on map" note.
+  const selectedSchoolCoords = useMemo<[number, number] | null>(() => {
+    if (!selectedSchoolDbn) return null;
+    const s = schoolsMaster?.find((x) => x.dbn === selectedSchoolDbn);
+    if (s && s.longitude != null && s.latitude != null) {
+      return [s.longitude, s.latitude];
+    }
+    if (enrichedSchoolData) {
+      const f = enrichedSchoolData.features.find((x) => x.properties.dbn === selectedSchoolDbn);
+      if (f) return [f.geometry.coordinates[0], f.geometry.coordinates[1]];
+    }
+    return null;
+  }, [selectedSchoolDbn, schoolsMaster, enrichedSchoolData]);
 
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Capture/restore map state across the Detail Panel lifecycle.
+  // `lastMapViewRef` tracks the latest camera reported by MapView's idle
+  // listener. `priorMapStateRef` snapshots {view, rightPanelCollapsed} at
+  // the moment the panel opens; restored on close.
+  const lastMapViewRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const priorMapStateRef = useRef<{
+    view: { center: [number, number]; zoom: number } | null;
+    rightPanelCollapsed: boolean;
+  } | null>(null);
+  const [flyToView, setFlyToView] = useState<{ center: [number, number]; zoom: number } | null>(null);
+
+  const prevSelectedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedSchoolDbn) setDetailsOpen(true);
-  }, [selectedSchoolDbn]);
+    const prev = prevSelectedRef.current;
+    if (!prev && selectedSchoolDbn) {
+      // OPEN edge: snapshot what was on screen before the panel takes over.
+      priorMapStateRef.current = {
+        view: lastMapViewRef.current,
+        rightPanelCollapsed,
+      };
+      // Force the right column open so the Detail Panel is visible.
+      if (rightPanelCollapsed) setRightPanelCollapsed(false);
+    }
+    prevSelectedRef.current = selectedSchoolDbn;
+  }, [selectedSchoolDbn, rightPanelCollapsed, setRightPanelCollapsed]);
 
-  const selectedSchoolName = useMemo(() => {
-    if (!selectedSchoolDbn || !schoolsMaster) return null;
-    return schoolsMaster.find((s) => s.dbn === selectedSchoolDbn)?.school_name ?? null;
-  }, [selectedSchoolDbn, schoolsMaster]);
+  const handleDetailClose = useCallback((): void => {
+    const prior = priorMapStateRef.current;
+    if (prior) {
+      if (prior.view) setFlyToView(prior.view);
+      setRightPanelCollapsed(prior.rightPanelCollapsed);
+      priorMapStateRef.current = null;
+    }
+    setSelectedSchool(null);
+  }, [setRightPanelCollapsed, setSelectedSchool]);
+
+  // Clear the one-shot flyToView after MapView consumes it so subsequent
+  // pan/zooms don't keep snapping the user back to the captured view.
+  useEffect(() => {
+    if (!flyToView) return;
+    const id = window.setTimeout(() => setFlyToView(null), 100);
+    return () => window.clearTimeout(id);
+  }, [flyToView]);
 
   /* -------------------- No-data flags (per-layer, independent) --------------------
-   * Each layer fires the 🗓️ branch ONLY when:
-   *  (a) its indicator is active, and
-   *  (b) the selected slider year doesn't map to a year the indicator has,
-   *      OR the API returned zero features for that year.
-   * The independence is what keeps the OTHER layer rendering — acceptance test #3.
+   * `resolveActiveLayers` already merged the registry-coverage check with the
+   * fetched-and-empty check. Each layer fires its 🗓️ branch independently —
+   * §6.6 acceptance test #3.
    */
-  const schoolNoData = Boolean(
-    schoolIndicator &&
-      (schoolYear == null || (schoolData ? schoolData.features.length === 0 : false)),
-  );
-  const communityNoData = Boolean(
-    communityIndicator &&
-      (communityYear == null || (communityData ? Object.keys(communityData.values).length === 0 : false)),
-  );
+  const schoolNoData = layers.school?.noData ?? false;
+  const communityNoData = layers.community?.noData ?? false;
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: rightPanelCollapsed ? '300px 1fr 28px' : '300px 1fr minmax(224px, 28%)',
+        // Detail Panel takes priority over the collapsed state — when a school
+        // is selected the right column is always shown at full width.
+        gridTemplateColumns: selectedSchoolDbn
+          ? '300px 1fr minmax(224px, 28%)'
+          : rightPanelCollapsed
+            ? '300px 1fr 28px'
+            : '300px 1fr minmax(224px, 28%)',
         height: '100dvh',
         width: '100vw',
         background: '#fff',
@@ -469,6 +559,14 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
           communityIndicator={communityIndicator}
         />
         <div style={{ position: 'relative', minHeight: 0 }}>
+          <PwcCounter
+            universeDbns={universe.schoolDbns}
+            pwcMembers={pwcMembers ?? []}
+            schoolLayer={layers.school}
+            schoolData={schoolData}
+            communityLayer={layers.community}
+            communitySeries={communityNormalizedSeries}
+          />
           <MapView
             schoolIndicator={schoolIndicator}
             schoolPoints={
@@ -488,39 +586,54 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
             schoolType={schoolType}
             filteredSchoolDbns={universe.schoolDbns}
             flyToCoords={selectedSchoolCoords}
+            flyToView={flyToView}
+            onViewChange={(v) => {
+              lastMapViewRef.current = v;
+            }}
+            onSchoolClick={setSelectedSchool}
+            selectedSchool={
+              selectedSchoolDbn && selectedSchoolCoords
+                ? { dbn: selectedSchoolDbn, coords: selectedSchoolCoords }
+                : null
+            }
             geoSelection={geoSelection}
           />
         </div>
       </main>
 
-      <RightPanel
-        indicator={analyticsIndicator}
-        analytics={analytics}
-        analyticsUnavailable={analyticsUnavailable}
-        schoolsMaster={schoolsMaster ?? []}
-        year={year}
-        showAggregationToggle={analyticsIndicator?.family === 'community'}
-        showFamilyToggle={bothFamiliesActive}
-        familyToggleValue={effectiveAnalyticsFamily ?? 'school'}
-        schoolIndicatorLabel={
-          schoolIndicator ? (schoolIndicator.short_label ?? schoolIndicator.label) : null
-        }
-        communityIndicatorLabel={
-          communityIndicator
-            ? (communityIndicator.short_label ?? communityIndicator.label)
-            : null
-        }
-      />
-
-      <SchoolDetailsStub
-        open={detailsOpen && selectedSchoolDbn != null}
-        dbn={selectedSchoolDbn}
-        schoolName={selectedSchoolName}
-        onClose={() => {
-          setDetailsOpen(false);
-          setSelectedSchool(null);
-        }}
-      />
+      {selectedSchoolDbn ? (
+        <SchoolDetailPanel
+          dbn={selectedSchoolDbn}
+          year={year}
+          schoolsMaster={schoolsMaster ?? []}
+          schoolLayer={layers.school}
+          communityLayer={layers.community}
+          schoolSeries={schoolNormalizedSeries}
+          communitySeries={communityNormalizedSeries}
+          universeDbns={universe.schoolDbns}
+          aggregationArea={aggregationArea}
+          onClose={handleDetailClose}
+        />
+      ) : (
+        <RightPanel
+          indicator={analyticsIndicator}
+          analytics={analytics}
+          analyticsUnavailable={analyticsUnavailable}
+          schoolsMaster={schoolsMaster ?? []}
+          year={year}
+          showAggregationToggle={analyticsIndicator?.family === 'community'}
+          showFamilyToggle={bothFamiliesActive}
+          familyToggleValue={effectiveAnalyticsFamily ?? 'school'}
+          schoolIndicatorLabel={
+            schoolIndicator ? (schoolIndicator.short_label ?? schoolIndicator.label) : null
+          }
+          communityIndicatorLabel={
+            communityIndicator
+              ? (communityIndicator.short_label ?? communityIndicator.label)
+              : null
+          }
+        />
+      )}
     </div>
   );
 }

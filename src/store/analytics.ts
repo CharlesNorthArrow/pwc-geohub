@@ -31,7 +31,9 @@ import type {
   IndicatorPublic,
   PwcMember,
 } from '../contract/types';
+import type { GoodDirection } from '../registry/types';
 import type { FilteredUniverse } from './derived';
+import { belongsToPwcGroup } from './pwcGroups';
 
 export type ListCategory = 'anchor' | 'healing_arts' | 'both' | 'pwc_other';
 
@@ -126,8 +128,8 @@ export function deriveAnalytics({
     if (v == null) continue;
     const m = pwcNow.get(dbn);
     if (!m) continue;
-    if (m.category === 'anchor' || m.category === 'both') anchorValues.push(v);
-    if (m.category === 'healing_arts' || m.category === 'both') healingValues.push(v);
+    if (belongsToPwcGroup(m.category, 'anchor')) anchorValues.push(v);
+    if (belongsToPwcGroup(m.category, 'healing_arts')) healingValues.push(v);
   }
   const anchorAvg = mean(anchorValues);
   const healingAvg = mean(healingValues);
@@ -166,8 +168,8 @@ export function deriveAnalytics({
       if (v == null) continue;
       const m = pYear.get(dbn);
       if (!m) continue;
-      if (m.category === 'anchor' || m.category === 'both') anchorVals.push(v);
-      if (m.category === 'healing_arts' || m.category === 'both') haVals.push(v);
+      if (belongsToPwcGroup(m.category, 'anchor')) anchorVals.push(v);
+      if (belongsToPwcGroup(m.category, 'healing_arts')) haVals.push(v);
     }
 
     return {
@@ -195,16 +197,42 @@ export function deriveAnalytics({
     });
   }
   // Worst → best per good_direction.
-  list.sort((a, b) => {
-    if (a.latestValue == null && b.latestValue == null) return a.dbn.localeCompare(b.dbn);
-    if (a.latestValue == null) return 1;
-    if (b.latestValue == null) return -1;
-    if (indicator.scale.good_direction === 'low') return b.latestValue - a.latestValue;
-    if (indicator.scale.good_direction === 'high') return a.latestValue - b.latestValue;
-    return a.dbn.localeCompare(b.dbn);
-  });
+  const sortedList = rankByGoodDirection(
+    list,
+    (r) => r.latestValue,
+    indicator.scale.good_direction,
+    (r) => r.dbn,
+  );
 
-  return { kpis, timeline, list };
+  return { kpis, timeline, list: sortedList };
+}
+
+/**
+ * Sort `rows` worst → best for a given `good_direction`. Nulls sort last.
+ * `tiebreakKey` (typically `r => r.dbn`) keeps output deterministic when
+ * values match or both sides are null. Pure; returns a new array.
+ *
+ * Exported so future features (School Detail, Scorecard) can rank their own
+ * rows without re-deriving the worst→best convention.
+ */
+export function rankByGoodDirection<T>(
+  rows: T[],
+  valueOf: (row: T) => number | null,
+  goodDirection: GoodDirection,
+  tiebreakKey: (row: T) => string,
+): T[] {
+  const out = rows.slice();
+  out.sort((a, b) => {
+    const av = valueOf(a);
+    const bv = valueOf(b);
+    if (av == null && bv == null) return tiebreakKey(a).localeCompare(tiebreakKey(b));
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (goodDirection === 'low') return bv - av;
+    if (goodDirection === 'high') return av - bv;
+    return tiebreakKey(a).localeCompare(tiebreakKey(b));
+  });
+  return out;
 }
 
 function mean(xs: number[]): number | null {

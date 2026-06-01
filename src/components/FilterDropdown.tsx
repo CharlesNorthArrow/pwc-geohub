@@ -12,7 +12,10 @@ export interface DropdownOption {
 interface Props {
   /** Short label shown in the trigger, e.g. "Cohort". */
   triggerLabel: string;
-  /** Currently selected option's display string, or "All" sentinel. */
+  /** Currently selected option's display string, or "All" sentinel. Surfaced
+   *  in a tooltip on the trigger AND used to mark the selected row in the
+   *  open panel — but NOT rendered inline on the trigger itself, so the
+   *  header bar's width stays stable as users change filters. */
   selectedLabel: string;
   options: DropdownOption[];
   /** Discreet note shown above the option list when set. */
@@ -24,6 +27,11 @@ interface Props {
   onPick: (value: string) => void;
   /** Whether the currently-selected value is the "all" / default state. */
   isAtDefault: boolean;
+  /** When non-zero, drives the count badge shown beside the trigger label.
+   *  Single-select filters pass 1 (or 0); the Geo multi-select passes the
+   *  total picks across all layers. Optional — defaults to "1 when not at
+   *  default" for the simple single-select case. */
+  activeCount?: number;
 }
 
 /**
@@ -41,6 +49,7 @@ export default function FilterDropdown({
   onReset,
   onPick,
   isAtDefault,
+  activeCount,
 }: Props): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -60,11 +69,20 @@ export default function FilterDropdown({
     ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
     : options;
 
+  // Trigger shows only the filter NAME + a count badge when active. The
+  // selected value lives in the tooltip and is marked inside the open panel
+  // so the header bar's pill width stays stable — single-select changes
+  // never push the time slider sideways.
+  const count = activeCount ?? (isAtDefault ? 0 : 1);
+  const tooltip = isAtDefault ? triggerLabel : `${triggerLabel}: ${selectedLabel}`;
+
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        title={tooltip}
+        aria-label={tooltip}
         style={{
           padding: '4px 10px',
           background: isAtDefault ? '#ffffff' : '#027BC0',
@@ -77,12 +95,29 @@ export default function FilterDropdown({
           alignItems: 'center',
           gap: 6,
           fontWeight: 500,
+          whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ opacity: 0.7, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
           {triggerLabel}
         </span>
-        <span>{selectedLabel}</span>
+        {count > 0 ? (
+          <span
+            style={{
+              background: isAtDefault ? '#027BC0' : 'white',
+              color: isAtDefault ? 'white' : '#027BC0',
+              borderRadius: 999,
+              padding: '0 6px',
+              fontSize: 10,
+              fontWeight: 700,
+              minWidth: 16,
+              textAlign: 'center',
+              lineHeight: '14px',
+            }}
+          >
+            {count}
+          </span>
+        ) : null}
         <span aria-hidden style={{ opacity: 0.6 }}>▾</span>
       </button>
 

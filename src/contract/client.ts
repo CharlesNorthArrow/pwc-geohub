@@ -11,7 +11,9 @@ import type {
   GeoSelectionResponse,
   IndicatorsResponse,
   PwcHistoryResponse,
+  PwcProgramResponse,
   PwcResponse,
+  SchoolProfileResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
 } from './types';
@@ -76,6 +78,18 @@ export function fetchAnalyticsSeries(
   const params = new URLSearchParams({ indicator: indicatorId });
   if (aggArea) params.set('aggArea', aggArea);
   return getJson<AnalyticsSeriesResponse>(`/api/analytics/series?${params.toString()}`);
+}
+
+export function fetchSchoolProfile(dbn: string): Promise<SchoolProfileResponse> {
+  return getJson<SchoolProfileResponse>(
+    `/api/schools/profile?dbn=${encodeURIComponent(dbn)}`,
+  );
+}
+
+export function fetchPwcProgram(dbn: string, year: string): Promise<PwcProgramResponse> {
+  return getJson<PwcProgramResponse>(
+    `/api/pwc/program?dbn=${encodeURIComponent(dbn)}&year=${encodeURIComponent(year)}`,
+  );
 }
 
 export function fetchGeoSelection(

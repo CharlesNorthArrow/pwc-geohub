@@ -54,6 +54,55 @@ To put a community indicator on the PWC KPI cards/list: average the community va
 ## Branding
 Logo top-left → links to https://partnershipwithchildren.org/. Palette (sampled — confirm against brand guide): primary blue `#027BC0`, orange `#F0901F`, lime `#A0B000`, magenta `#903090`, teal `#00A0B0`, navy text `#002040`. **Chrome only** — use separate perceptually-uniform ramps for choropleths.
 
+## Shared selectors (don't re-derive — import these)
+The Phase 1–5 features all share six pieces of derived logic. Each lives in one named place; School Detail / Scorecard / Admin Panel must **consume** them rather than reimplement. Behavior is locked by `reports/selectors-snapshot.json` — keep it byte-identical when refactoring.
+
+| Selector | File · export | Input → Output | Used by |
+|---|---|---|---|
+| **Filtered universe** (Geo → School Type → Cohort cascade) | `src/store/derived.ts` · `applyFilters({state, schoolsMaster, pwcMembers, allCohorts})` | → `{schoolDbns, afterGeo, afterSchoolType, cohortOptions, prefilterSummary}` | MapView, HeaderBar, Shell→deriveAnalytics |
+| **Active layers + per-layer year/availability/missing-year** | `src/store/activeLayers.ts` · `resolveActiveLayers({schoolIndicator, communityIndicator, sliderYear, analyticsFamilyPref, schoolFeatureCount, communityValueCount, latestPerLayer})` | → `{school, community, analytics, bothFamiliesActive}` where each `LayerState` carries `{indicator, displayYear, cohortYear, noData, available, nearest}`. `displayYear` is registry-driven (stable across fetch); `noData` ORs in the empty-fetch signal; `cohortYear` is the slider-format key for series-row lookups; `latestPerLayer=true` makes each layer ignore the slider and use its own latest registry year | Shell (pass `layer.displayYear` to fetchers, `layer.noData` to the render branch). YearBadge / TimeSlider / Legend should read `layer.available` + `layer.nearest` here instead of calling `indicatorSliderYears` / `nearestSliderYear` themselves. Detail Panel reads `layer.cohortYear` to key into the analytics series |
+| **Percentile in the filtered universe** | `src/store/percentile.ts` · `computePercentile({series, year, universeDbns, selectedDbn, goodDirection})` | → `{cohortValues, selfValue, rank, cohortSize, betterThanFraction, callout}`. Self is always included in the cohort; callout phrased via `good_direction`; small-N (cohort < 10) flips to "Rank X of N" instead of percentile | School Detail Panel §1.a, future Scorecard. Builds on top of `applyFilters` + `getAnalyticsSeries` — never recomputes the universe or the District/NTA aggregation |
+| **PWC group membership (the "both"-rule)** | `src/store/pwcGroups.ts` · `belongsToPwcGroup(category, group)` | (`PwcCategory`, `'anchor'\|'healing_arts'`) → `boolean`. Both-category schools pass either group | `applyFilters` (School Type cascade), `deriveAnalytics` (KPI / timeline / list), any future PWC-group predicate |
+| **PWC category derivation (server-side)** | `src/server/contract.ts` · `pwcCategoryFromFlags(core_school, arts_program)` (private) | (`boolean\|null`, `boolean\|null`) → `PwcCategory`. One place, used by `getPwcMembership` + `getPwcHistory` | server only |
+| **`good_direction` ranking** (worst → best) | `src/store/analytics.ts` · `rankByGoodDirection(rows, valueOf, goodDirection, tiebreakKey)` | → new sorted array; nulls last; deterministic tiebreak | `deriveAnalytics` (ranked list), upcoming Scorecard / School Detail tables. Sign of `delta` is interpreted by `deltaStatus(delta, good_direction)` in the same file |
+| **Group avg + delta** (KPI cards) | `src/store/analytics.ts` · `deriveAnalytics({indicator, year, series, pwcByYear, universe, timelineYears})` | → `{kpis: {anchor, healing_arts, all}, timeline, list}`. KPIs are means over the filtered universe; deltas vs all-cell; timeline citywide uses `afterSchoolType` (no Cohort) per §5.5 | RightPanel via Shell |
+| **School ↔ community aggregation (District / NTA)** | `src/server/contract.ts` · `getAnalyticsSeries(indicatorId, aggArea)` SQL | Joins `school_geo_crosswalk × area_tract_crosswalk × community_indicator_values` — **no `ST_Within`/`ST_Intersects` at request time.** §11.9 invariant — crosswalks built in Phase 0 ETL | `/api/analytics/series` → Shell → deriveAnalytics |
+
+**Rule of thumb:** if you're about to write `category === 'anchor' || category === 'both'`, or call `indicatorSliderYears` from a component, or recompute "is this layer's year present in the registry?", **stop** — there's already a selector for it.
+
+## School Detail Panel (where things live)
+The Detail Panel replaces RightPanel in the right column whenever `selectedSchoolDbn` is set — via map click, School filter, or ranked list. Closing restores the prior camera + right-panel-collapsed state captured at open.
+
+**Layout & chrome**
+- `src/components/SchoolDetailPanel.tsx` — three sections in vertical sequence, each in its own padded container with a divider + alternating background tone (white → `#f7f9fb` → white).
+- Header: PWC-blue (`#027BC0`) bar, white text, close × on the right. Inside: "SCHOOL DETAILS" eyebrow, name (large), DBN + borough + grades (subdued), and an inverted "Not shown on map" badge when the school is unplottable.
+- Three sections — each carries its **own year pill** (no shared section-level pill, so latest-mode reads correctly):
+  - **§1.a Indicators** — follows the slider (or the layer's latest in latest-mode). Per-active-layer block: family tag + indicator name + per-layer year pill (analytics-blue), self-value headline, `<StripPlot/>`, plain-language callout. Two blocks stack when both families are active.
+  - **§1.b School profile** — pinned to the school's latest demographics year (`profile.profile_year`). 4-metric row: Enrollment · % Poverty · % ELL · % Disabled. Race bar below. Pill tone = "profile" (grey).
+  - **§1.c PWC programs** — renders **only** when the school appears in `pwc_school_program` at all. Always shows all three program-detail rows (Community school / Arts program / OST program) with `—` for null/empty; food pantry + laundry as boolean chips. Pill tone = "program" (magenta).
+- Backend: `getSchoolProfile(dbn)` (`/api/schools/profile`) returns identity + latest-year demographics, **scaled 0→100 server-side** so `pct_*` matches the rest of the app's percent convention. `getPwcProgram(dbn, year)` (`/api/pwc/program`) returns the program row with `active` flag, `null` when not PWC.
+
+**Distribution viz (`src/components/StripPlot.tsx`)**
+- Pure consumer of `PercentileResult` — no math of its own.
+- Two render modes auto-picked by `cohortSize`:
+  - `< 10` → cohort dots on a single center line (no jitter, opaque). Selected school's value labeled.
+  - `≥ 10` → smoothed kernel-density curve only (no individual dots). Selected pin still on the strip.
+- Strip always spans container width: `width="100%"`, no `height` attribute, `preserveAspectRatio="xMidYMid meet"`. Circles stay round at any panel width.
+- Four equal-width visual quartile bands behind the strip (axis-position, not statistical-quartile). Statistical median rendered as a dashed tick on top.
+- Axis labels (min · median · max) live in HTML below the SVG, not inside it, so they never squish.
+
+**Map state capture / restore**
+- `MapView` exposes `onViewChange({center, zoom})` (fires on idle + post-init) and a one-shot `flyToView` prop.
+- Shell holds `lastMapViewRef` (latest camera) and `priorMapStateRef` (snapshot on open). Close handler restores both the camera and `rightPanelCollapsed`.
+- Selection zoom = `13` (NTA-level) for both School filter pick AND Detail Panel open — unified.
+- `selectedSchool={dbn, coords}` drives a maplibregl.Marker with the `.pwc-pulse` CSS keyframe (ring only — no center fill, so the indicator color + PWC halo stay visible through it). Skipped for unplottable schools; panel still opens with the "Not shown on map" badge.
+
+## Filter bar conventions (Header)
+- **Pills never grow with selection.** Every filter trigger shows only the filter name (uppercase) + a count badge when active. The chosen value lives in the trigger's `title` tooltip and is also highlighted in the open panel. Background flips white → `#027BC0` to signal "this filter is on". **Never inline the operator/value in the trigger** — it pushes the time slider.
+- **Reset button** = icon-only yellow chip (`#f5c400` bg, white `↺`). Placed **before** the time slider, not after, so its appear/disappear doesn't shift the slider's horizontal anchor.
+- **"Latest" pill** (`useHubStore.latestPerLayer`) sits beside the slider. When ON: `resolveActiveLayers` ignores `sliderYear` and each layer's `displayYear` becomes its own latest registry year — school and community may sit at different years simultaneously. Slider stays visible but dims to ~40% opacity. Toggle via `setLatestPerLayer`.
+- **PWC counter** = `src/components/PwcCounter.tsx`, rendered as a sibling of MapView (absolutely-positioned inside the same relative container). **Counts from the filtered universe, not the map viewport.** Total stays stable across indicator switches and pan/zoom. When an indicator is active and at least one in-view PWC school lacks a value, an indented "X of N have no data for this indicator" line appears below the headline — the total never moves.
+
 ## Build order (current = Phase 0)
 0. **Data foundation & ETL** ← start here (registry, normalize, crosswalks, API cache, geo cache, data-quality report). No UI.
 1. Map core + single-indicator render (points OR choropleth, dynamic legend, latest-year default).

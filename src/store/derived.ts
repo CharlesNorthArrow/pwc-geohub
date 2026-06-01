@@ -26,6 +26,7 @@ import {
   type PwcMember,
   type SchoolMaster,
 } from '../contract/types';
+import { belongsToPwcGroup } from './pwcGroups';
 import type { GeoFilterMap, HubState, SchoolType } from './useHubStore';
 
 export interface PrefilterSummary {
@@ -159,9 +160,9 @@ function passesSchoolType(
     case 'pwc':
       return true; // any PWC member (category in {anchor, healing_arts, both, pwc_other})
     case 'anchor':
-      return m.category === 'anchor' || m.category === 'both';
+      return belongsToPwcGroup(m.category, 'anchor');
     case 'healing_arts':
-      return m.category === 'healing_arts' || m.category === 'both';
+      return belongsToPwcGroup(m.category, 'healing_arts');
   }
 }
 

@@ -27,9 +27,13 @@ import type {
   PwcCategory,
   PwcHistoryResponse,
   PwcMember,
+  PwcProgram,
+  PwcProgramResponse,
   PwcResponse,
   SchoolFeature,
   SchoolMaster,
+  SchoolProfile,
+  SchoolProfileResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
 } from '../contract/types';
@@ -244,6 +248,27 @@ interface PwcRow {
 }
 
 /**
+ * Map raw program flags → `PwcCategory`. Spec §12 Q1 default: a school is
+ * 'both' when core_school AND arts_program are true, 'anchor' when only
+ * core_school, 'healing_arts' when only arts_program, 'pwc_other' otherwise.
+ *
+ * Lives here (server-side) because the client never sees the raw boolean
+ * flags — it only consumes the derived category. The client-side
+ * `belongsToPwcGroup` predicate consumes this output.
+ */
+function pwcCategoryFromFlags(
+  core_school: boolean | null,
+  arts_program: boolean | null,
+): PwcCategory {
+  const isAnchor = core_school === true;
+  const isArts = arts_program === true;
+  if (isAnchor && isArts) return 'both';
+  if (isAnchor) return 'anchor';
+  if (isArts) return 'healing_arts';
+  return 'pwc_other';
+}
+
+/**
  * One snapshot of PWC programmatic categorization at `year`.
  *
  * - "active" = at least one program field is non-null (so the all-null
@@ -275,16 +300,11 @@ export async function getPwcMembership(year: string): Promise<PwcResponse> {
         OR laundry IS NOT NULL
       )
   `;
-  const members: PwcMember[] = rows.map((r) => {
-    const isAnchor = r.core_school === true;
-    const isArts = r.arts_program === true;
-    let category: PwcCategory;
-    if (isAnchor && isArts) category = 'both';
-    else if (isAnchor) category = 'anchor';
-    else if (isArts) category = 'healing_arts';
-    else category = 'pwc_other';
-    return { dbn: r.dbn, category, cohort: r.cohort };
-  });
+  const members: PwcMember[] = rows.map((r) => ({
+    dbn: r.dbn,
+    category: pwcCategoryFromFlags(r.core_school, r.arts_program),
+    cohort: r.cohort,
+  }));
   return { year, members };
 }
 
@@ -421,13 +441,7 @@ export async function getPwcHistory(): Promise<PwcHistoryResponse> {
   `;
   const byYear: Record<string, PwcMember[]> = {};
   for (const r of rows) {
-    const isAnchor = r.core_school === true;
-    const isArts = r.arts_program === true;
-    let category: PwcCategory;
-    if (isAnchor && isArts) category = 'both';
-    else if (isAnchor) category = 'anchor';
-    else if (isArts) category = 'healing_arts';
-    else category = 'pwc_other';
+    const category = pwcCategoryFromFlags(r.core_school, r.arts_program);
     (byYear[r.year] ??= []).push({ dbn: r.dbn, category, cohort: r.cohort });
   }
   return { byYear };
@@ -503,6 +517,198 @@ export async function getAnalyticsSeries(
     agg_area: aggArea,
     series: rows,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* School Detail Panel                                                        */
+/* -------------------------------------------------------------------------- */
+
+interface SchoolProfileRow {
+  dbn: string;
+  school_name: string | null;
+  borough: string | null;
+  grades: string | null;
+  is_unplottable: boolean;
+  profile_year: string | null;
+  total_enrollment: number | null;
+  pct_students_with_disabilities: number | null;
+  pct_english_language_learners: number | null;
+  pct_poverty: number | null;
+  economic_need_index: number | null;
+  pct_asian: number | null;
+  pct_black: number | null;
+  pct_hispanic: number | null;
+  pct_white: number | null;
+  pct_multi_racial: number | null;
+}
+
+/**
+ * Identity + latest-available-year demographics for one school. The latest
+ * row is picked per-column from `schools_year` so a school with patchy years
+ * (e.g. enrollment in 2024-25 but demographics last present in 2023-24) still
+ * surfaces every field. `profile_year` reports the latest year that had at
+ * least one non-null demographic value — the Detail Panel uses it for the
+ * year pill on section 1.b.
+ *
+ * Returns null when the DBN isn't in `schools` at all.
+ */
+export async function getSchoolProfile(dbn: string): Promise<SchoolProfileResponse> {
+  const rows = await sql<SchoolProfileRow>`
+    WITH latest AS (
+      SELECT DISTINCT ON (dbn)
+        dbn, school_year,
+        total_enrollment,
+        pct_students_with_disabilities,
+        pct_english_language_learners,
+        pct_poverty,
+        economic_need_index,
+        pct_asian, pct_black, pct_hispanic, pct_white, pct_multi_racial
+      FROM schools_year
+      WHERE dbn = ${dbn}
+        AND (
+          total_enrollment IS NOT NULL
+          OR pct_students_with_disabilities IS NOT NULL
+          OR pct_english_language_learners IS NOT NULL
+          OR pct_poverty IS NOT NULL
+          OR economic_need_index IS NOT NULL
+          OR pct_asian IS NOT NULL OR pct_black IS NOT NULL
+          OR pct_hispanic IS NOT NULL OR pct_white IS NOT NULL
+          OR pct_multi_racial IS NOT NULL
+        )
+      ORDER BY dbn, school_year DESC
+    )
+    SELECT
+      s.dbn,
+      s.school_name,
+      s.borough,
+      s.grades,
+      s.is_unplottable,
+      latest.school_year AS profile_year,
+      latest.total_enrollment,
+      latest.pct_students_with_disabilities,
+      latest.pct_english_language_learners,
+      latest.pct_poverty,
+      latest.economic_need_index,
+      latest.pct_asian,
+      latest.pct_black,
+      latest.pct_hispanic,
+      latest.pct_white,
+      latest.pct_multi_racial
+    FROM schools s
+    LEFT JOIN latest ON latest.dbn = s.dbn
+    WHERE s.dbn = ${dbn}
+  `;
+  if (rows.length === 0) return { profile: null };
+  const r = rows[0]!;
+  // schools_master.csv stores pct_* fields as fractions in [0, 1]; the rest
+  // of the app's `format: 'percent'` rendering expects 0..100. Scale at the
+  // server boundary so the contract stays uniform with every other percent
+  // value (math proficiency, suspension rate, etc.). ENI is conventionally
+  // reported on a 0..1 scale, so it stays untouched.
+  const to100 = (v: number | null): number | null => (v == null ? null : v * 100);
+  const profile: SchoolProfile = {
+    dbn: r.dbn,
+    school_name: r.school_name,
+    borough: r.borough,
+    grades: r.grades,
+    is_unplottable: r.is_unplottable,
+    profile_year: r.profile_year,
+    total_enrollment: r.total_enrollment,
+    pct_students_with_disabilities: to100(r.pct_students_with_disabilities),
+    pct_english_language_learners: to100(r.pct_english_language_learners),
+    pct_poverty: to100(r.pct_poverty),
+    economic_need_index: r.economic_need_index,
+    pct_asian: to100(r.pct_asian),
+    pct_black: to100(r.pct_black),
+    pct_hispanic: to100(r.pct_hispanic),
+    pct_white: to100(r.pct_white),
+    pct_multi_racial: to100(r.pct_multi_racial),
+  };
+  return { profile };
+}
+
+interface PwcProgramRow {
+  dbn: string;
+  school_year: string;
+  core_school: boolean | null;
+  arts_program: boolean | null;
+  social_work_program: boolean | null;
+  community_school_program: boolean | null;
+  community_school_program_status: string | null;
+  arts_program_type: string | null;
+  ost_program: boolean | null;
+  ost_program_type: string | null;
+  food_pantry: boolean | null;
+  laundry: boolean | null;
+  cohort: string | null;
+}
+
+/**
+ * One pwc_school_program row for (dbn, year). `active=true` when at least one
+ * program field is non-null in that year (matches the "active row" rule used
+ * by `getPwcMembership`). Inactive rows still come back with the cohort
+ * preserved (cohort can be set without any program columns set) so the panel
+ * can show "no active program in 2020-21" while keeping context.
+ *
+ * Returns null when the DBN isn't in `pwc_school_program` AT ALL (= the
+ * school is not a PWC school in any year, so §1.c shouldn't render).
+ */
+export async function getPwcProgram(dbn: string, year: string): Promise<PwcProgramResponse> {
+  // Existence check — is this school PWC in any year?
+  const existsRows = await sql<{ exists: boolean }>`
+    SELECT EXISTS (
+      SELECT 1 FROM pwc_school_program WHERE dbn = ${dbn}
+    ) AS exists
+  `;
+  if (!existsRows[0]?.exists) return { program: null };
+
+  const rows = await sql<PwcProgramRow>`
+    SELECT dbn, school_year,
+      core_school, arts_program, social_work_program, community_school_program,
+      community_school_program_status, arts_program_type,
+      ost_program, ost_program_type, food_pantry, laundry, cohort
+    FROM pwc_school_program
+    WHERE dbn = ${dbn} AND school_year = ${year}
+  `;
+  // No row for this year at all → return a stub that the panel can render as
+  // "Not in the PWC program panel for {year}". Cohort missing in this case.
+  if (rows.length === 0) {
+    return {
+      program: {
+        dbn,
+        year,
+        category: null,
+        cohort: null,
+        active: false,
+        community_school_program_status: null,
+        arts_program_type: null,
+        ost_program_type: null,
+        food_pantry: null,
+        laundry: null,
+      },
+    };
+  }
+  const r = rows[0]!;
+  const active = [
+    r.core_school, r.arts_program, r.social_work_program, r.community_school_program,
+    r.ost_program, r.food_pantry, r.laundry,
+  ].some((v) => v !== null);
+  const category: PwcCategory | null = active
+    ? pwcCategoryFromFlags(r.core_school, r.arts_program)
+    : null;
+  const program: PwcProgram = {
+    dbn: r.dbn,
+    year: r.school_year,
+    category,
+    cohort: r.cohort,
+    active,
+    community_school_program_status: r.community_school_program_status,
+    arts_program_type: r.arts_program_type,
+    ost_program_type: r.ost_program_type,
+    food_pantry: r.food_pantry,
+    laundry: r.laundry,
+  };
+  return { program };
 }
 
 /* -------------------------------------------------------------------------- */
