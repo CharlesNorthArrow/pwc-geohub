@@ -15,11 +15,8 @@ import type {
 } from '../contract/types';
 import {
   backdropRadiusExpression,
-  buildAnchorTriangleSdf,
-  buildHealingDiamondSdf,
   colorBinsFor,
   colorExpression,
-  iconSizeExpression,
   radiusExpression,
 } from '../map/encoding';
 import type { SchoolType } from '../store/useHubStore';
@@ -47,27 +44,19 @@ interface Props {
    *  exact camera state captured on open. Set to null afterward. */
   flyToView: { center: [number, number]; zoom: number } | null;
   /** Cohort pick — when set, fitBounds to the cohort's schools. One-shot;
-   *  Shell clears after MapView consumes it so subsequent pan/zoom isn't
-   *  snapped back. */
+   *  Shell clears after MapView consumes it. */
   flyToBbox: [number, number, number, number] | null;
-  /** Latest camera observed by `idle` — Shell holds a ref for capture/restore.
-   *  Fires once on init and on every settle. */
+  /** Latest camera observed by `idle` — Shell holds a ref for capture/restore. */
   onViewChange?: (view: { center: [number, number]; zoom: number }) => void;
-  /** Click on any school dot (PWC or non-PWC, indicator or baseline) — fires
-   *  with the school's DBN. Shell wires this to `setSelectedSchool`, which
-   *  is the same path the School filter + ranked list use. */
+  /** Click on any school dot — fires with the school's DBN. */
   onSchoolClick?: (dbn: string) => void;
-  /** Currently-selected school's coords + DBN — drives the pulsing marker.
-   *  Null when no school is selected or the selected one is unplottable. */
+  /** Currently-selected school's coords + DBN — drives the pulsing marker. */
   selectedSchool?: { dbn: string; coords: [number, number] } | null;
-  /** Phase 3 polish — polygons of the currently-selected Geo filter areas.
-   *  Drawn as a line-only outline above tracts, below the school layers. */
+  /** Polygons of the currently-selected Geo filter areas. */
   geoSelection: GeoSelectionResponse | null;
 }
 
-/** NTA-level zoom — frames the surrounding neighborhood. Used by both the
- *  School filter pick and the School Detail Panel open path so the framing
- *  stays consistent. */
+/** NTA-level zoom — frames the surrounding neighborhood. */
 const SELECTION_ZOOM = 13;
 
 const NYC_BOUNDS: [number, number, number, number] = [-74.27, 40.49, -73.68, 40.92];
@@ -82,54 +71,71 @@ const LAYER_TRACTS_LINE = 'tracts-line';
 const LAYER_GEO_SELECTION_FILL = 'geo-selection-fill';
 const LAYER_GEO_SELECTION_LINE = 'geo-selection-line';
 
-/* School-point layer stack — non-PWC paints first (bottom), then pwc_other
- * circles, then symbol layers (diamond, star) on top so PWC schools dominate
- * dense clusters. Splitting by category via per-layer filters is more
- * reliable than `circle-sort-key`, which only orders inside a single layer.
- * The backdrop sits below everything to add a soft shadow under circles. */
+/* School-point layer stack — non-PWC paints first (bottom), then PWC
+ * circles on top so PWC schools dominate in dense clusters. Both PWC and
+ * non-PWC share the same circle-radius (= enrollment) so visual comparison
+ * is meaningful. Backdrop sits under everything as a soft shadow. */
 const LAYER_SCHOOLS_BACKDROP = 'schools-backdrop';
 const LAYER_SCHOOLS_NONPWC = 'schools-circles-nonpwc';
-const LAYER_SCHOOLS_PWC_OTHER = 'schools-circles-pwc-other';
-const LAYER_SCHOOLS_HEALING = 'schools-symbol-healing';
-const LAYER_SCHOOLS_ANCHOR = 'schools-symbol-anchor';
+const LAYER_SCHOOLS_PWC = 'schools-circles-pwc';
 
-const ICON_TRIANGLE = 'pwc-triangle';
-const ICON_DIAMOND = 'pwc-diamond';
-
-/** Halo (border) width in screen pixels for PWC symbol layers. Applies to
- *  both baseline (white border around solid group color) and indicator
- *  (group-color border around indicator fill) modes. */
-const PWC_HALO_WIDTH = 1;
-
-/* PWC brand colors — kept in lockstep with the Legend component. Healing
- * Arts now uses PWC green (#A0B000) instead of the previous orange — the
- * orange remains the community-family theming, not a PWC group color. */
+/* PWC brand colors — Anchor magenta, Healing Arts green, pwc_other blue. */
 const PWC_MAGENTA = '#903090'; // Anchor (includes both-category)
-const PWC_GREEN = '#A0B000';   // Healing Arts only (pure HA, no anchor overlap)
+const PWC_GREEN = '#A0B000';   // Healing Arts (pure HA only — anchor-wins)
 const PWC_BLUE = '#027BC0';    // pwc_other (program-active, not anchor/arts)
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
-/** Muted slate-blue for non-PWC schools in baseline mode — clearly blue
- *  but soft enough to recede behind the colored PWC dots. Paired with
- *  `BASELINE_NONPWC_OPACITY` below for the final on-map look. */
+/** Border width for PWC circle strokes (baseline + indicator mode). */
+const PWC_BORDER_WIDTH = 1.5;
+
+/** Muted slate-blue for non-PWC schools in baseline mode. */
 const BASELINE_FILL = '#7BA7C9';
 const BASELINE_NONPWC_OPACITY = 0.4;
 
-/** Stroke for "no data" schools (indicator mode) — medium neutral grey on a
- *  transparent fill, so the absence-of-fill is the only "no data" cue. Same
- *  grey appears in the legend's NoDataRow. Circles WITH data keep the white
- *  stroke that reads cleanly against any indicator color. */
+/** Stroke for "no data" schools (indicator mode) — medium neutral grey. */
 const NO_DATA_STROKE = '#7a8896';
 
-/** Drop shadow behind every visible school dot — bumped from the prior
- *  0.22 alpha to make the shadow legible against light basemap tiles.
- *  Paired with circle-blur 0.7 + a +2 px radius offset below. */
+/** Drop shadow alpha + blur — see backdrop layer. */
 const BACKDROP_FILL = 'rgba(0, 32, 64, 0.45)';
 
 /**
- * MapLibre style — light CARTO Voyager. Public, no key required. We avoid
- * MapTiler / Mapbox tiles in Phase 1 so the build works without third-party
- * keys; swap to a styled-vector basemap during Phase 6 polish if needed.
+ * Per-category fill in baseline mode (no indicator). Anchor magenta,
+ * Healing-Arts green, pwc_other blue. Anchor-wins: a school with both
+ * is_anchor and is_arts paints magenta because is_anchor is tested first.
+ */
+const PWC_BASELINE_FILL_EXPR: unknown = [
+  'case',
+  ['==', ['get', 'is_anchor'], true], PWC_MAGENTA,
+  ['==', ['get', 'is_arts'], true], PWC_GREEN,
+  ['==', ['get', 'pwc_other'], true], PWC_BLUE,
+  BASELINE_FILL,
+];
+
+/**
+ * Per-category stroke in baseline mode. Anchor/HA get a white border so the
+ * solid fill reads cleanly; pwc_other gets a blue stroke (matches its fill)
+ * which is the "blue halo" treatment.
+ */
+const PWC_BASELINE_STROKE_EXPR: unknown = [
+  'case',
+  ['==', ['get', 'pwc_other'], true], PWC_BLUE,
+  '#ffffff',
+];
+
+/**
+ * Per-category stroke color in indicator mode — the school's original PWC
+ * color becomes the border while the fill takes the indicator's color.
+ */
+const PWC_INDICATOR_STROKE_EXPR: unknown = [
+  'case',
+  ['==', ['get', 'is_anchor'], true], PWC_MAGENTA,
+  ['==', ['get', 'is_arts'], true], PWC_GREEN,
+  ['==', ['get', 'pwc_other'], true], PWC_BLUE,
+  NO_DATA_STROKE,
+];
+
+/**
+ * MapLibre style — light CARTO Voyager basemap. Public, no key required.
  */
 const BASE_STYLE: StyleSpecification = {
   version: 8,
@@ -189,21 +195,9 @@ export default function MapView({
     mapRef.current = map;
 
     map.on('load', () => {
-      // Register SDF icons for the Anchor triangle + Healing-Arts diamond.
-      // Built once on canvas — see src/map/encoding.ts for the SDF generator.
-      // Must be added BEFORE the symbol layers that reference them by name.
-      if (!map.hasImage(ICON_TRIANGLE)) {
-        map.addImage(ICON_TRIANGLE, buildAnchorTriangleSdf(), { sdf: true });
-      }
-      if (!map.hasImage(ICON_DIAMOND)) {
-        map.addImage(ICON_DIAMOND, buildHealingDiamondSdf(), { sdf: true });
-      }
-
-      // Empty sources/layers up-front; populated by the effects below.
       map.addSource(SOURCE_SCHOOLS, { type: 'geojson', data: EMPTY_FC });
 
-      // Selected-geographies overlay — drawn ABOVE tracts (so users can read
-      // boundaries against the choropleth) but BELOW school points.
+      // Selected-geographies overlay — drawn ABOVE tracts but BELOW schools.
       map.addSource(SOURCE_GEO_SELECTION, { type: 'geojson', data: EMPTY_FC });
       map.addLayer({
         id: LAYER_GEO_SELECTION_FILL,
@@ -226,19 +220,13 @@ export default function MapView({
       });
 
       // Stack order (bottom → top):
-      //   0. backdrop       (soft dark shadow behind every CIRCLE-rendered dot)
+      //   0. backdrop      (soft dark shadow behind every visible dot)
       //   1. non-PWC dots
-      //   2. pwc_other dots (blue halo via stroke)
-      //   3. Healing-Arts diamond symbol (SDF)
-      //   4. Anchor star symbol           (SDF) — on top so Anchor reads first
+      //   2. PWC dots      (anchor, healing-arts, pwc_other — split by stroke)
       map.addLayer({
         id: LAYER_SCHOOLS_BACKDROP,
         type: 'circle',
         source: SOURCE_SCHOOLS,
-        // Backdrop only paints under circle-rendered schools — symbol icons
-        // (anchor/HA) cover the center themselves and the dark circle peeks
-        // through their tips/corners otherwise.
-        filter: ['all', ['!=', ['get', 'is_anchor'], true], ['!=', ['get', 'is_arts'], true]],
         paint: {
           'circle-color': BACKDROP_FILL,
           'circle-radius': 6,
@@ -261,60 +249,20 @@ export default function MapView({
         },
       });
       map.addLayer({
-        id: LAYER_SCHOOLS_PWC_OTHER,
+        id: LAYER_SCHOOLS_PWC,
         type: 'circle',
         source: SOURCE_SCHOOLS,
-        // pwc_other: PWC-affiliated but neither core_school nor arts_program.
-        // Stays a circle (no special shape) but keeps a blue stroke so users
-        // can still spot it as part of the PWC network on the map.
-        filter: ['==', ['get', 'pwc_other'], true],
+        filter: ['==', ['get', 'is_pwc'], true],
         paint: {
-          'circle-color': PWC_BLUE,
+          'circle-color': '#cccccc',
           'circle-radius': 4,
-          'circle-stroke-color': PWC_BLUE,
-          'circle-stroke-width': PWC_HALO_WIDTH,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': PWC_BORDER_WIDTH,
           'circle-opacity': 0.95,
-        },
-      });
-      map.addLayer({
-        id: LAYER_SCHOOLS_HEALING,
-        type: 'symbol',
-        source: SOURCE_SCHOOLS,
-        // is_arts is now disjoint from is_anchor (Shell sets is_arts only when
-        // pure healing-arts), so the filter doesn't need an `!is_anchor` guard.
-        filter: ['==', ['get', 'is_arts'], true],
-        layout: {
-          'icon-image': ICON_DIAMOND,
-          'icon-size': 1,
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-        paint: {
-          'icon-color': PWC_GREEN,
-          'icon-halo-color': '#ffffff',
-          'icon-halo-width': PWC_HALO_WIDTH,
-        },
-      });
-      map.addLayer({
-        id: LAYER_SCHOOLS_ANCHOR,
-        type: 'symbol',
-        source: SOURCE_SCHOOLS,
-        filter: ['==', ['get', 'is_anchor'], true],
-        layout: {
-          'icon-image': ICON_TRIANGLE,
-          'icon-size': 1,
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-        paint: {
-          'icon-color': PWC_MAGENTA,
-          'icon-halo-color': '#ffffff',
-          'icon-halo-width': PWC_HALO_WIDTH,
         },
       });
 
       styleReadyRef.current = true;
-      // Force a re-eval of the data effects after style readiness.
       map.fire('phase1-style-ready');
     });
 
@@ -325,7 +273,7 @@ export default function MapView({
     };
   }, []);
 
-  // --- Tract polygons: add source + layers once URL is known --------------
+  // --- Tract polygons -----------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !tractGeoJsonUrl) return;
@@ -348,9 +296,6 @@ export default function MapView({
               ['==', ['feature-state', 'v'], null], 'rgba(0,0,0,0)',
               ['coalesce', ['feature-state', 'color'], 'rgba(0,0,0,0)'],
             ],
-            // Categorical indicators with `intensities` (racial_predominance)
-            // set a per-feature opacity in [0.3, 0.85]; sequential indicators
-            // leave it unset and fall back to the default 0.65.
             'fill-opacity': [
               'case',
               ['==', ['feature-state', 'v'], null], 0,
@@ -358,7 +303,7 @@ export default function MapView({
             ],
           },
         },
-        LAYER_SCHOOLS_BACKDROP, // beneath every school layer (incl. backdrop)
+        LAYER_SCHOOLS_BACKDROP,
       );
       map.addLayer(
         {
@@ -387,31 +332,24 @@ export default function MapView({
       if (!source) return;
       if (!schoolPoints || schoolPoints.features.length === 0) {
         source.setData(EMPTY_FC);
-        // Reset paint when there are no features — avoids stale expressions
-        // showing through when a fresh dataset arrives later.
-        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', '#cccccc');
-        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-radius', 4);
-        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', '#ffffff');
-        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', 1);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', 4);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
+        for (const id of [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC]) {
+          map.setPaintProperty(id, 'circle-color', '#cccccc');
+          map.setPaintProperty(id, 'circle-radius', 4);
+          map.setPaintProperty(id, 'circle-stroke-color', '#ffffff');
+          map.setPaintProperty(id, 'circle-stroke-width', 1);
+        }
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 0);
         return;
       }
       source.setData(schoolPoints);
       const dataRadius = radiusExpression() as unknown;
-      const iconSize = iconSizeExpression() as unknown;
 
-      // Symbol icon-size mirrors the circle radius curve so star/diamond
-      // schools size with enrollment + zoom just like circles do.
-      map.setLayoutProperty(LAYER_SCHOOLS_ANCHOR, 'icon-size', iconSize as never);
-      map.setLayoutProperty(LAYER_SCHOOLS_HEALING, 'icon-size', iconSize as never);
+      for (const id of [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC]) {
+        map.setPaintProperty(id, 'circle-radius', dataRadius as never);
+      }
 
-      // Backdrop radius is 2 px wider than the data dot so a soft drop
-      // shadow peeks out from behind the circle. Backdrop layer is filtered
-      // to circle-rendered features only (symbols don't need a shadow).
+      // Backdrop radius is 2 px wider than the data dot so a soft drop shadow
+      // peeks out from behind each circle.
       map.setPaintProperty(
         LAYER_SCHOOLS_BACKDROP,
         'circle-radius',
@@ -419,44 +357,27 @@ export default function MapView({
       );
 
       if (!schoolIndicator) {
-        /* -------------------- BASELINE mode (no indicator) --------------------
-         * Non-PWC: faded slate-blue circle, white stroke
-         * pwc_other: PWC blue circle, blue stroke (per user — keeps blue halo)
-         * Anchor: solid magenta star with white border (SDF halo)
-         * Healing Arts: solid green diamond with white border (SDF halo) */
+        // BASELINE mode: non-PWC = faded slate-blue circle, PWC = category color
+        // with a thin border (white for anchor/HA, blue for pwc_other).
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', BASELINE_FILL);
-        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-radius', dataRadius as never);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', '#ffffff');
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', 1);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', BASELINE_NONPWC_OPACITY);
 
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', dataRadius as never);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-opacity', 0.95);
-
-        map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-color', PWC_MAGENTA);
-        map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-color', '#ffffff');
-        map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', PWC_HALO_WIDTH);
-
-        map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-color', PWC_GREEN);
-        map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-color', '#ffffff');
-        map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', PWC_HALO_WIDTH);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', PWC_BASELINE_FILL_EXPR as never);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', PWC_BASELINE_STROKE_EXPR as never);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', PWC_BORDER_WIDTH);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 0.95);
 
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 1);
         return;
       }
 
-      /* -------------------- INDICATOR mode --------------------
-       * All four layers share the same indicator-color expression so values
-       * are comparable across families. Schools with `value_num == null` use
-       * a hollow style (transparent fill, group-colored outline) so they
-       * read as "PWC school, no data" rather than "lowest-bin color."
-       *   - Non-PWC circle: indicator color + white stroke (or grey for no-data)
-       *   - pwc_other circle: indicator color + BLUE stroke (keeps PWC cue)
-       *   - Anchor star: indicator color icon + magenta halo (= original border)
-       *   - HA diamond:  indicator color icon + green halo */
+      // INDICATOR mode: both PWC and non-PWC dots share the gradient fill so
+      // values are comparable; PWC schools are flagged by a category-colored
+      // border (magenta/green/blue). Schools with `value_num == null` render
+      // as a hollow ring — for non-PWC the stroke is grey, for PWC the
+      // stroke keeps its category color so "no data PWC" is still spotable.
       const schoolValueList: number[] = [];
       for (const f of schoolPoints.features) {
         const v = f.properties.value_num;
@@ -487,31 +408,18 @@ export default function MapView({
       ];
 
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', colorExpr as never);
-      map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-radius', dataRadius as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', nonPwcStrokeColor as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', nonPwcStrokeWidth as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', 0.85);
 
-      // pwc_other always shows the blue halo, even in no-data state, so users
-      // can spot PWC-affiliated schools in the indicator view.
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', colorExpr as never);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', dataRadius as never);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-opacity', 0.95);
+      // PWC: indicator-color fill, category-color stroke (always — even when
+      // value is null, so the school stays visible as a colored ring).
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', colorExpr as never);
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', PWC_INDICATOR_STROKE_EXPR as never);
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', PWC_BORDER_WIDTH);
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 0.95);
 
-      // Symbol layers: icon-color = indicator color (or transparent for
-      // no-data, leaving just the halo to read as a hollow outline).
-      map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-color', colorExpr as never);
-      map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-color', PWC_MAGENTA);
-      map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', PWC_HALO_WIDTH);
-
-      map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-color', colorExpr as never);
-      map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-color', PWC_GREEN);
-      map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', PWC_HALO_WIDTH);
-
-      // Backdrop hidden for hollow no-data circles (otherwise the dark
-      // shadow shows THROUGH the hollow center).
+      // Backdrop hidden for hollow no-data circles.
       map.setPaintProperty(
         LAYER_SCHOOLS_BACKDROP,
         'circle-opacity',
@@ -526,13 +434,7 @@ export default function MapView({
     else map.once('phase1-style-ready', apply);
   }, [schoolIndicator, schoolPoints]);
 
-  // --- Combined filter (Phase 2 PWC + Phase 3 cascade) applied to school layers
-  //
-  // The Phase 3 `applyFilters` selector already encodes School Type, so its
-  // output is the FINAL universe of DBNs. We could drop the `schoolType`
-  // expression entirely — but keeping it makes the map's behavior obvious
-  // from the filter expression alone, and it's cheap (constant-size). We
-  // intersect via MapLibre 'all': both predicates must pass.
+  // --- Combined filter (PWC + Phase 3 cascade) ---------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -542,39 +444,23 @@ export default function MapView({
         ? true
         : ['in', ['get', 'dbn'], ['literal', [...dbns]]];
       const cascade = ['all', filterFor(schoolType), inUniverse];
-      // Each layer KEEPS its category predicate so the four buckets paint
-      // separately. Intersect cascade with that predicate.
       const nonPwcFilter = ['all', cascade, ['!=', ['get', 'is_pwc'], true]];
-      const pwcOtherFilter = ['all', cascade, ['==', ['get', 'pwc_other'], true]];
-      const anchorFilter = ['all', cascade, ['==', ['get', 'is_anchor'], true]];
-      const healingFilter = ['all', cascade, ['==', ['get', 'is_arts'], true]];
-      // Backdrop matches circles only (non-PWC + pwc_other) — symbol layers
-      // don't need a drop shadow.
-      const backdropFilter = ['all', cascade,
-        ['!=', ['get', 'is_anchor'], true],
-        ['!=', ['get', 'is_arts'], true],
-      ];
+      const pwcFilter = ['all', cascade, ['==', ['get', 'is_pwc'], true]];
       if (map.getLayer(LAYER_SCHOOLS_BACKDROP)) {
-        map.setFilter(LAYER_SCHOOLS_BACKDROP, backdropFilter as never);
+        map.setFilter(LAYER_SCHOOLS_BACKDROP, cascade as never);
       }
       if (map.getLayer(LAYER_SCHOOLS_NONPWC)) {
         map.setFilter(LAYER_SCHOOLS_NONPWC, nonPwcFilter as never);
       }
-      if (map.getLayer(LAYER_SCHOOLS_PWC_OTHER)) {
-        map.setFilter(LAYER_SCHOOLS_PWC_OTHER, pwcOtherFilter as never);
-      }
-      if (map.getLayer(LAYER_SCHOOLS_ANCHOR)) {
-        map.setFilter(LAYER_SCHOOLS_ANCHOR, anchorFilter as never);
-      }
-      if (map.getLayer(LAYER_SCHOOLS_HEALING)) {
-        map.setFilter(LAYER_SCHOOLS_HEALING, healingFilter as never);
+      if (map.getLayer(LAYER_SCHOOLS_PWC)) {
+        map.setFilter(LAYER_SCHOOLS_PWC, pwcFilter as never);
       }
     };
     if (styleReadyRef.current) apply();
     else map.once('phase1-style-ready', apply);
   }, [schoolType, filteredSchoolDbns]);
 
-  // --- Selected-geographies overlay: update source data + zoom + tract filter
+  // --- Selected-geographies overlay --------------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -582,8 +468,6 @@ export default function MapView({
       const src = map.getSource(SOURCE_GEO_SELECTION) as GeoJSONSource | undefined;
       if (src) src.setData(geoSelection ?? EMPTY_FC);
 
-      // Filter the community tract layers to the intersection set. Empty
-      // selection → no filter (full NYC choropleth, as before).
       const tracts = geoSelection?.intersectingTractGeoids ?? [];
       const tractFilter: unknown = tracts.length === 0
         ? true
@@ -592,8 +476,6 @@ export default function MapView({
         if (map.getLayer(id)) map.setFilter(id, tractFilter as never);
       }
 
-      // Fit the viewport to the union of selected polygons. We only zoom IN
-      // when there is a selection — clearing filters preserves current view.
       const bbox = geoSelection ? boundsOf(geoSelection) : null;
       if (bbox) {
         map.fitBounds(
@@ -609,9 +491,7 @@ export default function MapView({
     else map.once('phase1-style-ready', apply);
   }, [geoSelection]);
 
-  // --- flyTo when the user picks a school (spec §6.4) -------------------
-  // SELECTION_ZOOM = 13 (NTA level) for both the School filter pick AND the
-  // Detail Panel open path — same framing for both selection surfaces.
+  // --- flyTo when the user picks a school -------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyToCoords) return;
@@ -664,17 +544,10 @@ export default function MapView({
   }, [onViewChange]);
 
   // --- Click handlers on school dots → open the Detail Panel ------------
-  // All four school dot layers (non-PWC circle, pwc_other circle, healing
-  // diamond symbol, anchor star symbol) carry the same `dbn` property.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !onSchoolClick) return;
-    const SCHOOL_HIT_LAYERS = [
-      LAYER_SCHOOLS_NONPWC,
-      LAYER_SCHOOLS_PWC_OTHER,
-      LAYER_SCHOOLS_HEALING,
-      LAYER_SCHOOLS_ANCHOR,
-    ];
+    const SCHOOL_HIT_LAYERS = [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC];
     const onClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }): void => {
       const f = e.features?.[0];
       const dbn = (f?.properties?.dbn as string | undefined) ?? null;
@@ -753,9 +626,6 @@ export default function MapView({
         };
         const intensity = intensities?.[geoid];
         if (typeof intensity === 'number' && Number.isFinite(intensity)) {
-          // Map [25, 100] → [0.3, 0.85]. With 4 categories the predominant
-          // share is mathematically ≥ 25%, so this anchors weak majorities
-          // near the floor and strong majorities near the ceiling.
           const clamped = Math.max(25, Math.min(100, intensity));
           state.opacity = 0.3 + ((clamped - 25) / 75) * 0.55;
         }
@@ -777,8 +647,7 @@ export default function MapView({
   );
 }
 
-/** Walk every coordinate in a selection FC and return [w, s, e, n], or null
- *  when the collection is empty. */
+/** Walk every coordinate in a selection FC and return [w, s, e, n]. */
 function boundsOf(fc: GeoSelectionResponse): [number, number, number, number] | null {
   let w = Infinity;
   let s = Infinity;
@@ -805,10 +674,9 @@ function boundsOf(fc: GeoSelectionResponse): [number, number, number, number] | 
 }
 
 /**
- * MapLibre filter expression keyed off the PWC flags merged onto every
- * school feature (`is_pwc`, `is_anchor`, `is_arts`). With the anchor-wins
- * rule both-category schools carry is_anchor=true and is_arts=false, so
- * the Healing Arts filter is a disjoint subset of PWC schools.
+ * MapLibre filter expression keyed off PWC flags. With the anchor-wins rule
+ * both-category schools carry is_anchor=true and is_arts=false, so the
+ * Healing Arts filter is a disjoint subset of PWC schools.
  */
 function filterFor(t: SchoolType): unknown {
   switch (t) {
@@ -820,7 +688,6 @@ function filterFor(t: SchoolType): unknown {
       return ['==', ['get', 'is_arts'], true];
     case 'all':
     default:
-      // MapLibre treats `true` as "no filter".
       return true;
   }
 }

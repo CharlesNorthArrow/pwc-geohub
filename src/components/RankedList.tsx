@@ -126,36 +126,28 @@ export default function RankedList({
 }
 
 /**
- * Anchor-wins: both-category schools render as Anchor (triangle). Healing
- * Arts = green diamond. pwc_other = blue circle. Shapes mirror the map
- * symbology so users can scan the list and the map with the same visual
- * vocabulary.
+ * Anchor-wins: both-category schools render as Anchor (magenta dot). All
+ * PWC categories use the same circle glyph — color carries the group.
  */
 function CategoryGlyph({ category }: { category: RankedRow['category'] }): React.JSX.Element {
-  if (category === 'anchor' || category === 'both') {
-    return <Glyph shape="triangle" color={ANCHOR} />;
-  }
-  if (category === 'healing_arts') return <Glyph shape="diamond" color={HEALING} />;
-  return <Glyph shape="circle" color={BLUE} />; // pwc_other
+  if (category === 'anchor' || category === 'both') return <Dot color={ANCHOR} />;
+  if (category === 'healing_arts') return <Dot color={HEALING} />;
+  return <Dot color={BLUE} />; // pwc_other
 }
 
-function Glyph({
-  shape,
-  color,
-}: {
-  shape: 'triangle' | 'diamond' | 'circle';
-  color: string;
-}): React.JSX.Element {
+function Dot({ color }: { color: string }): React.JSX.Element {
   return (
-    <svg aria-hidden viewBox="0 0 20 20" width={11} height={11} style={{ flex: 'none' }}>
-      {shape === 'triangle' ? (
-        <polygon points="10,2 18,17 2,17" fill={color} />
-      ) : shape === 'diamond' ? (
-        <polygon points="10,2 18,10 10,18 2,10" fill={color} />
-      ) : (
-        <circle cx={10} cy={10} r={7} fill={color} />
-      )}
-    </svg>
+    <span
+      aria-hidden
+      style={{
+        display: 'inline-block',
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: color,
+        flex: 'none',
+      }}
+    />
   );
 }
 

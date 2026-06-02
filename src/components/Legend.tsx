@@ -177,7 +177,7 @@ function BaselineSchoolLegend(): React.JSX.Element {
       >
         All NYC schools
       </div>
-      <Caption>Symbol &amp; color</Caption>
+      <Caption>Dot color</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <ShapeRow
           shape="circle"
@@ -186,17 +186,17 @@ function BaselineSchoolLegend(): React.JSX.Element {
           label="Other NYC school"
         />
         <ShapeRow
-          shape="triangle"
+          shape="circle"
           fill={PWC_MAGENTA}
           strokeColor="#ffffff"
-          strokeWidth={0.75}
+          strokeWidth={1}
           label="PWC Anchor school"
         />
         <ShapeRow
-          shape="diamond"
+          shape="circle"
           fill={PWC_GREEN}
           strokeColor="#ffffff"
-          strokeWidth={0.75}
+          strokeWidth={1}
           label="PWC Healing Arts school"
         />
         <ShapeRow
@@ -207,7 +207,7 @@ function BaselineSchoolLegend(): React.JSX.Element {
           label="PWC (other program)"
         />
       </div>
-      <Caption>Symbol size = total enrollment</Caption>
+      <Caption>Dot size = total enrollment</Caption>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
         {ENROLLMENT_BINS.map((b) => (
           <div
@@ -396,24 +396,24 @@ function PwcHaloLegend(): React.JSX.Element {
       <Caption>PWC schools (outline)</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
         <ShapeRow
-          shape="triangle"
+          shape="circle"
           fill="#dde4ea"
           strokeColor={PWC_MAGENTA}
-          strokeWidth={1}
+          strokeWidth={1.5}
           label="Anchor (core school)"
         />
         <ShapeRow
-          shape="diamond"
+          shape="circle"
           fill="#dde4ea"
           strokeColor={PWC_GREEN}
-          strokeWidth={1}
+          strokeWidth={1.5}
           label="Healing Arts"
         />
         <ShapeRow
           shape="circle"
           fill="#dde4ea"
           strokeColor={PWC_BLUE}
-          strokeWidth={1}
+          strokeWidth={1.5}
           label="PWC (other program)"
         />
       </div>

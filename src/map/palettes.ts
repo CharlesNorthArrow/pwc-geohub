@@ -53,18 +53,24 @@ export const DIVERGING_GREYTEAL_MUTED = [
 
 /**
  * Community sequential ramp — light grey (#D3DCE8) → deep brick red (#932B25).
- * 5 stops linearly interpolated in RGB. Used for every sequential community
- * indicator regardless of good_direction; since the community registry uses
- * `good_direction: 'low'` across the board, low values land at the grey end
- * (neutral/good) and high values land at the red end (intense/bad), matching
- * the natural "color = intensity of concern" reading.
+ * Stops are HAND-PICKED (not linear-RGB interpolated) to maximize perceptual
+ * distinction between bins. Earlier linear interpolation produced muddy mids
+ * (all greys-with-a-hint-of-pink) that read as "kinda the same color"; this
+ * version pushes mid stops toward warm/saturated reds so bin1→bin4 shows a
+ * clear ramp of intensity, not just luminance.
+ *
+ * Used for every sequential community indicator regardless of good_direction;
+ * the community registry uses `good_direction: 'low'` across the board, so
+ * low values land at the grey end (neutral) and high values land at the deep
+ * red end (intense), matching the natural "color = intensity of concern"
+ * reading.
  */
 export const COMMUNITY_GREY_RED = [
-  '#D3DCE8', // bin 0 — low value, neutral grey-blue
-  '#C3B0B7', // bin 1
-  '#B38486', // bin 2
-  '#A35756', // bin 3
-  '#932B25', // bin 4 — high value, deep brick red
+  '#D3DCE8', // bin 0 — light grey-blue (user anchor, low/neutral)
+  '#D9A8A4', // bin 1 — light salmon (clear jump from grey)
+  '#BC6F5E', // bin 2 — warm rust
+  '#A8554C', // bin 3 — strong brick red
+  '#932B25', // bin 4 — deep brick red (user anchor, high/intense)
 ] as const;
 
 /** Stable category → color map for the 4 race categories the registry ships. */

@@ -222,6 +222,11 @@ function FamilyGroup({
     });
   }
 
+  // Whole-family collapse — clicking the chevron next to "School indicators"
+  // / "Community indicators" folds the entire group away. Theme-level expand
+  // state inside is preserved across collapse/expand cycles.
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div>
       <div
@@ -238,10 +243,34 @@ function FamilyGroup({
           marginBottom: 4,
         }}
       >
-        <span>{title}</span>
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title}`}
+          title={`${collapsed ? 'Expand' : 'Collapse'} ${title}`}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'inherit',
+            font: 'inherit',
+            letterSpacing: 'inherit',
+            textTransform: 'inherit',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span aria-hidden style={{ fontSize: 9, display: 'inline-block', width: 10 }}>
+            {collapsed ? '▶' : '▼'}
+          </span>
+          <span>{title}</span>
+        </button>
         {titleAction}
       </div>
-      {flat ? (
+      {collapsed ? null : flat ? (
         // Community indicators render as a flat list — no theme headers.
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {items.map((i) => (
@@ -255,53 +284,53 @@ function FamilyGroup({
           ))}
         </div>
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {byTheme.map(([theme, list]) => {
-          const open = expanded.has(theme);
-          const hasActive = list.some((i) => i.id === activeId);
-          return (
-            <div key={theme}>
-              <button
-                type="button"
-                onClick={() => toggle(theme)}
-                aria-expanded={open}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '2px 0',
-                  fontSize: 11,
-                  cursor: 'pointer',
-                  color: hasActive ? accent : '#467c9d',
-                  fontWeight: hasActive ? 700 : 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <span aria-hidden style={{ fontSize: 8, display: 'inline-block', width: 10 }}>
-                  {open ? '▼' : '▶'}
-                </span>
-                <span style={{ flex: 1 }}>{theme}</span>
-              </button>
-              {open ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 14 }}>
-                  {list.map((i) => (
-                    <IndicatorRow
-                      key={i.id}
-                      indicator={i}
-                      selected={i.id === activeId}
-                      accent={accent}
-                      onPick={() => onPick(i.id)}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {byTheme.map(([theme, list]) => {
+            const open = expanded.has(theme);
+            const hasActive = list.some((i) => i.id === activeId);
+            return (
+              <div key={theme}>
+                <button
+                  type="button"
+                  onClick={() => toggle(theme)}
+                  aria-expanded={open}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px 0',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    color: hasActive ? accent : '#467c9d',
+                    fontWeight: hasActive ? 700 : 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span aria-hidden style={{ fontSize: 8, display: 'inline-block', width: 10 }}>
+                    {open ? '▼' : '▶'}
+                  </span>
+                  <span style={{ flex: 1 }}>{theme}</span>
+                </button>
+                {open ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 14 }}>
+                    {list.map((i) => (
+                      <IndicatorRow
+                        key={i.id}
+                        indicator={i}
+                        selected={i.id === activeId}
+                        accent={accent}
+                        onPick={() => onPick(i.id)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

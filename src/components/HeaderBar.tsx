@@ -146,17 +146,37 @@ export default function HeaderBar({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 12,
         padding: '0 12px',
-        // Match the Logo container exactly so the orange bottom border reads
-        // as one continuous line across the dashboard's top edge.
-        minHeight: 64,
+        // Fixed height — the header never grows with the filter row. When
+        // filter chips overflow horizontally the inner scroller below
+        // catches them instead of stacking onto a second line.
+        height: 64,
         borderBottom: '3px solid #F0901F',
         boxShadow: '0 1px 2px rgba(0, 32, 64, 0.12)',
         background: '#ffffff',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
       }}
     >
+      {/* Filter cluster — horizontal scroll kicks in only when the chips
+       *  collectively exceed the available width. `minWidth: 0` is the bit
+       *  flexbox needs to let the container actually shrink. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flex: '1 1 auto',
+          minWidth: 0,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'thin',
+          // Pad the right edge of the scroll area so the last chip never
+          // butts right up against the divider.
+          paddingRight: 4,
+        }}
+      >
       {/* Geo — label + count badge only (no inline summary). */}
       <button
         type="button"
@@ -274,8 +294,22 @@ export default function HeaderBar({
           ↺
         </button>
       ) : null}
+      </div>{/* /filter cluster */}
 
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* Vertical partition between the filter cluster and the time-slider
+       *  block. Subtle slate-grey line, ~half the toolbar height, with a
+       *  margin so it doesn't visually touch either neighbor. */}
+      <div
+        aria-hidden
+        style={{
+          width: 1,
+          height: 32,
+          background: '#c5cdd6',
+          flex: 'none',
+        }}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
         {/* "Latest" pill — when on, each layer ignores the slider and shows
          *  its own latest available year. The slider stays visible but
          *  visually dimmed so the relationship is obvious. */}
