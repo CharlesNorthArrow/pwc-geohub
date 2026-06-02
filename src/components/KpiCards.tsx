@@ -35,7 +35,7 @@ export default function KpiCards({ indicator, kpis, year }: Props): React.JSX.El
         formatter={fmt}
         deltaFormatter={deltaFormatterFor(indicator)}
         status={deltaStatus(kpis.healing_arts.delta, indicator.scale.good_direction)}
-        accent="#F0901F"
+        accent="#A0B000"
       />
       <Card
         label="All in view"

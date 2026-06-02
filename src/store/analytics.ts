@@ -19,11 +19,15 @@
  *   - KPI all-schools-avg respects Geo + School Type + Cohort (universe.schoolDbns).
  *   - Timeline citywide line respects Geo + School Type but NOT Cohort — uses
  *     `universe.afterSchoolType` instead.
- *   - Anchor / Healing-Arts groups use per-year PWC membership: a school may
- *     be Anchor in one year and not the next; historical points reflect that.
- *   - Both-category schools count in BOTH the Anchor and Healing Arts groups
- *     (Q1 default applied at Phase 2). In the ranked list they appear ONCE
- *     with a dual category symbol.
+ *   - KPIs + ranked list use per-year PWC membership (the snapshot at the
+ *     active slider year).
+ *   - TIMELINE backfills membership from the LATEST PWC vintage so a school
+ *     that's currently Anchor contributes its indicator value across all
+ *     historical years on the chart — the user wants to see the trajectory
+ *     of "schools that are PWC now," not "schools that were PWC then."
+ *   - Anchor-wins: both-category schools count ONLY in the Anchor group
+ *     (see `belongsToPwcGroup` — the Healing Arts group is disjoint from
+ *     Anchor, never an overlap).
  */
 
 import type {
@@ -148,10 +152,15 @@ export function deriveAnalytics({
     all: { n: allValuesInUniverse.length, avg: allAvg, delta: null },
   };
 
-  /* -------------------- Timeline (3 series × N years) -------------------- */
+  /* -------------------- Timeline (3 series × N years) --------------------
+   * Timeline uses LATEST-vintage PWC membership for every year on the chart,
+   * so a school that's Anchor today contributes its 2019 / 2020 / … values
+   * to the Anchor line even though it may not have been on the program then.
+   * Backfilling like this lets the user see the trajectory of "schools that
+   * are PWC now" rather than "schools that were PWC at year Y." */
+  const pwcLatest = latestPwcMembership(pwcByYear);
   const timeline: TimelinePoint[] = timelineYears.map((y) => {
     const vYear = valuesAt(y);
-    const pYear = pwcAt(y);
 
     // Citywide line — pre-Cohort universe (afterSchoolType).
     const cityVals: number[] = [];
@@ -160,16 +169,16 @@ export function deriveAnalytics({
       if (v != null) cityVals.push(v);
     }
 
-    // Anchor / HA lines — full filtered universe.
+    // Anchor / HA lines — full filtered universe, latest-vintage membership.
     const anchorVals: number[] = [];
     const haVals: number[] = [];
     for (const dbn of universe.schoolDbns) {
       const v = vYear.get(dbn);
       if (v == null) continue;
-      const m = pYear.get(dbn);
+      const m = pwcLatest.get(dbn);
       if (!m) continue;
       if (belongsToPwcGroup(m.category, 'anchor')) anchorVals.push(v);
-      if (belongsToPwcGroup(m.category, 'healing_arts')) haVals.push(v);
+      else if (belongsToPwcGroup(m.category, 'healing_arts')) haVals.push(v);
     }
 
     return {
@@ -233,6 +242,22 @@ export function rankByGoodDirection<T>(
     return tiebreakKey(a).localeCompare(tiebreakKey(b));
   });
   return out;
+}
+
+/**
+ * The most recent PWC membership snapshot in `pwcByYear`. Keys are sortable
+ * school_year strings ("2024-25" > "2023-24" lexicographically), so the max
+ * key gives us the freshest vintage. Returns a Dbn→PwcMember map for O(1)
+ * lookups in the timeline loop. Empty input → empty map.
+ */
+function latestPwcMembership(
+  pwcByYear: Record<string, PwcMember[]>,
+): Map<string, PwcMember> {
+  const years = Object.keys(pwcByYear);
+  if (years.length === 0) return new Map();
+  years.sort();
+  const latest = years[years.length - 1]!;
+  return new Map((pwcByYear[latest] ?? []).map((m) => [m.dbn, m]));
 }
 
 function mean(xs: number[]): number | null {

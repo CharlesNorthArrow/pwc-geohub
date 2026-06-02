@@ -563,22 +563,22 @@ function CategoryBadge({
   category: PwcProgram['category'];
   cohort: string | null;
 }): React.JSX.Element {
+  // Anchor-wins: both-category schools render as Anchor (purple star on the
+  // map, "Anchor" label here). The both → Anchor fold matches the symbology.
   const groupLabel =
-    category === 'both'
-      ? 'Anchor + Healing Arts'
-      : category === 'anchor'
-        ? 'Anchor'
-        : category === 'healing_arts'
-          ? 'Healing Arts'
-          : category === 'pwc_other'
-            ? 'PWC (other program)'
-            : '—';
+    category === 'anchor' || category === 'both'
+      ? 'Anchor'
+      : category === 'healing_arts'
+        ? 'Healing Arts'
+        : category === 'pwc_other'
+          ? 'PWC (other program)'
+          : '—';
   const accent =
     category === 'anchor' || category === 'both'
-      ? '#903090'
+      ? '#903090' // magenta
       : category === 'healing_arts'
-        ? '#F0901F'
-        : '#027BC0';
+        ? '#A0B000' // PWC green (Healing Arts)
+        : '#027BC0'; // PWC blue (other program)
   return (
     <div
       style={{

@@ -242,8 +242,11 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     const features: SchoolFeature[] = schoolData.features.map((f) => {
       const m = byDbn.get(f.properties.dbn);
       if (!m) return stripPwcFlags(f);
+      // Anchor-wins: both-category schools render as Anchor only (purple star).
+      // Pure Healing-Arts schools render as a green diamond. The contract still
+      // emits 'both' as a category, but the visual buckets are disjoint here.
       const isAnchor = m.category === 'anchor' || m.category === 'both';
-      const isArts = m.category === 'healing_arts' || m.category === 'both';
+      const isArts = m.category === 'healing_arts';
       const pwcOther = m.category === 'pwc_other';
       return {
         ...f,
@@ -275,7 +278,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     const features: SchoolFeature[] = schoolsMaster.map((s) => {
       const m = byDbn.get(s.dbn);
       const isAnchor = m?.category === 'anchor' || m?.category === 'both';
-      const isArts = m?.category === 'healing_arts' || m?.category === 'both';
+      const isArts = m?.category === 'healing_arts';
       const pwcOther = m?.category === 'pwc_other';
       return {
         type: 'Feature',
@@ -496,6 +499,45 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   } | null>(null);
   const [flyToView, setFlyToView] = useState<{ center: [number, number]; zoom: number } | null>(null);
 
+  /* -------------------- Cohort selection → fitBounds -------------------- */
+  // When the user picks a cohort, fit the map to the bbox of the cohort's
+  // schools so they're framed in view. Triggers on the cohort transition
+  // (null → cohort or cohortA → cohortB); clearing back to null leaves the
+  // current camera untouched. Bbox is computed against the filtered universe
+  // (which already encodes Geo + School Type + Cohort), so e.g. picking
+  // "Brownsville" while School Type is "Anchor" zooms to Anchor schools in
+  // Brownsville rather than every cohort school.
+  const [flyToBbox, setFlyToBbox] = useState<[number, number, number, number] | null>(null);
+  const prevCohortRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevCohortRef.current;
+    prevCohortRef.current = cohort;
+    if (!cohort || cohort === prev) return;
+    if (!schoolsMaster) return;
+    let w = Infinity;
+    let s = Infinity;
+    let e = -Infinity;
+    let n = -Infinity;
+    let touched = false;
+    for (const sm of schoolsMaster) {
+      if (!universe.schoolDbns.has(sm.dbn)) continue;
+      if (sm.longitude == null || sm.latitude == null) continue;
+      if (sm.longitude < w) w = sm.longitude;
+      if (sm.longitude > e) e = sm.longitude;
+      if (sm.latitude < s) s = sm.latitude;
+      if (sm.latitude > n) n = sm.latitude;
+      touched = true;
+    }
+    if (touched) setFlyToBbox([w, s, e, n]);
+  }, [cohort, schoolsMaster, universe.schoolDbns]);
+
+  // One-shot — clear after MapView consumes it so pan/zoom isn't sticky.
+  useEffect(() => {
+    if (!flyToBbox) return;
+    const id = window.setTimeout(() => setFlyToBbox(null), 100);
+    return () => window.clearTimeout(id);
+  }, [flyToBbox]);
+
   const prevSelectedRef = useRef<string | null>(null);
   useEffect(() => {
     const prev = prevSelectedRef.current;
@@ -664,6 +706,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
             filteredSchoolDbns={universe.schoolDbns}
             flyToCoords={selectedSchoolCoords}
             flyToView={flyToView}
+            flyToBbox={flyToBbox}
             onViewChange={(v) => {
               lastMapViewRef.current = v;
             }}

@@ -51,6 +51,22 @@ export const DIVERGING_GREYTEAL_MUTED = [
   '#3a8a8a', // good (teal)
 ] as const;
 
+/**
+ * Community sequential ramp — light grey (#D3DCE8) → deep brick red (#932B25).
+ * 5 stops linearly interpolated in RGB. Used for every sequential community
+ * indicator regardless of good_direction; since the community registry uses
+ * `good_direction: 'low'` across the board, low values land at the grey end
+ * (neutral/good) and high values land at the red end (intense/bad), matching
+ * the natural "color = intensity of concern" reading.
+ */
+export const COMMUNITY_GREY_RED = [
+  '#D3DCE8', // bin 0 — low value, neutral grey-blue
+  '#C3B0B7', // bin 1
+  '#B38486', // bin 2
+  '#A35756', // bin 3
+  '#932B25', // bin 4 — high value, deep brick red
+] as const;
+
 /** Stable category → color map for the 4 race categories the registry ships. */
 export const RACE_QUALITATIVE: Readonly<Record<string, string>> = {
   White: '#1f77b4',
@@ -104,6 +120,13 @@ export function rampForIndicator(
     if (base) {
       return goodDirection === 'low' ? [...base].reverse() : base;
     }
+    return rampFor(goodDirection);
   }
-  return rampFor(goodDirection);
+  // Community family — single grey→red ramp for every sequential indicator.
+  // Reverse for good_direction='high' so the bin0→bin4 = bad→good convention
+  // holds. The current community registry uses 'low' across the board, so
+  // the reverse branch is defensive and exercised when new indicators arrive.
+  return goodDirection === 'high'
+    ? [...COMMUNITY_GREY_RED].reverse()
+    : COMMUNITY_GREY_RED;
 }

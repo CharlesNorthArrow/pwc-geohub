@@ -226,15 +226,151 @@ export function backdropRadiusExpression(): unknown {
   return zoomScaledRadius(2);
 }
 
-/** Radius for the halo OUTER ring — same zoom curve, plus a 2 px offset
- *  ONLY for both-category PWC schools (anchor + healing arts). Anchor-only
- *  and HA-only schools get a single ring hugging the dot circumference. */
-export function haloOuterRadiusExpression(): unknown {
-  const bothOffset: unknown = [
-    'case',
-    ['all', ['==', ['get', 'is_anchor'], true], ['==', ['get', 'is_arts'], true]],
-    2,
-    0,
+/* -------------------------------------------------------------------------- */
+/* SDF symbols for Anchor stars + Healing-Arts diamonds                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Native pixel size of the SDF images registered with the map. The shape
+ * inside the canvas reaches ~`SDF_SHAPE_RADIUS` px from center, so we scale
+ * icon-size by `radius / SDF_SHAPE_RADIUS` to match a circle of the same
+ * paint radius (see `iconSizeExpression`).
+ */
+const SDF_SIZE = 32;
+const SDF_SHAPE_RADIUS = 14;
+const SDF_BUFFER = 8;
+
+/**
+ * Build a zoom-aware `icon-size` expression that makes a star/diamond SDF
+ * icon land at the same on-screen radius as a circle drawn with
+ * `radiusExpression`. Math: image is `SDF_SIZE` px wide, shape extends
+ * `SDF_SHAPE_RADIUS` px from center, so size 1.0 ≈ radius `SDF_SHAPE_RADIUS`.
+ * We want effective radius R, so size = R / SDF_SHAPE_RADIUS.
+ *
+ * Bakes the scale INSIDE each interpolate stop (rather than wrapping the
+ * interpolate in a divide) so `['zoom']` stays at the top level — MapLibre
+ * rejects nested zoom expressions in non-step/interpolate parents.
+ */
+export function iconSizeExpression(): unknown {
+  const base = baseRadiusExpression();
+  const factored = (factor: number): unknown => [
+    '/',
+    ['*', base, factor],
+    SDF_SHAPE_RADIUS,
   ];
-  return zoomScaledRadius(bothOffset);
+  return [
+    'interpolate', ['exponential', 1.6], ['zoom'],
+    11, factored(1.0),
+    13, factored(1.4),
+    15, factored(2.0),
+    18, factored(3.2),
+  ];
+}
+
+/** RGBA image bundle in the shape MapLibre's `map.addImage` accepts directly. */
+export interface SdfImage {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+
+/**
+ * Generate the SDF image for the PWC Anchor star (5-pointed). Returns the
+ * RGBA bundle MapLibre wants for `addImage(..., { sdf: true })`. Runs in
+ * the browser (canvas API); MapView calls this lazily on map load.
+ */
+export function buildAnchorStarSdf(): SdfImage {
+  return buildSdf((ctx, size) => {
+    const cx = size / 2;
+    const cy = size / 2;
+    const outer = SDF_SHAPE_RADIUS;
+    const inner = outer * 0.45;
+    const points = 5;
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const angle = (i * Math.PI) / points - Math.PI / 2;
+      const r = i % 2 === 0 ? outer : inner;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
+/** Generate the SDF image for the Healing Arts diamond. */
+export function buildHealingDiamondSdf(): SdfImage {
+  return buildSdf((ctx, size) => {
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = SDF_SHAPE_RADIUS;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r, cy);
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
+/**
+ * Tiny SDF generator: rasterize the shape in white on transparent, then for
+ * every pixel store the signed distance to the nearest in/out boundary in
+ * the alpha channel. Mapbox / MapLibre encode SDFs as alpha=192+16·dist
+ * clamped to [0,255] — 192 is inside, 64 is outside, with a smooth halo so
+ * `icon-halo-width` can grow the outline a few pixels in any direction.
+ *
+ * Brute force: O(N²·R²) where N=32, R=SDF_BUFFER=8 → ~278K ops per image,
+ * negligible compared to map style ready time.
+ */
+function buildSdf(
+  draw: (ctx: CanvasRenderingContext2D, size: number) => void,
+): SdfImage {
+  const size = SDF_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return { width: size, height: size, data: new Uint8ClampedArray(size * size * 4) };
+  }
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'white';
+  draw(ctx, size);
+  const mask = ctx.getImageData(0, 0, size, size).data;
+
+  const isInside = (x: number, y: number): boolean => {
+    if (x < 0 || x >= size || y < 0 || y >= size) return false;
+    return (mask[(y * size + x) * 4 + 3] ?? 0) > 128;
+  };
+
+  const out = new Uint8ClampedArray(size * size * 4);
+  const radius = SDF_BUFFER;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const inside = isInside(x, y);
+      let minDistSq = Infinity;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          if (isInside(x + dx, y + dy) !== inside) {
+            const dSq = dx * dx + dy * dy;
+            if (dSq < minDistSq) minDistSq = dSq;
+          }
+        }
+      }
+      const dist = minDistSq === Infinity ? radius : Math.sqrt(minDistSq);
+      const signed = inside ? dist : -dist;
+      const alpha = Math.max(0, Math.min(255, Math.round(192 + 16 * signed)));
+      const idx = (y * size + x) * 4;
+      out[idx] = 255;
+      out[idx + 1] = 255;
+      out[idx + 2] = 255;
+      out[idx + 3] = alpha;
+    }
+  }
+  return { width: size, height: size, data: out };
 }

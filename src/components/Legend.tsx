@@ -77,8 +77,11 @@ export default function Legend({
  *  baseline non-PWC dots. */
 const BASELINE_FILL = '#7BA7C9';
 const BASELINE_NONPWC_OPACITY = 0.4;
-const PWC_MAGENTA = '#903090';
-const PWC_ORANGE = '#F0901F';
+const PWC_MAGENTA = '#903090';  // Anchor (star)
+const PWC_GREEN = '#A0B000';    // Healing Arts (diamond)
+const PWC_BLUE = '#027BC0';     // pwc_other (circle with blue halo)
+/** Community-family accent — distinct from Healing Arts. Stays orange. */
+const COMMUNITY_ACCENT = '#F0901F';
 
 /** Tiny ALL-CAPS family label (School / Community). Colored per family so
  *  the legend's accent matches the per-family slider dots above. */
@@ -96,7 +99,7 @@ function FamilyTag({
         fontWeight: 700,
         letterSpacing: 0.6,
         textTransform: 'uppercase',
-        color: family === 'community' ? PWC_ORANGE : '#467c9d',
+        color: family === 'community' ? COMMUNITY_ACCENT : '#467c9d',
         marginBottom: 2,
       }}
     >
@@ -174,23 +177,37 @@ function BaselineSchoolLegend(): React.JSX.Element {
       >
         All NYC schools
       </div>
-      <Caption>Circle color</Caption>
+      <Caption>Symbol &amp; color</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <BaselineDotRow
-          color={BASELINE_FILL}
+        <ShapeRow
+          shape="circle"
+          fill={BASELINE_FILL}
           opacity={BASELINE_NONPWC_OPACITY}
           label="Other NYC school"
         />
-        <BaselineDotRow color={PWC_MAGENTA} label="PWC Anchor school" />
-        <BaselineDotRow color={PWC_ORANGE} label="PWC Healing Arts school" />
-        <BaselineDotRow
-          color={PWC_MAGENTA}
-          strokeColor={PWC_ORANGE}
+        <ShapeRow
+          shape="star"
+          fill={PWC_MAGENTA}
+          strokeColor="#ffffff"
+          strokeWidth={1.5}
+          label="PWC Anchor school"
+        />
+        <ShapeRow
+          shape="diamond"
+          fill={PWC_GREEN}
+          strokeColor="#ffffff"
+          strokeWidth={1.5}
+          label="PWC Healing Arts school"
+        />
+        <ShapeRow
+          shape="circle"
+          fill={PWC_BLUE}
+          strokeColor={PWC_BLUE}
           strokeWidth={2}
-          label="Both (Anchor + Healing Arts)"
+          label="PWC (other program)"
         />
       </div>
-      <Caption>Circle size = total enrollment</Caption>
+      <Caption>Symbol size = total enrollment</Caption>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
         {ENROLLMENT_BINS.map((b) => (
           <div
@@ -215,16 +232,18 @@ function BaselineSchoolLegend(): React.JSX.Element {
   );
 }
 
-function BaselineDotRow({
-  color,
+/** Inline SVG symbol — circle / star / diamond — rendered at a fixed 14 px box
+ *  so the legend rows align cleanly regardless of which shape they show. */
+function ShapeRow({
+  shape,
+  fill,
   opacity = 1,
   strokeColor,
   strokeWidth = 0,
   label,
 }: {
-  color: string;
-  /** Swatch fill opacity — defaults to 1; the baseline non-PWC row uses
-   *  0.4 to mirror the map. */
+  shape: 'circle' | 'star' | 'diamond';
+  fill: string;
   opacity?: number;
   strokeColor?: string;
   strokeWidth?: number;
@@ -232,21 +251,62 @@ function BaselineDotRow({
 }): React.JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span
-        aria-hidden
-        style={{
-          display: 'inline-block',
-          width: 14,
-          height: 14,
-          borderRadius: '50%',
-          background: color,
-          opacity,
-          border: strokeWidth > 0 && strokeColor ? `${strokeWidth}px solid ${strokeColor}` : 'none',
-          boxSizing: 'content-box',
-        }}
+      <ShapeIcon
+        shape={shape}
+        fill={fill}
+        opacity={opacity}
+        strokeColor={strokeColor}
+        strokeWidth={strokeWidth}
       />
       <span style={{ fontSize: 11, color: '#002040' }}>{label}</span>
     </div>
+  );
+}
+
+function ShapeIcon({
+  shape,
+  fill,
+  opacity = 1,
+  strokeColor,
+  strokeWidth = 0,
+  size = 16,
+}: {
+  shape: 'circle' | 'star' | 'diamond';
+  fill: string;
+  opacity?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  size?: number;
+}): React.JSX.Element {
+  const stroke = strokeWidth > 0 && strokeColor ? strokeColor : 'none';
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 20 20"
+      width={size}
+      height={size}
+      style={{ overflow: 'visible', opacity, flex: 'none' }}
+    >
+      {shape === 'circle' ? (
+        <circle cx={10} cy={10} r={7} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      ) : shape === 'star' ? (
+        <polygon
+          points="10,1 12.4,7.4 19,7.4 13.8,11.6 15.9,18 10,14 4.1,18 6.2,11.6 1,7.4 7.6,7.4"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinejoin="round"
+        />
+      ) : (
+        <polygon
+          points="10,2 18,10 10,18 2,10"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
   );
 }
 
@@ -324,65 +384,38 @@ function NoDataRow(): React.JSX.Element {
   );
 }
 
-/** Phase 2: explains the halo symbology so users can read the map. */
+/**
+ * Indicator-mode PWC legend — in this mode the symbol fill IS the indicator
+ * color, and the outline retains the PWC group color so users can still spot
+ * Anchor vs Healing Arts at a glance. We render the outlined-shape pattern.
+ */
 function PwcHaloLegend(): React.JSX.Element {
   return (
     <div style={{ marginTop: 12 }}>
-      <Caption>PWC schools (halo)</Caption>
+      <Caption>PWC schools (outline)</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
-        <HaloRow color="#903090" label="Anchor (core school)" rings={1} />
-        <HaloRow color="#F0901F" label="Healing Arts" rings={1} />
-        <HaloRow color="#903090" label="Both (Anchor ∩ Healing Arts)" rings={2} secondColor="#F0901F" />
+        <ShapeRow
+          shape="star"
+          fill="#dde4ea"
+          strokeColor={PWC_MAGENTA}
+          strokeWidth={2}
+          label="Anchor (core school)"
+        />
+        <ShapeRow
+          shape="diamond"
+          fill="#dde4ea"
+          strokeColor={PWC_GREEN}
+          strokeWidth={2}
+          label="Healing Arts"
+        />
+        <ShapeRow
+          shape="circle"
+          fill="#dde4ea"
+          strokeColor={PWC_BLUE}
+          strokeWidth={2}
+          label="PWC (other program)"
+        />
       </div>
-    </div>
-  );
-}
-
-function HaloRow({
-  color,
-  secondColor,
-  label,
-  rings,
-}: {
-  color: string;
-  secondColor?: string;
-  label: string;
-  rings: 1 | 2;
-}): React.JSX.Element {
-  // Stacked rings rendered with nested boxes so a single CSS rule handles both
-  // the one-ring and two-ring case without an SVG.
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ position: 'relative', width: 22, height: 22, display: 'inline-block' }}>
-        <span
-          style={{
-            position: 'absolute',
-            inset: rings === 2 ? 1 : 4,
-            borderRadius: '50%',
-            border: `2px solid ${rings === 2 ? secondColor ?? color : color}`,
-          }}
-        />
-        {rings === 2 ? (
-          <span
-            style={{
-              position: 'absolute',
-              inset: 5,
-              borderRadius: '50%',
-              border: `2px solid ${color}`,
-            }}
-          />
-        ) : null}
-        <span
-          style={{
-            position: 'absolute',
-            inset: 8,
-            borderRadius: '50%',
-            background: '#467c9d',
-            opacity: 0.5,
-          }}
-        />
-      </span>
-      <span style={{ color: '#002040' }}>{label}</span>
     </div>
   );
 }

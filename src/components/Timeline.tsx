@@ -16,7 +16,7 @@ interface Props {
 
 const SERIES_COLORS = {
   anchor: '#903090',
-  healing_arts: '#F0901F',
+  healing_arts: '#A0B000', // PWC green — matches map symbology (diamond)
   citywide: '#467c9d',
 } as const;
 

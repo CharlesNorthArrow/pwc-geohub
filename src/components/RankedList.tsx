@@ -14,7 +14,7 @@ interface Props {
 }
 
 const ANCHOR = '#903090';
-const HEALING = '#F0901F';
+const HEALING = '#A0B000'; // PWC green — matches map symbology (diamond)
 const BLUE = '#027BC0';
 
 /** Spec §5.3 — ranked PWC schools (worst → best per good_direction), each
@@ -125,32 +125,39 @@ export default function RankedList({
   );
 }
 
+/**
+ * Anchor-wins: both-category schools render as Anchor (star). Healing Arts
+ * = green diamond. pwc_other = blue circle. Shapes mirror the map symbology
+ * so users can scan the list and the map with the same visual vocabulary.
+ */
 function CategoryGlyph({ category }: { category: RankedRow['category'] }): React.JSX.Element {
-  if (category === 'both') {
-    return (
-      <span style={{ display: 'inline-flex', gap: 1 }}>
-        <Dot color={ANCHOR} />
-        <Dot color={HEALING} />
-      </span>
-    );
+  if (category === 'anchor' || category === 'both') {
+    return <Glyph shape="star" color={ANCHOR} />;
   }
-  if (category === 'anchor') return <Dot color={ANCHOR} />;
-  if (category === 'healing_arts') return <Dot color={HEALING} />;
-  return <Dot color={BLUE} />; // pwc_other
+  if (category === 'healing_arts') return <Glyph shape="diamond" color={HEALING} />;
+  return <Glyph shape="circle" color={BLUE} />; // pwc_other
 }
 
-function Dot({ color }: { color: string }): React.JSX.Element {
+function Glyph({
+  shape,
+  color,
+}: {
+  shape: 'star' | 'diamond' | 'circle';
+  color: string;
+}): React.JSX.Element {
   return (
-    <span
-      aria-hidden
-      style={{
-        display: 'inline-block',
-        width: 7,
-        height: 7,
-        borderRadius: '50%',
-        background: color,
-      }}
-    />
+    <svg aria-hidden viewBox="0 0 20 20" width={11} height={11} style={{ flex: 'none' }}>
+      {shape === 'star' ? (
+        <polygon
+          points="10,1 12.4,7.4 19,7.4 13.8,11.6 15.9,18 10,14 4.1,18 6.2,11.6 1,7.4 7.6,7.4"
+          fill={color}
+        />
+      ) : shape === 'diamond' ? (
+        <polygon points="10,2 18,10 10,18 2,10" fill={color} />
+      ) : (
+        <circle cx={10} cy={10} r={7} fill={color} />
+      )}
+    </svg>
   );
 }
 

@@ -104,7 +104,10 @@ export const useHubStore = create<HubState>((set) => ({
   activeSchoolIndicator: null,
   activeCommunityIndicator: null,
   year: DEFAULT_YEAR,
-  schoolType: 'all',
+  // Default to PWC-only so the app loads with the partner-school lens applied.
+  // Users flip to "All NYC" via the School Type dropdown when they want the
+  // citywide universe.
+  schoolType: 'pwc',
   geoFilters: {},
   cohort: null,
   selectedSchoolDbn: null,

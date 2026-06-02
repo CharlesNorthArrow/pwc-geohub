@@ -31,15 +31,18 @@ interface Props {
   communitySeries: AnalyticsSeriesRow[] | null;
 }
 
-const PWC_MAGENTA = '#903090';
-const PWC_ORANGE = '#F0901F';
+const PWC_MAGENTA = '#903090';   // Anchor (includes both-category)
+const PWC_GREEN = '#A0B000';     // Healing Arts (pure HA only)
+const PWC_BLUE = '#027BC0';      // pwc_other
+const COMMUNITY_ACCENT = '#F0901F'; // distinct from PWC HA
 
 /**
  * Floating top-left counter — PWC schools currently in view (filtered by
- * Geo + School Type + Cohort cascade, NOT by map viewport). Both-category
- * schools count in BOTH Anchor and Healing Arts buckets (the "both-rule").
- * When an indicator is active, surfaces a "X of N do not have data for
- * {indicator}" line per family so the totals stay honest.
+ * Geo + School Type + Cohort cascade, NOT by map viewport). Anchor-wins:
+ * both-category schools count ONLY in Anchor, so the Anchor + Healing Arts
+ * + Other buckets are disjoint and sum to the total. When an indicator is
+ * active, surfaces a "X of N do not have data for {indicator}" line per
+ * family so the totals stay honest.
  */
 export default function PwcCounter({
   universeDbns,
@@ -53,22 +56,21 @@ export default function PwcCounter({
     const pwcByDbn = new Map(pwcMembers.map((m) => [m.dbn, m]));
     let anchor = 0;
     let healing = 0;
-    let both = 0;
     let other = 0;
     const pwcInUniverse: string[] = [];
     for (const dbn of universeDbns) {
       const m = pwcByDbn.get(dbn);
       if (!m) continue;
       pwcInUniverse.push(dbn);
-      if (m.category === 'both') both++;
-      else if (m.category === 'anchor') anchor++;
+      // Anchor-wins: both-category schools fold into Anchor only. Healing Arts
+      // counts pure HA only — these three buckets are disjoint.
+      if (m.category === 'anchor' || m.category === 'both') anchor++;
       else if (m.category === 'healing_arts') healing++;
       else other++;
     }
     return {
       anchor,
       healing,
-      both,
       other,
       total: pwcInUniverse.length,
       pwcDbns: pwcInUniverse,
@@ -103,9 +105,6 @@ export default function PwcCounter({
   }, [communityLayer, communitySeries, counts.pwcDbns]);
 
   if (counts.total === 0) return null;
-
-  const anchorTotal = counts.anchor + counts.both;
-  const artsTotal = counts.healing + counts.both;
 
   return (
     <div
@@ -151,19 +150,10 @@ export default function PwcCounter({
       >
         {counts.total}
       </div>
-      <Row color={PWC_MAGENTA} label="Anchor" count={anchorTotal} />
-      <Row color={PWC_ORANGE} label="Healing Arts" count={artsTotal} />
-      {counts.both > 0 ? (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 9,
-            color: '#a8b3bf',
-            fontStyle: 'italic',
-          }}
-        >
-          {counts.both} counted in both
-        </div>
+      <Row color={PWC_MAGENTA} label="Anchor" count={counts.anchor} />
+      <Row color={PWC_GREEN} label="Healing Arts" count={counts.healing} />
+      {counts.other > 0 ? (
+        <Row color={PWC_BLUE} label="Other program" count={counts.other} />
       ) : null}
 
       {/* Missing-data lines — one per active family. Only render when the
@@ -171,7 +161,7 @@ export default function PwcCounter({
        *  lacks a value for it. Total above never moves. */}
       {schoolMissing != null && schoolMissing > 0 && schoolLayer ? (
         <MissingLine
-          accent="#027BC0"
+          accent={PWC_BLUE}
           label={schoolLayer.indicator.short_label ?? schoolLayer.indicator.label}
           missing={schoolMissing}
           total={counts.total}
@@ -179,7 +169,7 @@ export default function PwcCounter({
       ) : null}
       {communityMissing != null && communityMissing > 0 && communityLayer ? (
         <MissingLine
-          accent={PWC_ORANGE}
+          accent={COMMUNITY_ACCENT}
           label={communityLayer.indicator.short_label ?? communityLayer.indicator.label}
           missing={communityMissing}
           total={counts.total}
