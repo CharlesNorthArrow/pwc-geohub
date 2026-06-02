@@ -15,7 +15,7 @@ import type {
 } from '../contract/types';
 import {
   backdropRadiusExpression,
-  buildAnchorStarSdf,
+  buildAnchorTriangleSdf,
   buildHealingDiamondSdf,
   colorBinsFor,
   colorExpression,
@@ -93,8 +93,13 @@ const LAYER_SCHOOLS_PWC_OTHER = 'schools-circles-pwc-other';
 const LAYER_SCHOOLS_HEALING = 'schools-symbol-healing';
 const LAYER_SCHOOLS_ANCHOR = 'schools-symbol-anchor';
 
-const ICON_STAR = 'pwc-star';
+const ICON_TRIANGLE = 'pwc-triangle';
 const ICON_DIAMOND = 'pwc-diamond';
+
+/** Halo (border) width in screen pixels for PWC symbol layers. Applies to
+ *  both baseline (white border around solid group color) and indicator
+ *  (group-color border around indicator fill) modes. */
+const PWC_HALO_WIDTH = 1;
 
 /* PWC brand colors — kept in lockstep with the Legend component. Healing
  * Arts now uses PWC green (#A0B000) instead of the previous orange — the
@@ -184,11 +189,11 @@ export default function MapView({
     mapRef.current = map;
 
     map.on('load', () => {
-      // Register SDF icons for the Anchor star + Healing-Arts diamond. Built
-      // once on canvas — see src/map/encoding.ts for the SDF generator. Must
-      // be added BEFORE the symbol layers that reference them by name.
-      if (!map.hasImage(ICON_STAR)) {
-        map.addImage(ICON_STAR, buildAnchorStarSdf(), { sdf: true });
+      // Register SDF icons for the Anchor triangle + Healing-Arts diamond.
+      // Built once on canvas — see src/map/encoding.ts for the SDF generator.
+      // Must be added BEFORE the symbol layers that reference them by name.
+      if (!map.hasImage(ICON_TRIANGLE)) {
+        map.addImage(ICON_TRIANGLE, buildAnchorTriangleSdf(), { sdf: true });
       }
       if (!map.hasImage(ICON_DIAMOND)) {
         map.addImage(ICON_DIAMOND, buildHealingDiamondSdf(), { sdf: true });
@@ -267,7 +272,7 @@ export default function MapView({
           'circle-color': PWC_BLUE,
           'circle-radius': 4,
           'circle-stroke-color': PWC_BLUE,
-          'circle-stroke-width': 2,
+          'circle-stroke-width': PWC_HALO_WIDTH,
           'circle-opacity': 0.95,
         },
       });
@@ -287,7 +292,7 @@ export default function MapView({
         paint: {
           'icon-color': PWC_GREEN,
           'icon-halo-color': '#ffffff',
-          'icon-halo-width': 2,
+          'icon-halo-width': PWC_HALO_WIDTH,
         },
       });
       map.addLayer({
@@ -296,7 +301,7 @@ export default function MapView({
         source: SOURCE_SCHOOLS,
         filter: ['==', ['get', 'is_anchor'], true],
         layout: {
-          'icon-image': ICON_STAR,
+          'icon-image': ICON_TRIANGLE,
           'icon-size': 1,
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
@@ -304,7 +309,7 @@ export default function MapView({
         paint: {
           'icon-color': PWC_MAGENTA,
           'icon-halo-color': '#ffffff',
-          'icon-halo-width': 2,
+          'icon-halo-width': PWC_HALO_WIDTH,
         },
       });
 
@@ -391,7 +396,7 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', PWC_BLUE);
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', 4);
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', 2);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 0);
         return;
       }
@@ -428,16 +433,16 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', PWC_BLUE);
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', dataRadius as never);
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', 2);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
         map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-opacity', 0.95);
 
         map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-color', PWC_MAGENTA);
         map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-color', '#ffffff');
-        map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', 2);
+        map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', PWC_HALO_WIDTH);
 
         map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-color', PWC_GREEN);
         map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-color', '#ffffff');
-        map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', 2);
+        map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', PWC_HALO_WIDTH);
 
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 1);
         return;
@@ -492,18 +497,18 @@ export default function MapView({
       map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-color', colorExpr as never);
       map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-radius', dataRadius as never);
       map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-color', PWC_BLUE);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', 2);
+      map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-stroke-width', PWC_HALO_WIDTH);
       map.setPaintProperty(LAYER_SCHOOLS_PWC_OTHER, 'circle-opacity', 0.95);
 
       // Symbol layers: icon-color = indicator color (or transparent for
       // no-data, leaving just the halo to read as a hollow outline).
       map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-color', colorExpr as never);
       map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-color', PWC_MAGENTA);
-      map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', 2);
+      map.setPaintProperty(LAYER_SCHOOLS_ANCHOR, 'icon-halo-width', PWC_HALO_WIDTH);
 
       map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-color', colorExpr as never);
       map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-color', PWC_GREEN);
-      map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', 2);
+      map.setPaintProperty(LAYER_SCHOOLS_HEALING, 'icon-halo-width', PWC_HALO_WIDTH);
 
       // Backdrop hidden for hollow no-data circles (otherwise the dark
       // shadow shows THROUGH the hollow center).

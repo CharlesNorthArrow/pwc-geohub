@@ -186,24 +186,24 @@ function BaselineSchoolLegend(): React.JSX.Element {
           label="Other NYC school"
         />
         <ShapeRow
-          shape="star"
+          shape="triangle"
           fill={PWC_MAGENTA}
           strokeColor="#ffffff"
-          strokeWidth={1.5}
+          strokeWidth={0.75}
           label="PWC Anchor school"
         />
         <ShapeRow
           shape="diamond"
           fill={PWC_GREEN}
           strokeColor="#ffffff"
-          strokeWidth={1.5}
+          strokeWidth={0.75}
           label="PWC Healing Arts school"
         />
         <ShapeRow
           shape="circle"
           fill={PWC_BLUE}
           strokeColor={PWC_BLUE}
-          strokeWidth={2}
+          strokeWidth={1}
           label="PWC (other program)"
         />
       </div>
@@ -242,7 +242,7 @@ function ShapeRow({
   strokeWidth = 0,
   label,
 }: {
-  shape: 'circle' | 'star' | 'diamond';
+  shape: 'circle' | 'triangle' | 'diamond';
   fill: string;
   opacity?: number;
   strokeColor?: string;
@@ -271,7 +271,7 @@ function ShapeIcon({
   strokeWidth = 0,
   size = 16,
 }: {
-  shape: 'circle' | 'star' | 'diamond';
+  shape: 'circle' | 'triangle' | 'diamond';
   fill: string;
   opacity?: number;
   strokeColor?: string;
@@ -289,9 +289,10 @@ function ShapeIcon({
     >
       {shape === 'circle' ? (
         <circle cx={10} cy={10} r={7} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
-      ) : shape === 'star' ? (
+      ) : shape === 'triangle' ? (
+        // Equilateral, point up. Matches the map's SDF triangle shape.
         <polygon
-          points="10,1 12.4,7.4 19,7.4 13.8,11.6 15.9,18 10,14 4.1,18 6.2,11.6 1,7.4 7.6,7.4"
+          points="10,2 18,17 2,17"
           fill={fill}
           stroke={stroke}
           strokeWidth={strokeWidth}
@@ -395,24 +396,24 @@ function PwcHaloLegend(): React.JSX.Element {
       <Caption>PWC schools (outline)</Caption>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
         <ShapeRow
-          shape="star"
+          shape="triangle"
           fill="#dde4ea"
           strokeColor={PWC_MAGENTA}
-          strokeWidth={2}
+          strokeWidth={1}
           label="Anchor (core school)"
         />
         <ShapeRow
           shape="diamond"
           fill="#dde4ea"
           strokeColor={PWC_GREEN}
-          strokeWidth={2}
+          strokeWidth={1}
           label="Healing Arts"
         />
         <ShapeRow
           shape="circle"
           fill="#dde4ea"
           strokeColor={PWC_BLUE}
-          strokeWidth={2}
+          strokeWidth={1}
           label="PWC (other program)"
         />
       </div>

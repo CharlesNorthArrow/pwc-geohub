@@ -126,13 +126,14 @@ export default function RankedList({
 }
 
 /**
- * Anchor-wins: both-category schools render as Anchor (star). Healing Arts
- * = green diamond. pwc_other = blue circle. Shapes mirror the map symbology
- * so users can scan the list and the map with the same visual vocabulary.
+ * Anchor-wins: both-category schools render as Anchor (triangle). Healing
+ * Arts = green diamond. pwc_other = blue circle. Shapes mirror the map
+ * symbology so users can scan the list and the map with the same visual
+ * vocabulary.
  */
 function CategoryGlyph({ category }: { category: RankedRow['category'] }): React.JSX.Element {
   if (category === 'anchor' || category === 'both') {
-    return <Glyph shape="star" color={ANCHOR} />;
+    return <Glyph shape="triangle" color={ANCHOR} />;
   }
   if (category === 'healing_arts') return <Glyph shape="diamond" color={HEALING} />;
   return <Glyph shape="circle" color={BLUE} />; // pwc_other
@@ -142,16 +143,13 @@ function Glyph({
   shape,
   color,
 }: {
-  shape: 'star' | 'diamond' | 'circle';
+  shape: 'triangle' | 'diamond' | 'circle';
   color: string;
 }): React.JSX.Element {
   return (
     <svg aria-hidden viewBox="0 0 20 20" width={11} height={11} style={{ flex: 'none' }}>
-      {shape === 'star' ? (
-        <polygon
-          points="10,1 12.4,7.4 19,7.4 13.8,11.6 15.9,18 10,14 4.1,18 6.2,11.6 1,7.4 7.6,7.4"
-          fill={color}
-        />
+      {shape === 'triangle' ? (
+        <polygon points="10,2 18,17 2,17" fill={color} />
       ) : shape === 'diamond' ? (
         <polygon points="10,2 18,10 10,18 2,10" fill={color} />
       ) : (

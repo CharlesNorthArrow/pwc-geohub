@@ -275,26 +275,25 @@ export interface SdfImage {
 }
 
 /**
- * Generate the SDF image for the PWC Anchor star (5-pointed). Returns the
- * RGBA bundle MapLibre wants for `addImage(..., { sdf: true })`. Runs in
- * the browser (canvas API); MapView calls this lazily on map load.
+ * Generate the SDF image for the PWC Anchor triangle (upward-pointing
+ * equilateral). Returns the RGBA bundle MapLibre wants for
+ * `addImage(..., { sdf: true })`. Runs in the browser (canvas API); MapView
+ * calls this lazily on map load.
  */
-export function buildAnchorStarSdf(): SdfImage {
+export function buildAnchorTriangleSdf(): SdfImage {
   return buildSdf((ctx, size) => {
     const cx = size / 2;
     const cy = size / 2;
-    const outer = SDF_SHAPE_RADIUS;
-    const inner = outer * 0.45;
-    const points = 5;
+    const r = SDF_SHAPE_RADIUS;
+    // Equilateral triangle, tip up. Vertical centroid offset so the visual
+    // weight reads centered (the geometric centroid sits 1/3 from base).
+    const tip: [number, number] = [cx, cy - r];
+    const bl: [number, number] = [cx - (r * Math.sqrt(3)) / 2, cy + r / 2];
+    const br: [number, number] = [cx + (r * Math.sqrt(3)) / 2, cy + r / 2];
     ctx.beginPath();
-    for (let i = 0; i < points * 2; i++) {
-      const angle = (i * Math.PI) / points - Math.PI / 2;
-      const r = i % 2 === 0 ? outer : inner;
-      const x = cx + r * Math.cos(angle);
-      const y = cy + r * Math.sin(angle);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    ctx.moveTo(tip[0], tip[1]);
+    ctx.lineTo(br[0], br[1]);
+    ctx.lineTo(bl[0], bl[1]);
     ctx.closePath();
     ctx.fill();
   });
@@ -319,9 +318,16 @@ export function buildHealingDiamondSdf(): SdfImage {
 /**
  * Tiny SDF generator: rasterize the shape in white on transparent, then for
  * every pixel store the signed distance to the nearest in/out boundary in
- * the alpha channel. Mapbox / MapLibre encode SDFs as alpha=192+16·dist
- * clamped to [0,255] — 192 is inside, 64 is outside, with a smooth halo so
- * `icon-halo-width` can grow the outline a few pixels in any direction.
+ * the alpha channel. MapLibre samples the icon boundary at alpha=128, so we
+ * encode `alpha = 128 + 16 · signed_dist` (positive inside, negative outside).
+ * That puts the boundary exactly at the drawn edge and gives `icon-halo-width`
+ * an 8 px window in either direction.
+ *
+ * Earlier version used `192 + 16·signed`, which placed alpha=128 four pixels
+ * OUTSIDE the drawn shape — that inflated the rendered icon and swallowed the
+ * 2 px halo border in indicator mode (the halo color was hidden underneath
+ * the inflated icon body). Fixed encoding makes the icon-halo-color paint
+ * visibly outside the shape edge.
  *
  * Brute force: O(N²·R²) where N=32, R=SDF_BUFFER=8 → ~278K ops per image,
  * negligible compared to map style ready time.
@@ -364,7 +370,7 @@ function buildSdf(
       }
       const dist = minDistSq === Infinity ? radius : Math.sqrt(minDistSq);
       const signed = inside ? dist : -dist;
-      const alpha = Math.max(0, Math.min(255, Math.round(192 + 16 * signed)));
+      const alpha = Math.max(0, Math.min(255, Math.round(128 + 16 * signed)));
       const idx = (y * size + x) * 4;
       out[idx] = 255;
       out[idx + 1] = 255;
