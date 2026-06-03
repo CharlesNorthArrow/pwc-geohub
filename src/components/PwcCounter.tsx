@@ -9,6 +9,7 @@ import type {
 } from '../contract/types';
 import type { LayerState } from '../store/activeLayers';
 import { belongsToPwcGroup } from '../store/pwcGroups';
+import { useHubStore } from '../store/useHubStore';
 
 interface Props {
   /** DBNs that pass every active filter (Geo + School Type + Cohort). The
@@ -52,6 +53,9 @@ export default function PwcCounter({
   communityLayer,
   communitySeries,
 }: Props): React.JSX.Element | null {
+  const pwcHalosVisible = useHubStore((s) => s.pwcHalosVisible);
+  const setPwcHalosVisible = useHubStore((s) => s.setPwcHalosVisible);
+
   const counts = useMemo(() => {
     const pwcByDbn = new Map(pwcMembers.map((m) => [m.dbn, m]));
     let anchor = 0;
@@ -174,6 +178,35 @@ export default function PwcCounter({
           missing={communityMissing}
           total={counts.total}
         />
+      ) : null}
+
+      {/* Halo toggle — drops the colored border around PWC dots so the map
+       *  reads as a clean indicator view without the PWC overlay. Only shown
+       *  when a school indicator is active; in baseline view the PWC color
+       *  is the fill itself so no halo is in play. */}
+      {schoolLayer ? (
+        <button
+          type="button"
+          onClick={() => setPwcHalosVisible(!pwcHalosVisible)}
+          aria-pressed={!pwcHalosVisible}
+          title={pwcHalosVisible ? 'Hide PWC halos' : 'Show PWC halos'}
+          style={{
+            marginTop: 8,
+            padding: '4px 6px',
+            background: pwcHalosVisible ? '#eef4f8' : '#ffffff',
+            color: pwcHalosVisible ? '#1a4a73' : '#467c9d',
+            border: '1px solid #c5cdd6',
+            borderRadius: 4,
+            fontSize: 10,
+            cursor: 'pointer',
+            fontWeight: 600,
+            width: '100%',
+            textAlign: 'center',
+            letterSpacing: 0.2,
+          }}
+        >
+          {pwcHalosVisible ? '◉ Halos on' : '○ Halos off'}
+        </button>
       ) : null}
     </div>
   );

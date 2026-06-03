@@ -92,6 +92,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const analyticsFamilyPref = useHubStore((s) => s.analyticsFamily);
   const schoolsHidden = useHubStore((s) => s.schoolsHidden);
   const communityHidden = useHubStore((s) => s.communityHidden);
+  const pwcHalosVisible = useHubStore((s) => s.pwcHalosVisible);
   const latestPerLayer = useHubStore((s) => s.latestPerLayer);
 
   // One-shot fetches.
@@ -717,6 +718,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
                 : null
             }
             geoSelection={geoSelection}
+            pwcHalosVisible={pwcHalosVisible}
           />
         </div>
       </main>

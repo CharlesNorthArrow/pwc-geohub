@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface DropdownOption {
   value: string;
@@ -54,12 +55,39 @@ export default function FilterDropdown({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // Close on outside click.
+  // The panel is rendered via portal (to document.body) with `position: fixed`
+  // so the toolbar's overflow clipping can't hide it. We track the trigger's
+  // bounding rect to position the panel.
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !rootRef.current) return;
+    const update = (): void => {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (r) setTriggerRect(r);
+    };
+    update();
+    // Re-position on scroll/resize. `capture: true` catches the inner header
+    // scroller, not just the window.
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  // Close on outside click. Click target may live in the portal, so we check
+  // both the trigger root AND the panel before closing.
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent): void {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -121,13 +149,15 @@ export default function FilterDropdown({
         <span aria-hidden style={{ opacity: 0.6 }}>▾</span>
       </button>
 
-      {open ? (
+      {open && triggerRect && typeof document !== 'undefined'
+        ? createPortal(
         <div
+          ref={panelRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            zIndex: 10,
+            position: 'fixed',
+            top: triggerRect.bottom + 4,
+            left: triggerRect.left,
+            zIndex: 1000,
             minWidth: 240,
             maxWidth: 320,
             background: 'white',
@@ -237,8 +267,10 @@ export default function FilterDropdown({
               );
             })}
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   );
 }

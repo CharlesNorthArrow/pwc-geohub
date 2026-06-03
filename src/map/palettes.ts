@@ -24,31 +24,40 @@ export const ROCKET_R_5 = ['#fbe7c6', '#f1a07a', '#dd5f5f', '#a82255', '#43012e'
 /* helper handles the high-good vs low-good flip.                             */
 /* -------------------------------------------------------------------------- */
 
-/** Student Outcomes — muted red↔blue. Low-value end = red (bad when good=high). */
+/**
+ * School diverging palettes — bold hues, visible mid grey. The previous
+ * version was deliberately muted with a near-white center (#ebebeb), which
+ * read as "all the same color" against the basemap. These keep the same hue
+ * identity (red↔blue, purple↔green, charcoal↔teal) but push saturation at the
+ * endpoints AND swap the mid stop to a legible neutral grey (#b9c0c8) that
+ * holds its own against the basemap without disappearing.
+ */
+
+/** Student Outcomes — bold red↔blue. Low-value end = red (bad when good=high). */
 export const DIVERGING_RDBU_MUTED = [
-  '#b85b6e', // bad
-  '#dba3ab',
-  '#ebebeb', // neutral
-  '#a3bcd1',
-  '#5d83a8', // good
+  '#a82838', // bad (deep red)
+  '#e07a8a', // light red
+  '#b9c0c8', // neutral mid (legible grey)
+  '#5d92c4', // medium blue
+  '#1f4d8c', // good (strong navy)
 ] as const;
 
-/** Student Experience — muted purple↔green. */
+/** Student Experience — bold purple↔green. */
 export const DIVERGING_PUGN_MUTED = [
-  '#8e5a8e', // bad (purple)
-  '#cdaecd',
-  '#ebebeb',
-  '#a8cca0',
-  '#5d8e60', // good (green)
+  '#6a1f6a', // bad (deep purple)
+  '#b97ab9', // light purple
+  '#b9c0c8', // neutral mid
+  '#76b06d', // medium green
+  '#1f6a2a', // good (forest green)
 ] as const;
 
-/** Staff & School Culture — muted dark grey↔teal. */
+/** Staff & School Culture — bold charcoal↔teal. */
 export const DIVERGING_GREYTEAL_MUTED = [
-  '#4a4a4a', // bad (dark grey)
-  '#a8a8a8',
-  '#dedede',
-  '#9cc5c4',
-  '#3a8a8a', // good (teal)
+  '#2b2b2b', // bad (very dark charcoal)
+  '#8a8a8a', // medium grey
+  '#b8c8c8', // neutral mid (cool grey, hints toward teal)
+  '#5db0ae', // medium teal
+  '#1f6e6e', // good (strong teal)
 ] as const;
 
 /**

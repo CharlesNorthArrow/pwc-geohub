@@ -54,6 +54,11 @@ interface Props {
   selectedSchool?: { dbn: string; coords: [number, number] } | null;
   /** Polygons of the currently-selected Geo filter areas. */
   geoSelection: GeoSelectionResponse | null;
+  /** When false, drop the colored stroke/halo around PWC schools so they
+   *  blend with non-PWC dots. Fills stay PWC-colored in baseline mode so
+   *  schools remain identifiable; in indicator mode they read identically
+   *  to non-PWC. Default = true. */
+  pwcHalosVisible: boolean;
 }
 
 /** NTA-level zoom — frames the surrounding neighborhood. */
@@ -85,8 +90,10 @@ const PWC_GREEN = '#A0B000';   // Healing Arts (pure HA only — anchor-wins)
 const PWC_BLUE = '#027BC0';    // pwc_other (program-active, not anchor/arts)
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
-/** Border width for PWC circle strokes (baseline + indicator mode). */
-const PWC_BORDER_WIDTH = 1.5;
+/** Border width for PWC circle strokes (baseline + indicator mode).
+ *  Doubled from 1.5 → 3 to make the PWC halo more legible against the
+ *  larger circle radii. */
+const PWC_BORDER_WIDTH = 3;
 
 /** Muted slate-blue for non-PWC schools in baseline mode. */
 const BASELINE_FILL = '#7BA7C9';
@@ -109,17 +116,6 @@ const PWC_BASELINE_FILL_EXPR: unknown = [
   ['==', ['get', 'is_arts'], true], PWC_GREEN,
   ['==', ['get', 'pwc_other'], true], PWC_BLUE,
   BASELINE_FILL,
-];
-
-/**
- * Per-category stroke in baseline mode. Anchor/HA get a white border so the
- * solid fill reads cleanly; pwc_other gets a blue stroke (matches its fill)
- * which is the "blue halo" treatment.
- */
-const PWC_BASELINE_STROKE_EXPR: unknown = [
-  'case',
-  ['==', ['get', 'pwc_other'], true], PWC_BLUE,
-  '#ffffff',
 ];
 
 /**
@@ -175,6 +171,7 @@ export default function MapView({
   onSchoolClick,
   selectedSchool,
   geoSelection,
+  pwcHalosVisible,
 }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -364,9 +361,14 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', 1);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', BASELINE_NONPWC_OPACITY);
 
+        // Baseline view: PWC identity lives in the fill color, so no halo is
+        // needed — just a thin white edge for separation, same as non-PWC
+        // dots. The `pwcHalosVisible` toggle only matters in indicator mode
+        // (where the colored stroke is the only PWC cue once fills become
+        // indicator-color).
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', PWC_BASELINE_FILL_EXPR as never);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', PWC_BASELINE_STROKE_EXPR as never);
-        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', PWC_BORDER_WIDTH);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', '#ffffff');
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', 1);
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 0.95);
 
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 1);
@@ -410,14 +412,27 @@ export default function MapView({
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', colorExpr as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', nonPwcStrokeColor as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', nonPwcStrokeWidth as never);
-      map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', 0.85);
+      // Indicator-mode fills are fully opaque so the new bolder ramp lands at
+      // full saturation; the prior 0.85 alpha was washing out the mid-bins.
+      map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', 1);
 
       // PWC: indicator-color fill, category-color stroke (always — even when
       // value is null, so the school stays visible as a colored ring).
+      // When halos are toggled OFF, swap the category stroke for the same
+      // grey/white stroke non-PWC dots use — PWC schools then read identically
+      // to non-PWC at a glance.
       map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', colorExpr as never);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', PWC_INDICATOR_STROKE_EXPR as never);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', PWC_BORDER_WIDTH);
-      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 0.95);
+      map.setPaintProperty(
+        LAYER_SCHOOLS_PWC,
+        'circle-stroke-color',
+        (pwcHalosVisible ? PWC_INDICATOR_STROKE_EXPR : nonPwcStrokeColor) as never,
+      );
+      map.setPaintProperty(
+        LAYER_SCHOOLS_PWC,
+        'circle-stroke-width',
+        (pwcHalosVisible ? PWC_BORDER_WIDTH : nonPwcStrokeWidth) as never,
+      );
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 1);
 
       // Backdrop hidden for hollow no-data circles.
       map.setPaintProperty(
@@ -432,7 +447,7 @@ export default function MapView({
     };
     if (styleReadyRef.current) apply();
     else map.once('phase1-style-ready', apply);
-  }, [schoolIndicator, schoolPoints]);
+  }, [schoolIndicator, schoolPoints, pwcHalosVisible]);
 
   // --- Combined filter (PWC + Phase 3 cascade) ---------------------------
   useEffect(() => {

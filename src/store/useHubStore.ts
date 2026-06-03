@@ -74,6 +74,14 @@ export interface HubState {
    *  community indicator stays selected so flipping back on is instant. */
   communityHidden: boolean;
 
+  /** When false, the colored halo / border around PWC school dots is dropped
+   *  so they blend visually with non-PWC schools — useful when the user
+   *  wants to read the indicator without the PWC overlay. Fills still carry
+   *  the category color in baseline mode (magenta/green/blue) so PWC
+   *  schools remain identifiable; in indicator mode they look just like
+   *  non-PWC dots. Default = true (halos on). */
+  pwcHalosVisible: boolean;
+
   /**
    * "Latest year for all" mode. When true, each active layer resolves its
    * displayYear to ITS OWN latest available year — independent of the
@@ -97,6 +105,7 @@ export interface HubState {
   setAnalyticsFamily: (f: 'school' | 'community') => void;
   setSchoolsHidden: (hidden: boolean) => void;
   setCommunityHidden: (hidden: boolean) => void;
+  setPwcHalosVisible: (visible: boolean) => void;
   setLatestPerLayer: (latest: boolean) => void;
 }
 
@@ -119,6 +128,7 @@ export const useHubStore = create<HubState>((set) => ({
   analyticsFamily: 'school',
   schoolsHidden: false,
   communityHidden: false,
+  pwcHalosVisible: true,
   latestPerLayer: false,
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
@@ -133,5 +143,6 @@ export const useHubStore = create<HubState>((set) => ({
   setAnalyticsFamily: (f) => set({ analyticsFamily: f }),
   setSchoolsHidden: (hidden) => set({ schoolsHidden: hidden }),
   setCommunityHidden: (hidden) => set({ communityHidden: hidden }),
+  setPwcHalosVisible: (visible) => set({ pwcHalosVisible: visible }),
   setLatestPerLayer: (latest) => set({ latestPerLayer: latest }),
 }));
