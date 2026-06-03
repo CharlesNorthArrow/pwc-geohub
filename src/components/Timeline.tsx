@@ -8,17 +8,18 @@ interface Props {
   points: TimelinePoint[];
   /** Slider year — drawn as a vertical marker. */
   activeYear: string;
-  /** Legend label for the reference (third) series. "Citywide" when no
-   *  Geo/School Type filter is active; under filters it describes the
-   *  actual comparison cohort. */
-  comparisonLabel: string;
 }
 
 const SERIES_COLORS = {
+  pwc: '#027BC0',          // PWC brand blue — roll-up of every PWC school
   anchor: '#903090',
-  healing_arts: '#A0B000', // PWC green — matches map symbology (diamond)
-  citywide: '#467c9d',
+  healing_arts: '#A0B000', // PWC green — matches map symbology
+  allInView: '#1c3557',    // dark navy — All Schools (filtered universe)
+  citywide: '#467c9d',     // slate — Citywide (static NYC average)
 } as const;
+
+/** Series-key helper that stays in sync with TimelinePoint. */
+type SeriesKey = keyof typeof SERIES_COLORS;
 
 /** Spec §5.2 — 3 series + vertical marker at the selected year.
  *  Custom SVG, no chart library. */
@@ -26,7 +27,6 @@ export default function Timeline({
   indicator,
   points,
   activeYear,
-  comparisonLabel,
 }: Props): React.JSX.Element {
   const width = 320;
   const height = 130;
@@ -37,11 +37,11 @@ export default function Timeline({
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
 
-  // Y domain across all three series; ignore nulls.
+  // Y domain across all five series; ignore nulls.
   let dMin = Infinity;
   let dMax = -Infinity;
   for (const p of points) {
-    for (const v of [p.anchor.avg, p.healing_arts.avg, p.citywide.avg]) {
+    for (const v of [p.pwc.avg, p.anchor.avg, p.healing_arts.avg, p.allInView.avg, p.citywide.avg]) {
       if (v == null) continue;
       if (v < dMin) dMin = v;
       if (v > dMax) dMax = v;
@@ -63,7 +63,7 @@ export default function Timeline({
     points.length <= 1 ? padL + innerW / 2 : padL + (i / (points.length - 1)) * innerW;
   const yAt = (v: number): number => padT + innerH - ((v - y0) / (y1 - y0)) * innerH;
 
-  const linePath = (key: 'anchor' | 'healing_arts' | 'citywide'): string => {
+  const linePath = (key: SeriesKey): string => {
     let path = '';
     let started = false;
     points.forEach((p, i) => {
@@ -82,7 +82,7 @@ export default function Timeline({
 
   // Dots at every defined point, drawn on top of lines. Single-year indicators
   // (e.g. CDC PLACES 2023-only) have no line at all — the dots are the chart.
-  const dotsFor = (key: 'anchor' | 'healing_arts' | 'citywide'): Array<{ x: number; y: number }> => {
+  const dotsFor = (key: SeriesKey): Array<{ x: number; y: number }> => {
     const out: Array<{ x: number; y: number }> = [];
     points.forEach((p, i) => {
       const v = p[key].avg;
@@ -136,20 +136,38 @@ export default function Timeline({
           />
         ) : null}
 
-        {/* Lines */}
-        <path d={linePath('citywide')} stroke={SERIES_COLORS.citywide} fill="none" strokeWidth={1.6} />
+        {/* Lines — paint reference lines (citywide, all-in-view) first so
+         *  they sit underneath the PWC group lines, with the PWC roll-up
+         *  rendered LAST and thicker so it's the primary signal. The
+         *  citywide line is dashed to signal it's a static reference (vs
+         *  the solid lines, which react to the filter cascade). */}
+        <path
+          d={linePath('citywide')}
+          stroke={SERIES_COLORS.citywide}
+          fill="none"
+          strokeWidth={1.6}
+          strokeDasharray="4,3"
+        />
+        <path d={linePath('allInView')} stroke={SERIES_COLORS.allInView} fill="none" strokeWidth={1.6} />
         <path d={linePath('healing_arts')} stroke={SERIES_COLORS.healing_arts} fill="none" strokeWidth={1.6} />
         <path d={linePath('anchor')} stroke={SERIES_COLORS.anchor} fill="none" strokeWidth={1.6} />
+        <path d={linePath('pwc')} stroke={SERIES_COLORS.pwc} fill="none" strokeWidth={2.4} />
 
         {/* Dots — drawn after lines so they sit on top. */}
         {dotsFor('citywide').map((d, i) => (
           <circle key={`c${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.citywide} />
+        ))}
+        {dotsFor('allInView').map((d, i) => (
+          <circle key={`v${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.allInView} />
         ))}
         {dotsFor('healing_arts').map((d, i) => (
           <circle key={`h${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.healing_arts} />
         ))}
         {dotsFor('anchor').map((d, i) => (
           <circle key={`a${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.anchor} />
+        ))}
+        {dotsFor('pwc').map((d, i) => (
+          <circle key={`p${i}`} cx={d.x} cy={d.y} r={3} fill={SERIES_COLORS.pwc} />
         ))}
 
         {/* X-axis labels */}
@@ -167,22 +185,45 @@ export default function Timeline({
           </text>
         ))}
       </svg>
-      {/* Legend strip — the third series's label is dynamic ("Citywide" when
-       *  the user has no Geo/School Type filter active, otherwise reflects
-       *  the actual cohort that line is averaged over). */}
+      {/* Legend strip — five static labels. "All Schools in view" tracks
+       *  the filter cascade; "Citywide" is a static NYC reference that
+       *  never moves with filters. */}
       <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#467c9d', marginTop: 4, flexWrap: 'wrap' }}>
+        <LegendDot color={SERIES_COLORS.pwc} label="PWC schools" />
         <LegendDot color={SERIES_COLORS.anchor} label="Anchor" />
         <LegendDot color={SERIES_COLORS.healing_arts} label="Healing Arts" />
-        <LegendDot color={SERIES_COLORS.citywide} label={comparisonLabel} />
+        <LegendDot color={SERIES_COLORS.allInView} label="All Schools in view" />
+        <LegendDot color={SERIES_COLORS.citywide} label="Citywide" dashed />
       </div>
     </div>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }): React.JSX.Element {
+function LegendDot({
+  color,
+  label,
+  dashed = false,
+}: {
+  color: string;
+  label: string;
+  dashed?: boolean;
+}): React.JSX.Element {
   return (
     <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-      <span style={{ width: 10, height: 2, background: color, display: 'inline-block' }} />
+      {dashed ? (
+        // Mirror the chart's strokeDasharray="4,3" with a CSS dashed border
+        // so the legend swatch matches the line.
+        <span
+          style={{
+            width: 12,
+            height: 0,
+            borderTop: `2px dashed ${color}`,
+            display: 'inline-block',
+          }}
+        />
+      ) : (
+        <span style={{ width: 10, height: 2, background: color, display: 'inline-block' }} />
+      )}
       {label}
     </span>
   );

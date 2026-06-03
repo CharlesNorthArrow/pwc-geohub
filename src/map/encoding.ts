@@ -160,14 +160,14 @@ export function colorExpression(bins: ColorBins, valueAccessor: unknown[]): unkn
  * so size is comparable when switching the active indicator (spec §4.2).
  */
 export const ENROLLMENT_BINS = [
-  // Sizes were 3 / 5 / 7 / 9 / 12 — too small to spot at city zoom. Min
-  // bumped ×3 (3→9) and max ×1.5 (12→18); mid bins shifted by the same
-  // +6 offset so the relative spacing across bins is unchanged.
-  { upTo: 200, radius: 9, label: '≤200' },
-  { upTo: 400, radius: 11, label: '201–400' },
-  { upTo: 700, radius: 13, label: '401–700' },
-  { upTo: 1200, radius: 15, label: '701–1,200' },
-  { upTo: Infinity, radius: 18, label: '>1,200' },
+  // Min ×0.9 (9→8) and max ×0.8 (18→14) — compresses the size range so
+  // large schools stop dominating the map while small ones stay spottable.
+  // Mid bins interpolated on the linear scale.
+  { upTo: 200, radius: 8, label: '≤200' },
+  { upTo: 400, radius: 10, label: '201–400' },
+  { upTo: 700, radius: 11, label: '401–700' },
+  { upTo: 1200, radius: 12, label: '701–1,200' },
+  { upTo: Infinity, radius: 14, label: '>1,200' },
 ] as const;
 
 /** Internal: the enrollment-driven reference radius (no zoom scaling). */

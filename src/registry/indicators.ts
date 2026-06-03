@@ -387,7 +387,12 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r' },
+    // CDC PLACES MHLTH values cluster tightly in the 15–25% band across most
+    // NYC tracts, so equal-interval bins (over the full min→max range) leave
+    // the whole choropleth in the lower 1–2 buckets and the map reads as a
+    // single pink wash. Quantile binning splits the population into 5 equal
+    // groups by value count, surfacing within-range variation.
+    scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r', bin_method: 'quantile' },
     geometry: 'polygon',
     years: [...CDC_PLACES_YEARS],
     status: 'active',

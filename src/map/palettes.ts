@@ -76,9 +76,9 @@ export const DIVERGING_GREYTEAL_MUTED = [
  */
 export const COMMUNITY_GREY_RED = [
   '#D3DCE8', // bin 0 — light grey-blue (user anchor, low/neutral)
-  '#D9A8A4', // bin 1 — light salmon (clear jump from grey)
-  '#BC6F5E', // bin 2 — warm rust
-  '#A8554C', // bin 3 — strong brick red
+  '#F0A8A0', // bin 1 — vivid light salmon
+  '#E26A55', // bin 2 — vivid coral
+  '#C44438', // bin 3 — vivid brick red
   '#932B25', // bin 4 — deep brick red (user anchor, high/intense)
 ] as const;
 

@@ -11,23 +11,29 @@
  *   - the Phase 3 filtered universe (the school list the rest of the app sees)
  *
  * Outputs:
- *   - kpis: per-group { n, avg, delta } at the active year
- *   - timeline: 3 series (Anchor avg, HA avg, citywide avg) per year
+ *   - kpis: per-group { n, avg, delta } at the active year — three cells:
+ *       PWC schools, Citywide reference, All in view
+ *   - timeline: 4 series (PWC avg, Anchor avg, HA avg, citywide avg) per year
  *   - list: ranked PWC schools (worst → best per good_direction) with sparkline
  *
  * §5.5 + §6.6 nuance:
- *   - KPI all-schools-avg respects Geo + School Type + Cohort (universe.schoolDbns).
- *   - Timeline citywide line respects Geo + School Type but NOT Cohort — uses
- *     `universe.afterSchoolType` instead.
- *   - KPIs + ranked list use per-year PWC membership (the snapshot at the
- *     active slider year).
- *   - TIMELINE backfills membership from the LATEST PWC vintage so a school
- *     that's currently Anchor contributes its indicator value across all
- *     historical years on the chart — the user wants to see the trajectory
- *     of "schools that are PWC now," not "schools that were PWC then."
+ *   - KPI "All Schools" + timeline "All in view" line respect Geo + School
+ *     Type + Cohort (universe.schoolDbns) — every school currently rendered
+ *     on the map.
+ *   - KPI "Citywide" + timeline "Citywide" line are a STATIC NYC average,
+ *     computed over every school in the series for that year regardless of
+ *     any filter. Same number no matter what the user has picked.
+ *   - KPI PWC cell + ranked list use per-year PWC membership (the snapshot at
+ *     the active slider year). The PWC TIMELINE series (and the Anchor / HA
+ *     breakdown beneath it) backfill membership from the LATEST PWC vintage so
+ *     a school that's PWC today contributes its 2019 / 2020 / … values to the
+ *     chart even though it may not have been on the program then — the user
+ *     wants the trajectory of "schools that are PWC now," not "schools that
+ *     were PWC at year Y."
  *   - Anchor-wins: both-category schools count ONLY in the Anchor group
  *     (see `belongsToPwcGroup` — the Healing Arts group is disjoint from
- *     Anchor, never an overlap).
+ *     Anchor, never an overlap). pwc_other is part of the PWC roll-up but is
+ *     neither Anchor nor Healing Arts on the timeline breakdown.
  */
 
 import type {
@@ -49,16 +55,29 @@ export interface KpiCell {
 }
 
 export interface KpiSet {
-  anchor: KpiCell;
-  healing_arts: KpiCell;
+  /** All PWC schools (Anchor ∪ Healing Arts ∪ pwc_other) in the filtered
+   *  universe at the active year. Delta is computed vs `all`. */
+  pwc: KpiCell;
+  /** STATIC NYC average — every school in the series for the active year
+   *  regardless of any filter. No delta — it's a fixed reference. */
+  citywide: KpiCell;
+  /** All schools in the filtered universe (full cascade incl. Cohort) — the
+   *  schools currently shown on the map. No delta — it's the local reference. */
   all: KpiCell;
 }
 
 export interface TimelinePoint {
   year: string;
+  /** All PWC schools rolled up (Anchor + Healing Arts + pwc_other). Drawn
+   *  on top of the Anchor / Healing Arts lines so the union is the primary
+   *  signal. */
+  pwc: { n: number; avg: number | null };
   anchor: { n: number; avg: number | null };
   healing_arts: { n: number; avg: number | null };
-  /** Citywide reference — Geo + School Type applied, NOT Cohort. */
+  /** All schools in the filtered universe — the schools currently on the
+   *  map. Matches the KPI "All Schools" cell. */
+  allInView: { n: number; avg: number | null };
+  /** Citywide — static NYC average, no filters. Matches the KPI "Citywide". */
   citywide: { n: number; avg: number | null };
 }
 
@@ -118,6 +137,7 @@ export function deriveAnalytics({
   const valuesNow = valuesAt(year);
   const pwcNow = pwcAt(year);
 
+  // All-in-view = full filter cascade applied (Geo + School Type + Cohort).
   const allValuesInUniverse: number[] = [];
   for (const dbn of universe.schoolDbns) {
     const v = valuesNow.get(dbn);
@@ -125,30 +145,31 @@ export function deriveAnalytics({
   }
   const allAvg = mean(allValuesInUniverse);
 
-  const anchorValues: number[] = [];
-  const healingValues: number[] = [];
+  // Citywide = static NYC average — every school in the series for this
+  // year. No filter cascade applied. Same number regardless of how the user
+  // has filtered the map.
+  const citywideValues: number[] = [];
+  for (const v of valuesNow.values()) {
+    citywideValues.push(v);
+  }
+  const citywideAvg = mean(citywideValues);
+
+  // PWC roll-up = every PWC school (any category) in the filtered universe.
+  const pwcValues: number[] = [];
   for (const dbn of universe.schoolDbns) {
     const v = valuesNow.get(dbn);
     if (v == null) continue;
-    const m = pwcNow.get(dbn);
-    if (!m) continue;
-    if (belongsToPwcGroup(m.category, 'anchor')) anchorValues.push(v);
-    if (belongsToPwcGroup(m.category, 'healing_arts')) healingValues.push(v);
+    if (pwcNow.has(dbn)) pwcValues.push(v);
   }
-  const anchorAvg = mean(anchorValues);
-  const healingAvg = mean(healingValues);
+  const pwcAvg = mean(pwcValues);
 
   const kpis: KpiSet = {
-    anchor: {
-      n: anchorValues.length,
-      avg: anchorAvg,
-      delta: anchorAvg != null && allAvg != null ? anchorAvg - allAvg : null,
+    pwc: {
+      n: pwcValues.length,
+      avg: pwcAvg,
+      delta: pwcAvg != null && allAvg != null ? pwcAvg - allAvg : null,
     },
-    healing_arts: {
-      n: healingValues.length,
-      avg: healingAvg,
-      delta: healingAvg != null && allAvg != null ? healingAvg - allAvg : null,
-    },
+    citywide: { n: citywideValues.length, avg: citywideAvg, delta: null },
     all: { n: allValuesInUniverse.length, avg: allAvg, delta: null },
   };
 
@@ -162,14 +183,22 @@ export function deriveAnalytics({
   const timeline: TimelinePoint[] = timelineYears.map((y) => {
     const vYear = valuesAt(y);
 
-    // Citywide line — pre-Cohort universe (afterSchoolType).
+    // Citywide line — STATIC NYC average. Every school with a value for
+    // this year, no filter.
     const cityVals: number[] = [];
-    for (const dbn of universe.afterSchoolType) {
+    for (const v of vYear.values()) cityVals.push(v);
+
+    // All-in-view = filtered universe (Geo + School Type + Cohort).
+    const allInViewVals: number[] = [];
+    for (const dbn of universe.schoolDbns) {
       const v = vYear.get(dbn);
-      if (v != null) cityVals.push(v);
+      if (v != null) allInViewVals.push(v);
     }
 
-    // Anchor / HA lines — full filtered universe, latest-vintage membership.
+    // PWC roll-up + Anchor / HA breakdown — full filtered universe,
+    // latest-vintage membership. pwc_other schools count in the PWC line
+    // but not in the Anchor / HA lines.
+    const pwcVals: number[] = [];
     const anchorVals: number[] = [];
     const haVals: number[] = [];
     for (const dbn of universe.schoolDbns) {
@@ -177,14 +206,17 @@ export function deriveAnalytics({
       if (v == null) continue;
       const m = pwcLatest.get(dbn);
       if (!m) continue;
+      pwcVals.push(v);
       if (belongsToPwcGroup(m.category, 'anchor')) anchorVals.push(v);
       else if (belongsToPwcGroup(m.category, 'healing_arts')) haVals.push(v);
     }
 
     return {
       year: y,
+      pwc: { n: pwcVals.length, avg: mean(pwcVals) },
       anchor: { n: anchorVals.length, avg: mean(anchorVals) },
       healing_arts: { n: haVals.length, avg: mean(haVals) },
+      allInView: { n: allInViewVals.length, avg: mean(allInViewVals) },
       citywide: { n: cityVals.length, avg: mean(cityVals) },
     };
   });

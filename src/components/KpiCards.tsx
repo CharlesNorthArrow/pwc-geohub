@@ -9,39 +9,45 @@ interface Props {
   year: string;
 }
 
-/** Spec §5.1 — three cards: Anchor avg, Healing Arts avg, All-schools avg.
- *  Anchor / Healing Arts show a Δ vs the All-schools cell, color-coded via
- *  good_direction. The number is the raw delta — color carries the
- *  better/worse semantics so users can read both signal and direction. */
+/** Three cards: PWC schools, All Schools, Citywide. Captions tell the user
+ *  what each scope means so the difference between "All Schools shown on
+ *  map" and "Static NYC average" is unambiguous when filters are active.
+ *  The PWC card carries a Δ vs the All-Schools cell, color-coded via
+ *  good_direction. To break out Anchor vs Healing Arts the user filters
+ *  School Type. */
 export default function KpiCards({ indicator, kpis, year }: Props): React.JSX.Element {
   const fmt = formatterFor(indicator);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
       <Card
-        label="Anchor avg"
-        value={kpis.anchor.avg}
-        delta={kpis.anchor.delta}
-        n={kpis.anchor.n}
+        label="PWC schools"
+        caption="PWC schools shown on map"
+        value={kpis.pwc.avg}
+        delta={kpis.pwc.delta}
+        n={kpis.pwc.n}
         formatter={fmt}
         deltaFormatter={deltaFormatterFor(indicator)}
-        status={deltaStatus(kpis.anchor.delta, indicator.scale.good_direction)}
-        accent="#903090"
+        status={deltaStatus(kpis.pwc.delta, indicator.scale.good_direction)}
+        accent="#027BC0"
       />
       <Card
-        label="Healing Arts avg"
-        value={kpis.healing_arts.avg}
-        delta={kpis.healing_arts.delta}
-        n={kpis.healing_arts.n}
-        formatter={fmt}
-        deltaFormatter={deltaFormatterFor(indicator)}
-        status={deltaStatus(kpis.healing_arts.delta, indicator.scale.good_direction)}
-        accent="#A0B000"
-      />
-      <Card
-        label="All in view"
+        label="All Schools"
+        caption="All schools shown on map"
         value={kpis.all.avg}
         delta={null}
         n={kpis.all.n}
+        formatter={fmt}
+        deltaFormatter={deltaFormatterFor(indicator)}
+        status="neutral"
+        accent="#1c3557"
+        sub={`as of ${year}`}
+      />
+      <Card
+        label="Citywide"
+        caption="Static NYC average"
+        value={kpis.citywide.avg}
+        delta={null}
+        n={kpis.citywide.n}
         formatter={fmt}
         deltaFormatter={deltaFormatterFor(indicator)}
         status="neutral"
@@ -54,6 +60,7 @@ export default function KpiCards({ indicator, kpis, year }: Props): React.JSX.El
 
 function Card({
   label,
+  caption,
   value,
   delta,
   n,
@@ -64,6 +71,9 @@ function Card({
   sub,
 }: {
   label: string;
+  /** Short explanatory line under the label — tells the user what the cell
+   *  is scoped to (e.g. "PWC schools shown on map" vs "Static NYC average"). */
+  caption?: string;
   value: number | null;
   delta: number | null;
   n: number;
@@ -99,6 +109,11 @@ function Card({
       >
         {label}
       </div>
+      {caption ? (
+        <div style={{ fontSize: 9.5, color: '#7f8b97', lineHeight: 1.25 }}>
+          {caption}
+        </div>
+      ) : null}
       <div style={{ fontSize: 20, fontWeight: 700, color: '#002040', lineHeight: 1.1 }}>
         {value == null ? '—' : formatter(value)}
       </div>

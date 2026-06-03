@@ -247,11 +247,18 @@ interface UniverseSnap {
 
 interface AnalyticsSnap {
   kpis: {
-    anchor: { n: number; avg: number | null; delta: number | null; status: string };
-    healing_arts: { n: number; avg: number | null; delta: number | null; status: string };
+    pwc: { n: number; avg: number | null; delta: number | null; status: string };
+    citywide: { n: number; avg: number | null };
     all: { n: number; avg: number | null };
   };
-  timeline: Array<{ year: string; anchor: number | null; healing_arts: number | null; citywide: number | null }>;
+  timeline: Array<{
+    year: string;
+    pwc: number | null;
+    anchor: number | null;
+    healing_arts: number | null;
+    allInView: number | null;
+    citywide: number | null;
+  }>;
   /** Top 5 ranked rows — DBN + category + latestValue. */
   topList: Array<{ rank: number; dbn: string; category: string; latestValue: number | null }>;
   /** Full ranked-list order (DBN only) so the user can spot order changes. */
@@ -319,24 +326,21 @@ function snapAnalytics(indicator: IndicatorPublic, year: SliderYear, state: Filt
   });
   return {
     kpis: {
-      anchor: {
-        n: a.kpis.anchor.n,
-        avg: round(a.kpis.anchor.avg),
-        delta: round(a.kpis.anchor.delta),
-        status: deltaStatus(a.kpis.anchor.delta, indicator.scale.good_direction),
+      pwc: {
+        n: a.kpis.pwc.n,
+        avg: round(a.kpis.pwc.avg),
+        delta: round(a.kpis.pwc.delta),
+        status: deltaStatus(a.kpis.pwc.delta, indicator.scale.good_direction),
       },
-      healing_arts: {
-        n: a.kpis.healing_arts.n,
-        avg: round(a.kpis.healing_arts.avg),
-        delta: round(a.kpis.healing_arts.delta),
-        status: deltaStatus(a.kpis.healing_arts.delta, indicator.scale.good_direction),
-      },
+      citywide: { n: a.kpis.citywide.n, avg: round(a.kpis.citywide.avg) },
       all: { n: a.kpis.all.n, avg: round(a.kpis.all.avg) },
     },
     timeline: a.timeline.map((p) => ({
       year: p.year,
+      pwc: round(p.pwc.avg),
       anchor: round(p.anchor.avg),
       healing_arts: round(p.healing_arts.avg),
+      allInView: round(p.allInView.avg),
       citywide: round(p.citywide.avg),
     })),
     topList: a.list.slice(0, 5).map((r, i) => ({

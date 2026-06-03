@@ -422,12 +422,6 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
         ? communityNormalizedSeries
         : null;
 
-  /** Legend label for the timeline's reference (third) series. The series is
-   *  averaged over `universe.afterSchoolType` (Geo + School Type, NOT Cohort).
-   *  `prefilterSummary.forCohort` already encodes that filter set, so we lift
-   *  it straight through; null = no filters active → "Citywide". */
-  const comparisonLabel = universe.prefilterSummary.forCohort ?? 'Citywide';
-
   /**
    * Year the analytics panel computes its KPIs / timeline marker / ranked
    * list AT. In normal mode this is the slider year; in Latest mode it's
@@ -757,7 +751,6 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
               ? (communityIndicator.short_label ?? communityIndicator.label)
               : null
           }
-          comparisonLabel={comparisonLabel}
         />
       )}
     </div>
