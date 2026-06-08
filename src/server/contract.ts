@@ -13,6 +13,7 @@
 import { sql } from './db';
 import { INDICATORS, indicatorsById } from '../registry/indicators';
 import type { IndicatorRegistryEntry } from '../registry/types';
+import { normalizeMasterGrades } from '../lib/grades';
 import type {
   AggregationArea,
   AnalyticsSeriesResponse,
@@ -30,6 +31,8 @@ import type {
   PwcProgram,
   PwcProgramResponse,
   PwcResponse,
+  SchoolArtsEd,
+  SchoolArtsEdResponse,
   SchoolFeature,
   SchoolMaster,
   SchoolProfile,
@@ -250,6 +253,9 @@ interface PwcRow {
   dbn: string;
   core_school: boolean | null;
   arts_program: boolean | null;
+  social_work_program: boolean | null;
+  community_school_program: boolean | null;
+  ost_program: boolean | null;
   cohort: string | null;
 }
 
@@ -293,7 +299,8 @@ function pwcCategoryFromFlags(
  */
 export async function getPwcMembership(year: string): Promise<PwcResponse> {
   const rows = await sql<PwcRow>`
-    SELECT dbn, core_school, arts_program, cohort
+    SELECT dbn, core_school, arts_program,
+           social_work_program, community_school_program, ost_program, cohort
     FROM pwc_school_program
     WHERE school_year = ${year}
       AND (
@@ -310,6 +317,10 @@ export async function getPwcMembership(year: string): Promise<PwcResponse> {
     dbn: r.dbn,
     category: pwcCategoryFromFlags(r.core_school, r.arts_program),
     cohort: r.cohort,
+    social_work: r.social_work_program === true,
+    community_school: r.community_school_program === true,
+    arts_program: r.arts_program === true,
+    ost: r.ost_program === true,
   }));
   return { year, members };
 }
@@ -325,6 +336,7 @@ interface SchoolMasterRow {
   longitude: number | null;
   latitude: number | null;
   total_enrollment: number | null;
+  grades: string | null;
   /** PostGIS array_agg of `geo_layer:area_id` pairs, one per crosswalk hit. */
   geo_pairs: string[] | null;
 }
@@ -342,7 +354,7 @@ interface SchoolMasterRow {
 export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
   const layerIds = GEO_FILTER_LAYERS.map((l) => l.id);
   const rows = await sql<SchoolMasterRow>`
-    SELECT s.dbn, s.school_name, s.borough, s.longitude, s.latitude,
+    SELECT s.dbn, s.school_name, s.borough, s.longitude, s.latitude, s.grades,
       -- Latest non-null enrollment across all known school_year rows.
       (
         SELECT sy.total_enrollment
@@ -379,6 +391,7 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
       longitude: Number(r.longitude),
       latitude: Number(r.latitude),
       total_enrollment: r.total_enrollment,
+      grades_canonical: normalizeMasterGrades(r.grades),
       geos,
     };
   });
@@ -433,9 +446,13 @@ export async function getPwcHistory(): Promise<PwcHistoryResponse> {
     year: string;
     core_school: boolean | null;
     arts_program: boolean | null;
+    social_work_program: boolean | null;
+    community_school_program: boolean | null;
+    ost_program: boolean | null;
     cohort: string | null;
   }>`
-    SELECT dbn, school_year AS year, core_school, arts_program, cohort
+    SELECT dbn, school_year AS year, core_school, arts_program,
+           social_work_program, community_school_program, ost_program, cohort
     FROM pwc_school_program
     WHERE core_school IS NOT NULL
        OR arts_program IS NOT NULL
@@ -448,7 +465,15 @@ export async function getPwcHistory(): Promise<PwcHistoryResponse> {
   const byYear: Record<string, PwcMember[]> = {};
   for (const r of rows) {
     const category = pwcCategoryFromFlags(r.core_school, r.arts_program);
-    (byYear[r.year] ??= []).push({ dbn: r.dbn, category, cohort: r.cohort });
+    (byYear[r.year] ??= []).push({
+      dbn: r.dbn,
+      category,
+      cohort: r.cohort,
+      social_work: r.social_work_program === true,
+      community_school: r.community_school_program === true,
+      arts_program: r.arts_program === true,
+      ost: r.ost_program === true,
+    });
   }
   return { byYear };
 }
@@ -631,6 +656,46 @@ export async function getSchoolProfile(dbn: string): Promise<SchoolProfileRespon
     pct_multi_racial: to100(r.pct_multi_racial),
   };
   return { profile };
+}
+
+/**
+ * Latest arts_ed vintage with non-null disciplines for one school.
+ *
+ * Sourced from `school_indicator_values.value_text` where indicator_id
+ * = 'arts_ed_score' — the registry's `categorical_field` knob put the
+ * comma-separated `arts_ed_disciplines` column there at ETL time. The Detail
+ * Panel renders the result as chip pills under its own year pill, independent
+ * of the slider.
+ *
+ * Returns `{ year: null, disciplines: [] }` when this DBN has no arts_ed row
+ * (or every row has empty disciplines) — the panel falls back to a clean
+ * "not available" state.
+ */
+export async function getSchoolArtsEd(dbn: string): Promise<SchoolArtsEdResponse> {
+  const rows = await sql<{ school_year: string; value_text: string }>`
+    SELECT school_year, value_text
+    FROM school_indicator_values
+    WHERE indicator_id = 'arts_ed_score'
+      AND dbn = ${dbn}
+      AND value_text IS NOT NULL
+      AND length(trim(value_text)) > 0
+    ORDER BY school_year DESC
+    LIMIT 1
+  `;
+  if (rows.length === 0) {
+    const artsEd: SchoolArtsEd = { dbn, year: null, disciplines: [] };
+    return { artsEd };
+  }
+  const r = rows[0]!;
+  const seen = new Set<string>();
+  const disciplines: string[] = [];
+  for (const piece of r.value_text.split(',')) {
+    const t = piece.trim();
+    if (t.length === 0 || seen.has(t)) continue;
+    seen.add(t);
+    disciplines.push(t);
+  }
+  return { artsEd: { dbn, year: r.school_year, disciplines } };
 }
 
 interface PwcProgramRow {

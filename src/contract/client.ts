@@ -13,6 +13,7 @@ import type {
   PwcHistoryResponse,
   PwcProgramResponse,
   PwcResponse,
+  SchoolArtsEdResponse,
   SchoolProfileResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
@@ -83,6 +84,12 @@ export function fetchAnalyticsSeries(
 export function fetchSchoolProfile(dbn: string): Promise<SchoolProfileResponse> {
   return getJson<SchoolProfileResponse>(
     `/api/schools/profile?dbn=${encodeURIComponent(dbn)}`,
+  );
+}
+
+export function fetchSchoolArtsEd(dbn: string): Promise<SchoolArtsEdResponse> {
+  return getJson<SchoolArtsEdResponse>(
+    `/api/schools/arts-ed?dbn=${encodeURIComponent(dbn)}`,
   );
 }
 

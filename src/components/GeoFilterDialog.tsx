@@ -10,6 +10,7 @@ import {
   type SchoolMaster,
 } from '../contract/types';
 import type { GeoFilterMap } from '../store/useHubStore';
+import { NYC_GEO_DISTRICTS, type AllowListLayer } from '../config/nycGeoDistricts';
 
 interface Props {
   open: boolean;
@@ -130,7 +131,18 @@ export default function GeoFilterDialog({
 
   // Hooks must run on every render — `useMemo` cannot sit after the
   // `if (!open) return null` guard below (Rules of Hooks).
-  const layerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
+  const rawLayerOptions: GeoArea[] = geographies?.layers[activeLayer] ?? [];
+  // Apply NYC allow-list for Congressional / NYS Senate / NYS Assembly. Other
+  // layers pass through unchanged. Config is metadata-driven — edit
+  // `src/config/nycGeoDistricts.json` to change which districts appear.
+  const layerOptions: GeoArea[] = useMemo(() => {
+    if (!isAllowListLayer(activeLayer)) return rawLayerOptions;
+    const allowed = NYC_GEO_DISTRICTS[activeLayer];
+    return rawLayerOptions.filter((opt) => {
+      const num = districtNumberFor(activeLayer, opt);
+      return num != null && allowed.has(num);
+    });
+  }, [rawLayerOptions, activeLayer]);
   const layerCounts = countsByLayer[activeLayer];
   const layerPwcCounts = pwcCountsByLayer[activeLayer];
   // Populated areas first (descending by count); within a tier, natural-numeric
@@ -231,7 +243,11 @@ export default function GeoFilterDialog({
           background: 'white',
           width: 720,
           maxWidth: '90vw',
-          maxHeight: '85vh',
+          // Fixed visual size regardless of which tab is active. Counties has
+          // 5 rows; NYS Assembly has ~65 — without a locked height the modal
+          // popped between tab clicks, which read as a layout bug. The inner
+          // list scrolls within this envelope.
+          height: 'min(620px, 85vh)',
           display: 'grid',
           gridTemplateRows: 'auto 1fr auto',
           borderRadius: 8,
@@ -545,6 +561,10 @@ export default function GeoFilterDialog({
 
 function labelOf(id: GeoFilterLayerId): string {
   return GEO_FILTER_LAYERS.find((l) => l.id === id)?.label ?? id;
+}
+
+function isAllowListLayer(id: GeoFilterLayerId): id is AllowListLayer {
+  return id === 'congressional' || id === 'senate' || id === 'assembly';
 }
 
 function LegendKeyDot({

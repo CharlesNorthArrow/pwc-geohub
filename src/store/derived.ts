@@ -22,7 +22,9 @@
 
 import {
   GEO_FILTER_LAYERS,
+  PROGRAM_FLAGS,
   type GeoFilterLayerId,
+  type ProgramFlag,
   type PwcMember,
   type SchoolMaster,
 } from '../contract/types';
@@ -34,7 +36,11 @@ export interface PrefilterSummary {
   forSchoolType: string | null;
   /** Note shown above the Cohort dropdown — Geo + School Type. */
   forCohort: string | null;
-  /** Note shown above the School dropdown — Geo + School Type + Cohort. */
+  /** Note shown above the Program dropdown — Geo + School Type + Cohort. */
+  forProgram: string | null;
+  /** Note shown above the Grade dropdown — Geo + School Type + Cohort + Program. */
+  forGrade: string | null;
+  /** Note shown above the School dropdown — every upstream filter. */
   forSchool: string | null;
 }
 
@@ -45,6 +51,10 @@ export interface FilteredUniverse {
   afterGeo: Set<string>;
   /** DBNs that pass Geo + School Type (used to compute cohort options/counts). */
   afterSchoolType: Set<string>;
+  /** DBNs that pass Geo + School Type + Cohort. */
+  afterCohort: Set<string>;
+  /** DBNs that pass Geo + School Type + Cohort + Program. */
+  afterProgram: Set<string>;
   /** Cohort options shown in the dropdown, with `count` = number of in-view
    *  schools that belong to that cohort under the current Geo + School Type
    *  cascade. Greyed/disabled when count = 0 (per the agreed UX). */
@@ -54,7 +64,7 @@ export interface FilteredUniverse {
 }
 
 interface FiltersInput {
-  state: Pick<HubState, 'geoFilters' | 'schoolType' | 'cohort'>;
+  state: Pick<HubState, 'geoFilters' | 'schoolType' | 'cohort' | 'programs' | 'grades'>;
   schoolsMaster: SchoolMaster[];
   pwcMembers: PwcMember[];
   /** All cohort labels seen in pwc_schools.csv. Driven from the same data —
@@ -69,6 +79,7 @@ export function applyFilters({
   allCohorts,
 }: FiltersInput): FilteredUniverse {
   const pwcByDbn = new Map(pwcMembers.map((m) => [m.dbn, m]));
+  const schoolByDbn = new Map(schoolsMaster.map((s) => [s.dbn, s]));
 
   // --- Step 1: Geo cascade --------------------------------------------------
   const geoActive = countGeoLayers(state.geoFilters) > 0;
@@ -84,9 +95,21 @@ export function applyFilters({
   }
 
   // --- Step 3: Cohort cascade ----------------------------------------------
-  const finalSet = new Set<string>();
+  const afterCohort = new Set<string>();
   for (const dbn of afterSchoolType) {
-    if (passesCohort(dbn, state.cohort, pwcByDbn)) finalSet.add(dbn);
+    if (passesCohort(dbn, state.cohort, pwcByDbn)) afterCohort.add(dbn);
+  }
+
+  // --- Step 4: Program cascade (PWC-only, OR over picked flags) ------------
+  const afterProgram = new Set<string>();
+  for (const dbn of afterCohort) {
+    if (passesProgram(dbn, state.programs, pwcByDbn)) afterProgram.add(dbn);
+  }
+
+  // --- Step 5: Grade cascade (OR over picked tokens) -----------------------
+  const finalSet = new Set<string>();
+  for (const dbn of afterProgram) {
+    if (passesGrade(dbn, state.grades, schoolByDbn)) finalSet.add(dbn);
   }
 
   // --- Cohort options + counts (computed against afterSchoolType so the cohort
@@ -107,17 +130,38 @@ export function applyFilters({
   const geoSummary = geoActive ? summarizeGeo(state.geoFilters) : null;
   const schoolTypeSummary = state.schoolType !== 'all' ? labelSchoolType(state.schoolType) : null;
   const cohortSummary = state.cohort ?? null;
+  const programSummary = summarizePrograms(state.programs);
+  const gradeSummary = summarizeGrades(state.grades);
 
   const forSchoolType = geoSummary ? `Geo: ${geoSummary}` : null;
-  const forCohort = joinNotes(geoSummary, schoolTypeSummary, null);
-  const forSchool = joinNotes(geoSummary, schoolTypeSummary, cohortSummary);
+  const forCohort = joinNotes({ geo: geoSummary, schoolType: schoolTypeSummary });
+  const forProgram = joinNotes({
+    geo: geoSummary,
+    schoolType: schoolTypeSummary,
+    cohort: cohortSummary,
+  });
+  const forGrade = joinNotes({
+    geo: geoSummary,
+    schoolType: schoolTypeSummary,
+    cohort: cohortSummary,
+    program: programSummary,
+  });
+  const forSchool = joinNotes({
+    geo: geoSummary,
+    schoolType: schoolTypeSummary,
+    cohort: cohortSummary,
+    program: programSummary,
+    grade: gradeSummary,
+  });
 
   return {
     schoolDbns: finalSet,
     afterGeo,
     afterSchoolType,
+    afterCohort,
+    afterProgram,
     cohortOptions,
-    prefilterSummary: { forSchoolType, forCohort, forSchool },
+    prefilterSummary: { forSchoolType, forCohort, forProgram, forGrade, forSchool },
   };
 }
 
@@ -176,6 +220,42 @@ function passesCohort(
   return m?.cohort === cohort;
 }
 
+/** Program filter: OR across picked flags. Empty pick = pass. Non-PWC dbns
+ *  drop out because they're absent from `pwcByDbn` — selection implicitly
+ *  scopes the universe to PWC schools. Honors per-year active logic because
+ *  `pwcByDbn` is built from the slider-year membership snapshot. */
+function passesProgram(
+  dbn: string,
+  picked: ProgramFlag[],
+  pwcByDbn: Map<string, PwcMember>,
+): boolean {
+  if (picked.length === 0) return true;
+  const m = pwcByDbn.get(dbn);
+  if (!m) return false;
+  for (const flag of picked) {
+    if (m[flag]) return true;
+  }
+  return false;
+}
+
+/** Grade filter: OR across picked tokens. Empty pick = pass. Compares against
+ *  `schools_master.grades_canonical` (already normalized at the server). */
+function passesGrade(
+  dbn: string,
+  picked: string[],
+  schoolByDbn: Map<string, SchoolMaster>,
+): boolean {
+  if (picked.length === 0) return true;
+  const s = schoolByDbn.get(dbn);
+  if (!s) return false;
+  if (s.grades_canonical.length === 0) return false;
+  const set = new Set(s.grades_canonical);
+  for (const g of picked) {
+    if (set.has(g)) return true;
+  }
+  return false;
+}
+
 function summarizeGeo(g: GeoFilterMap): string {
   const parts: string[] = [];
   for (const layer of GEO_FILTER_LAYERS) {
@@ -209,14 +289,36 @@ function labelSchoolType(t: SchoolType): string {
   }
 }
 
-function joinNotes(
-  geo: string | null,
-  schoolType: string | null,
-  cohort: string | null,
-): string | null {
+interface NoteParts {
+  geo?: string | null;
+  schoolType?: string | null;
+  cohort?: string | null;
+  program?: string | null;
+  grade?: string | null;
+}
+
+function joinNotes(parts: NoteParts): string | null {
   const segs: string[] = [];
-  if (geo) segs.push(`Geo: ${geo}`);
-  if (schoolType) segs.push(`School Type: ${schoolType}`);
-  if (cohort) segs.push(`Cohort: ${cohort}`);
+  if (parts.geo) segs.push(`Geo: ${parts.geo}`);
+  if (parts.schoolType) segs.push(`School Type: ${parts.schoolType}`);
+  if (parts.cohort) segs.push(`Cohort: ${parts.cohort}`);
+  if (parts.program) segs.push(`Program: ${parts.program}`);
+  if (parts.grade) segs.push(`Grade: ${parts.grade}`);
   return segs.length > 0 ? segs.join(' · ') : null;
+}
+
+function summarizePrograms(picked: ProgramFlag[]): string | null {
+  if (picked.length === 0) return null;
+  if (picked.length === 1) {
+    const flag = picked[0]!;
+    const def = PROGRAM_FLAGS.find((p) => p.id === flag);
+    return def?.label ?? flag;
+  }
+  return `${picked.length} selected`;
+}
+
+function summarizeGrades(picked: string[]): string | null {
+  if (picked.length === 0) return null;
+  if (picked.length <= 4) return picked.join(', ');
+  return `${picked.length} selected`;
 }

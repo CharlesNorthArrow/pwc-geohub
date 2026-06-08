@@ -41,6 +41,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       label_field: 'arts_ed_score_label',
       key: 'dbn',
       year_field: 'school_year',
+      // arts_ed_disciplines is a comma-separated multi-set of disciplines
+      // taught at the school (e.g. "Dance, Music, Theater, Visual Arts").
+      // We stash it in `value_text` via the same side-text mechanism that
+      // safety_climate uses for its rating — the School Detail Panel's
+      // Arts Education block reads it back through `getSchoolArtsEd`.
+      categorical_field: 'arts_ed_disciplines',
     },
     format: 'integer',
     scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted' },
@@ -68,7 +74,18 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'rate_per_100',
-    scale: { type: 'diverging', good_direction: 'low', ramp: 'diverging_pugn_muted' },
+    // NYC suspension rates cluster ~0–5% across most schools, with a long
+    // right tail of outlier schools. Equal-interval bins would waste 4 out
+    // of 5 colors on the tail; quintile bins spread color across the
+    // distribution so within-cluster variation is readable. Breaks are
+    // computed citywide over schools with a value for the displayed year
+    // (stable across filter state).
+    scale: {
+      type: 'diverging',
+      good_direction: 'low',
+      ramp: 'diverging_pugn_muted',
+      bin_method: 'quantile',
+    },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',

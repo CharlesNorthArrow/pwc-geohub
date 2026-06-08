@@ -118,6 +118,8 @@ export default function Scorecard({ initialIndicators }: InitialProps): React.JS
         geoFilters: county ? { county: [county] } : {},
         schoolType: 'all',
         cohort: null,
+        programs: [],
+        grades: [],
       },
       schoolsMaster,
       pwcMembers: pwcMembers ?? [],

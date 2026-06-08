@@ -5,12 +5,14 @@ import { useEffect, useState } from 'react';
 import StripPlot from './StripPlot';
 import {
   fetchPwcProgram,
+  fetchSchoolArtsEd,
   fetchSchoolProfile,
 } from '../contract/client';
 import type {
   AggregationArea,
   AnalyticsSeriesRow,
   PwcProgram,
+  SchoolArtsEd,
   SchoolMaster,
   SchoolProfile,
 } from '../contract/types';
@@ -70,6 +72,11 @@ export default function SchoolDetailPanel({
   // API returns `program: null` for the latter and §1.c renders nothing.
   const [program, setProgram] = useState<PwcProgram | null>(null);
   const [programLoaded, setProgramLoaded] = useState(false);
+  // Arts education enrichment (between §1.b and §1.c). Slider-independent —
+  // pinned to the school's latest arts_ed vintage with non-null disciplines.
+  // `null` = in-flight; loaded state always has `artsEd` set (year/disciplines
+  // may be null/empty, which the section renders as "not available").
+  const [artsEd, setArtsEd] = useState<SchoolArtsEd | null>(null);
 
   // Section 1.b: latest-year profile (slider-independent — fetch once per dbn).
   useEffect(() => {
@@ -81,6 +88,26 @@ export default function SchoolDetailPanel({
         if (!abandoned) {
           console.warn('[SchoolDetailPanel] profile fetch failed', err);
           setProfile(null);
+        }
+      });
+    return () => {
+      abandoned = true;
+    };
+  }, [dbn]);
+
+  // Arts education: slider-independent — fetch once per dbn, same pattern as
+  // §1.b ProfileSection.
+  useEffect(() => {
+    let abandoned = false;
+    setArtsEd(null);
+    fetchSchoolArtsEd(dbn)
+      .then((r) => !abandoned && setArtsEd(r.artsEd))
+      .catch((err) => {
+        if (!abandoned) {
+          console.warn('[SchoolDetailPanel] arts-ed fetch failed', err);
+          // Fall through to the loaded-but-empty state so the section still
+          // renders its "not available" copy instead of an infinite spinner.
+          setArtsEd({ dbn, year: null, disciplines: [] });
         }
       });
     return () => {
@@ -235,8 +262,12 @@ export default function SchoolDetailPanel({
         <ProfileSection profile={profile} />
       </div>
 
+      <div style={{ background: '#ffffff', padding: 12, borderBottom: '1px solid #e5e9ee' }}>
+        <ArtsEdSection artsEd={artsEd} />
+      </div>
+
       {programLoaded ? (
-        <div style={{ background: '#ffffff', padding: 12 }}>
+        <div style={{ background: '#f7f9fb', padding: 12 }}>
           <ProgramSection program={program} sliderYear={year} />
         </div>
       ) : null}
@@ -502,6 +533,57 @@ function RaceBar({ profile }: { profile: SchoolProfile }): React.JSX.Element {
         ))}
       </div>
     </div>
+  );
+}
+
+/* ========================================================================== */
+/* Arts Education (between §1.b and §1.c — applies to ALL schools)            */
+/* ========================================================================== */
+
+function ArtsEdSection({ artsEd }: { artsEd: SchoolArtsEd | null }): React.JSX.Element {
+  if (artsEd == null) {
+    return (
+      <Section header="Arts education">
+        <div style={{ fontSize: 11, color: '#a8b3bf' }}>Loading…</div>
+      </Section>
+    );
+  }
+  if (artsEd.year == null || artsEd.disciplines.length === 0) {
+    return (
+      <Section header="Arts education" sub="No arts education data on file">
+        <div style={{ fontSize: 11, color: '#a8b3bf' }}>
+          The DOE Arts in Schools report doesn't list disciplines for this school.
+        </div>
+      </Section>
+    );
+  }
+  return (
+    <Section header="Arts education" yearPill={artsEd.year} pillTone="profile">
+      <SubHeader>Disciplines taught</SubHeader>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {artsEd.disciplines.map((d) => (
+          <DisciplineChip key={d} label={d} />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function DisciplineChip({ label }: { label: string }): React.JSX.Element {
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        padding: '3px 8px',
+        borderRadius: 999,
+        background: '#eef4f8',
+        color: '#1a4a73',
+        border: '1px solid #cbd9e3',
+        fontWeight: 600,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 

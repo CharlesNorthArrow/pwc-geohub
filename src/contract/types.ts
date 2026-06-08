@@ -107,7 +107,28 @@ export interface CommunityResponse {
 
 export type PwcCategory = 'anchor' | 'healing_arts' | 'both' | 'pwc_other';
 
-export interface PwcMember {
+/** Raw program flags carried per-year alongside the derived `category` so the
+ *  Program filter can match on any subset (Social work / Community school /
+ *  Healing arts / Out-of-school). `arts_program` overlaps the `healing_arts`
+ *  category but is exposed here too so the Program filter stays uniform across
+ *  the four pwc_school_program columns. */
+export interface PwcProgramFlags {
+  social_work: boolean;
+  community_school: boolean;
+  arts_program: boolean;
+  ost: boolean;
+}
+
+export type ProgramFlag = keyof PwcProgramFlags;
+
+export const PROGRAM_FLAGS: ReadonlyArray<{ id: ProgramFlag; label: string }> = [
+  { id: 'social_work', label: 'Social work' },
+  { id: 'community_school', label: 'Community school' },
+  { id: 'arts_program', label: 'Healing arts' },
+  { id: 'ost', label: 'Out-of-school' },
+];
+
+export interface PwcMember extends PwcProgramFlags {
   dbn: string;
   category: PwcCategory;
   cohort: string | null;
@@ -198,6 +219,12 @@ export interface SchoolMaster {
    *  Null if no year has reported a non-null enrollment. Used to size the
    *  baseline (no-indicator-selected) circles. */
   total_enrollment: number | null;
+  /** Canonical grade tokens this school serves (PK/K/1..12), normalized
+   *  server-side from `schools.grades`. Empty when the source value is
+   *  missing or unparseable — the Grade filter treats empty as "doesn't
+   *  match anything explicit", which matches DOE convention for ungraded /
+   *  alt schools. */
+  grades_canonical: string[];
 }
 
 /** GET /api/schools-master → ~1,779 plottable schools. */
@@ -279,6 +306,31 @@ export interface SchoolProfile {
 /** GET /api/schools/profile?dbn= */
 export interface SchoolProfileResponse {
   profile: SchoolProfile | null;
+}
+
+/**
+ * Arts Education enrichment surfaced in the Detail Panel below the school
+ * profile. Sourced from `arts_ed.csv`'s `arts_ed_disciplines` column (the
+ * comma-separated list of disciplines taught at the school), captured via the
+ * registry's `categorical_field` side-text knob on `arts_ed_score`. Slider-
+ * independent — the panel pins to the school's latest arts_ed vintage with
+ * non-null disciplines.
+ */
+export interface SchoolArtsEd {
+  dbn: string;
+  /** school_year of the row whose disciplines populate `disciplines`. Null
+   *  when this DBN has no row in arts_ed at all (or every row has empty
+   *  disciplines) — the panel falls back to a "not available" state. */
+  year: string | null;
+  /** Canonical discipline tokens for that year, deduped + ordered as they
+   *  appear in the source CSV (Dance, Music, Theater, Visual Arts in the
+   *  full-coverage case). */
+  disciplines: string[];
+}
+
+/** GET /api/schools/arts-ed?dbn= */
+export interface SchoolArtsEdResponse {
+  artsEd: SchoolArtsEd;
 }
 
 /**

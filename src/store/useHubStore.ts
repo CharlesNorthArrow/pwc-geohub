@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { AggregationArea, GeoFilterLayerId } from '../contract/types';
+import type { AggregationArea, GeoFilterLayerId, ProgramFlag } from '../contract/types';
 import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 
 /**
@@ -48,6 +48,17 @@ export interface HubState {
 
   /** Spec §6.3 — single-select Cohort. null = "All cohorts". */
   cohort: string | null;
+
+  /** Multipick (OR) of PWC program flags. Empty array = no constraint;
+   *  any selection implicitly scopes the universe to PWC schools (because
+   *  the flags only exist on PWC rows). Follows the slider year via
+   *  `pwcMembers`. */
+  programs: ProgramFlag[];
+
+  /** Multipick (OR) of canonical grade tokens (PK / K / 1..12). Empty array
+   *  = no constraint. Resolved against `schools_master.grades_canonical` at
+   *  filter time. */
+  grades: string[];
 
   /** Spec §6.4 — the school the user picked in the School filter; drives
    *  flyTo + opens the School Details View stub. */
@@ -99,6 +110,8 @@ export interface HubState {
   setGeoFilters: (next: GeoFilterMap) => void;
   clearGeoFilters: () => void;
   setCohort: (cohort: string | null) => void;
+  setPrograms: (programs: ProgramFlag[]) => void;
+  setGrades: (grades: string[]) => void;
   setSelectedSchool: (dbn: string | null) => void;
   setAggregationArea: (a: AggregationArea) => void;
   setRightPanelCollapsed: (collapsed: boolean) => void;
@@ -119,6 +132,8 @@ export const useHubStore = create<HubState>((set) => ({
   schoolType: 'pwc',
   geoFilters: {},
   cohort: null,
+  programs: [],
+  grades: [],
   selectedSchoolDbn: null,
   aggregationArea: 'school_district',
   // Collapsed by default — the panel has nothing to show until the user picks
@@ -137,6 +152,8 @@ export const useHubStore = create<HubState>((set) => ({
   setGeoFilters: (next) => set({ geoFilters: next }),
   clearGeoFilters: () => set({ geoFilters: {} }),
   setCohort: (c) => set({ cohort: c }),
+  setPrograms: (programs) => set({ programs }),
+  setGrades: (grades) => set({ grades }),
   setSelectedSchool: (dbn) => set({ selectedSchoolDbn: dbn }),
   setAggregationArea: (a) => set({ aggregationArea: a }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),

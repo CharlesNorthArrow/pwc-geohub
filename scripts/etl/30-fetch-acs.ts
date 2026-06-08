@@ -155,6 +155,14 @@ function computeAcsValue(
       // color and the share for opacity, so tracts with a strong majority read
       // more saturated than mixed tracts.
       const total = acsNum(r['B03002_001E']);
+      // Uninhabited / water-only tracts (Central Park, harbors, airport
+      // edges) report total population 0. Without a denominator there's no
+      // honest "predominant group" to label; suppress both fields so the
+      // map's existing no-data branch (transparent fill) renders these
+      // tracts as blank instead of arbitrarily coloring them.
+      if (total == null || total <= 0) {
+        return { value_num: null, value_text: null, label: 'No population' };
+      }
       const groups: Array<{ label: string; n: number | null }> = [
         { label: 'White', n: acsNum(r['B03002_003E']) },
         { label: 'Black', n: acsNum(r['B03002_004E']) },
@@ -164,14 +172,11 @@ function computeAcsValue(
       const valid = groups.filter((g) => g.n != null) as Array<{ label: string; n: number }>;
       if (valid.length === 0) return { value_num: null, value_text: null, label: null };
       const top = valid.reduce((best, g) => (g.n > best.n ? g : best));
-      const ratio = total != null && total > 0 ? (top.n / total) * 100 : null;
+      const ratio = (top.n / total) * 100;
       return {
         value_num: ratio,
         value_text: top.label,
-        label:
-          ratio == null
-            ? `${top.label} predominance`
-            : `${top.label} predominance (${ratio.toFixed(0)}% of population)`,
+        label: `${top.label} predominance (${ratio.toFixed(0)}% of population)`,
       };
     }
     default:

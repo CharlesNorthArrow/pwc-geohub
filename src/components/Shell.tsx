@@ -83,6 +83,8 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const schoolType = useHubStore((s) => s.schoolType);
   const geoFilters = useHubStore((s) => s.geoFilters);
   const cohort = useHubStore((s) => s.cohort);
+  const programs = useHubStore((s) => s.programs);
+  const grades = useHubStore((s) => s.grades);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setYear = useHubStore((s) => s.setYear);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
@@ -320,12 +322,12 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
 
   const universe: FilteredUniverse = useMemo(() => {
     return applyFilters({
-      state: { geoFilters, schoolType, cohort },
+      state: { geoFilters, schoolType, cohort, programs, grades },
       schoolsMaster: schoolsMaster ?? [],
       pwcMembers: pwcMembers ?? [],
       allCohorts,
     });
-  }, [geoFilters, schoolType, cohort, schoolsMaster, pwcMembers, allCohorts]);
+  }, [geoFilters, schoolType, cohort, programs, grades, schoolsMaster, pwcMembers, allCohorts]);
 
   /* -------------------- Phase 5 analytics series -------------------- */
   // `layers.analytics` already encodes the family-preference fallback when

@@ -42,19 +42,19 @@ import type { SchoolType } from '../src/store/useHubStore.js';
 
 const SCHOOLS: SchoolMaster[] = [
   // Brownsville cohort, school_district 23
-  { dbn: 'DBN-01', school_name: 'P.S. One', borough: 'K', latitude: 40.66, longitude: -73.91, total_enrollment: 400, geos: { school_district: '23', council: '41', county: 'K' } },
-  { dbn: 'DBN-02', school_name: 'P.S. Two', borough: 'K', latitude: 40.67, longitude: -73.92, total_enrollment: 350, geos: { school_district: '23', council: '41', county: 'K' } },
-  { dbn: 'DBN-07', school_name: 'P.S. Seven', borough: 'K', latitude: 40.66, longitude: -73.92, total_enrollment: 200, geos: { school_district: '23', council: '41', county: 'K' } },
+  { dbn: 'DBN-01', school_name: 'P.S. One', borough: 'K', latitude: 40.66, longitude: -73.91, total_enrollment: 400, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
+  { dbn: 'DBN-02', school_name: 'P.S. Two', borough: 'K', latitude: 40.67, longitude: -73.92, total_enrollment: 350, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
+  { dbn: 'DBN-07', school_name: 'P.S. Seven', borough: 'K', latitude: 40.66, longitude: -73.92, total_enrollment: 200, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
   // East Harlem cohort, school_district 4
-  { dbn: 'DBN-03', school_name: 'P.S. Three', borough: 'M', latitude: 40.79, longitude: -73.94, total_enrollment: 500, geos: { school_district: '4', council: '8', county: 'M' } },
-  { dbn: 'DBN-04', school_name: 'P.S. Four', borough: 'M', latitude: 40.80, longitude: -73.94, total_enrollment: 300, geos: { school_district: '4', council: '8', county: 'M' } },
-  { dbn: 'DBN-08', school_name: 'P.S. Eight', borough: 'M', latitude: 40.79, longitude: -73.93, total_enrollment: 250, geos: { school_district: '4', council: '8', county: 'M' } },
+  { dbn: 'DBN-03', school_name: 'P.S. Three', borough: 'M', latitude: 40.79, longitude: -73.94, total_enrollment: 500, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
+  { dbn: 'DBN-04', school_name: 'P.S. Four', borough: 'M', latitude: 40.80, longitude: -73.94, total_enrollment: 300, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
+  { dbn: 'DBN-08', school_name: 'P.S. Eight', borough: 'M', latitude: 40.79, longitude: -73.93, total_enrollment: 250, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
   // Morrisania cohort, school_district 8
-  { dbn: 'DBN-05', school_name: 'P.S. Five', borough: 'X', latitude: 40.83, longitude: -73.90, total_enrollment: 600, geos: { school_district: '8', council: '17', county: 'X' } },
-  { dbn: 'DBN-09', school_name: 'P.S. Nine', borough: 'X', latitude: 40.83, longitude: -73.91, total_enrollment: 550, geos: { school_district: '8', council: '17', county: 'X' } },
+  { dbn: 'DBN-05', school_name: 'P.S. Five', borough: 'X', latitude: 40.83, longitude: -73.90, total_enrollment: 600, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [] },
+  { dbn: 'DBN-09', school_name: 'P.S. Nine', borough: 'X', latitude: 40.83, longitude: -73.91, total_enrollment: 550, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [] },
   // Fort Greene cohort, school_district 13
-  { dbn: 'DBN-06', school_name: 'P.S. Six', borough: 'K', latitude: 40.69, longitude: -73.97, total_enrollment: 450, geos: { school_district: '13', council: '35', county: 'K' } },
-  { dbn: 'DBN-10', school_name: 'P.S. Ten', borough: 'K', latitude: 40.69, longitude: -73.98, total_enrollment: 300, geos: { school_district: '13', council: '35', county: 'K' } },
+  { dbn: 'DBN-06', school_name: 'P.S. Six', borough: 'K', latitude: 40.69, longitude: -73.97, total_enrollment: 450, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [] },
+  { dbn: 'DBN-10', school_name: 'P.S. Ten', borough: 'K', latitude: 40.69, longitude: -73.98, total_enrollment: 300, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [] },
 ];
 
 // PWC membership snapshots — by year. Note: DBN-03 is 'both' (anchor + healing
@@ -66,12 +66,12 @@ function pwcSnapshot(year: SliderYear | '2025-26'): PwcMember[] {
   // through deltas in `deriveAnalytics` because the loops re-resolve.
   void year;
   return [
-    { dbn: 'DBN-01', category: 'anchor',       cohort: 'Brownsville' },
-    { dbn: 'DBN-02', category: 'healing_arts', cohort: 'Brownsville' },
-    { dbn: 'DBN-03', category: 'both',         cohort: 'East Harlem' },
-    { dbn: 'DBN-04', category: 'pwc_other',    cohort: 'East Harlem' },
-    { dbn: 'DBN-05', category: 'anchor',       cohort: 'Morrisania' },
-    { dbn: 'DBN-06', category: 'healing_arts', cohort: 'Fort Greene' },
+    { dbn: 'DBN-01', category: 'anchor',       cohort: 'Brownsville', social_work: false, community_school: false, arts_program: false, ost: false },
+    { dbn: 'DBN-02', category: 'healing_arts', cohort: 'Brownsville', social_work: false, community_school: false, arts_program: true,  ost: false },
+    { dbn: 'DBN-03', category: 'both',         cohort: 'East Harlem', social_work: false, community_school: false, arts_program: true,  ost: false },
+    { dbn: 'DBN-04', category: 'pwc_other',    cohort: 'East Harlem', social_work: false, community_school: false, arts_program: false, ost: false },
+    { dbn: 'DBN-05', category: 'anchor',       cohort: 'Morrisania',  social_work: false, community_school: false, arts_program: false, ost: false },
+    { dbn: 'DBN-06', category: 'healing_arts', cohort: 'Fort Greene', social_work: false, community_school: false, arts_program: true,  ost: false },
   ];
 }
 
@@ -290,6 +290,8 @@ function snapUniverse(state: FilterState): UniverseSnap {
       geoFilters: state.geoFilters,
       schoolType: state.schoolType,
       cohort: state.cohort,
+      programs: [],
+      grades: [],
     },
     schoolsMaster: SCHOOLS,
     pwcMembers: pwcSnapshot('2024-25'),
@@ -300,13 +302,17 @@ function snapUniverse(state: FilterState): UniverseSnap {
     afterGeo: [...u.afterGeo].sort(),
     afterSchoolType: [...u.afterSchoolType].sort(),
     cohortOptions: u.cohortOptions,
-    prefilterSummary: u.prefilterSummary,
+    prefilterSummary: {
+      forSchoolType: u.prefilterSummary.forSchoolType,
+      forCohort: u.prefilterSummary.forCohort,
+      forSchool: u.prefilterSummary.forSchool,
+    },
   };
 }
 
 function snapAnalytics(indicator: IndicatorPublic, year: SliderYear, state: FilterState): AnalyticsSnap {
   const u = applyFilters({
-    state: { geoFilters: state.geoFilters, schoolType: state.schoolType, cohort: state.cohort },
+    state: { geoFilters: state.geoFilters, schoolType: state.schoolType, cohort: state.cohort, programs: [], grades: [] },
     schoolsMaster: SCHOOLS,
     pwcMembers: pwcSnapshot('2024-25'),
     allCohorts: ALL_COHORTS,
@@ -402,7 +408,7 @@ const percentiles = PERCENTILE_CASES.map((c) => {
   const ind = indicatorById[c.indicator]!;
   const fs = FILTER_STATES.find((s) => s.name === c.filterState)!;
   const u = applyFilters({
-    state: { geoFilters: fs.geoFilters, schoolType: fs.schoolType, cohort: fs.cohort },
+    state: { geoFilters: fs.geoFilters, schoolType: fs.schoolType, cohort: fs.cohort, programs: [], grades: [] },
     schoolsMaster: SCHOOLS,
     pwcMembers: pwcSnapshot('2024-25'),
     allCohorts: ALL_COHORTS,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface DropdownOption {
@@ -33,6 +33,13 @@ interface Props {
    *  total picks across all layers. Optional — defaults to "1 when not at
    *  default" for the simple single-select case. */
   activeCount?: number;
+  /** Multi-select mode. Rows render as checkboxes, picking toggles via
+   *  `onPick` (parent computes the next array), and the panel does NOT close
+   *  on pick — only on outside-click or after Reset. */
+  multiSelect?: boolean;
+  /** When `multiSelect` is true, the set of currently-picked values. Drives
+   *  checkbox state. Ignored in single-select mode. */
+  selectedValues?: ReadonlyArray<string>;
 }
 
 /**
@@ -51,7 +58,13 @@ export default function FilterDropdown({
   onPick,
   isAtDefault,
   activeCount,
+  multiSelect = false,
+  selectedValues,
 }: Props): React.JSX.Element {
+  const pickedSet = useMemo(
+    () => (multiSelect ? new Set(selectedValues ?? []) : null),
+    [multiSelect, selectedValues],
+  );
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -230,21 +243,23 @@ export default function FilterDropdown({
             ) : null}
             {visible.map((opt) => {
               const zero = opt.count === 0;
+              const picked = pickedSet
+                ? pickedSet.has(opt.value)
+                : selectedLabel === opt.label;
               return (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => {
                     onPick(opt.value);
-                    setOpen(false);
+                    if (!multiSelect) setOpen(false);
                   }}
                   style={{
                     width: '100%',
                     textAlign: 'left',
                     padding: '4px 6px',
                     border: 'none',
-                    background:
-                      selectedLabel === opt.label ? '#eef4f8' : 'transparent',
+                    background: picked ? '#eef4f8' : 'transparent',
                     color: zero ? '#a8b3bf' : '#002040',
                     fontSize: 12,
                     cursor: 'pointer',
@@ -255,8 +270,26 @@ export default function FilterDropdown({
                     lineHeight: 1.3,
                   }}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {opt.label}
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {multiSelect ? (
+                      <input
+                        type="checkbox"
+                        checked={picked}
+                        readOnly
+                        tabIndex={-1}
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    ) : null}
+                    <span>{opt.label}</span>
                   </span>
                   {opt.count != null ? (
                     <span style={{ fontSize: 10, color: zero ? '#c5cdd6' : '#467c9d' }}>

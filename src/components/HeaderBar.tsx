@@ -1,20 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import FilterDropdown, { type DropdownOption } from './FilterDropdown';
 import GeoFilterDialog from './GeoFilterDialog';
 import TimeSlider from './TimeSlider';
 import {
   GEO_FILTER_LAYERS,
+  PROGRAM_FLAGS,
   type GeographiesResponse,
   type GeoFilterLayerId,
   type IndicatorPublic,
+  type ProgramFlag,
   type PwcHistoryResponse,
   type PwcMember,
   type SchoolMaster,
 } from '../contract/types';
 import { useHubStore, type SchoolType } from '../store/useHubStore';
 import type { FilteredUniverse } from '../store/derived';
+import { CANONICAL_GRADES } from '../lib/grades';
 
 interface Props {
   geographies: GeographiesResponse | null;
@@ -54,12 +58,36 @@ export default function HeaderBar({
   const setSchoolType = useHubStore((s) => s.setSchoolType);
   const cohort = useHubStore((s) => s.cohort);
   const setCohort = useHubStore((s) => s.setCohort);
+  const programs = useHubStore((s) => s.programs);
+  const setPrograms = useHubStore((s) => s.setPrograms);
+  const grades = useHubStore((s) => s.grades);
+  const setGrades = useHubStore((s) => s.setGrades);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
   const latestPerLayer = useHubStore((s) => s.latestPerLayer);
   const setLatestPerLayer = useHubStore((s) => s.setLatestPerLayer);
 
   const [geoOpen, setGeoOpen] = useState(false);
+
+  /* -------------------- Compact mode --------------------
+   * When the filter cluster gets too narrow to hold every chip side-by-side,
+   * collapse the whole set into a single "Filters" popover button. Beats a
+   * horizontal scroll (chips disappearing off-edge wasn't discoverable).
+   * Threshold = the natural inline width of the six chips + reset; tuned by
+   * eye and easy to revisit. ResizeObserver watches the cluster wrapper so
+   * the switch follows left/right panel resizing too, not just window width. */
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = clusterRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setCompact(w < 660);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   /* -------------------- Latest-year PWC membership -------------------- */
   // The Geo dialog shows a "Matched PWC schools (latest year)" column. Per
@@ -120,6 +148,65 @@ export default function HeaderBar({
   }));
   const cohortLabel = cohort ?? 'All';
 
+  /* -------------------- Program options --------------- */
+  // Counts = number of in-view schools (Geo + School Type + Cohort applied)
+  // that carry each program flag for the current year's PWC snapshot.
+  // Driven from `afterCohort` so the dropdown reflects what's pickable now.
+  const programOptions: DropdownOption[] = useMemo(() => {
+    const counts = new Map<ProgramFlag, number>();
+    for (const p of PROGRAM_FLAGS) counts.set(p.id, 0);
+    if (pwcHistory) {
+      // Use the latest PWC year snapshot as the option-count basis. Filtering
+      // itself uses the slider-year membership (via `pwcMembers` upstream),
+      // so the count is a "what's typically there" rather than a per-tick
+      // moving target.
+      const byDbn = new Map(latestPwc.map((m) => [m.dbn, m]));
+      for (const dbn of universe.afterCohort) {
+        const m = byDbn.get(dbn);
+        if (!m) continue;
+        for (const p of PROGRAM_FLAGS) {
+          if (m[p.id]) counts.set(p.id, (counts.get(p.id) ?? 0) + 1);
+        }
+      }
+    }
+    return PROGRAM_FLAGS.map((p) => ({
+      value: p.id,
+      label: p.label,
+      count: counts.get(p.id) ?? 0,
+    }));
+  }, [universe.afterCohort, latestPwc, pwcHistory]);
+  const programLabel =
+    programs.length === 0
+      ? 'All'
+      : programs.length === 1
+        ? (PROGRAM_FLAGS.find((p) => p.id === programs[0])?.label ?? programs[0]!)
+        : `${programs.length} selected`;
+  const togglePicked = <T extends string>(arr: T[], v: T): T[] =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  /* -------------------- Grade options ----------------- */
+  // Counts = in-view schools (Geo + School Type + Cohort + Program applied)
+  // that serve each canonical grade. Driven from `afterProgram` so the count
+  // tracks the cascade up to the Grade step.
+  const gradeOptions: DropdownOption[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const g of CANONICAL_GRADES) counts.set(g, 0);
+    const byDbn = new Map(schoolsMaster.map((s) => [s.dbn, s]));
+    for (const dbn of universe.afterProgram) {
+      const s = byDbn.get(dbn);
+      if (!s) continue;
+      for (const g of s.grades_canonical) {
+        if (counts.has(g)) counts.set(g, (counts.get(g) ?? 0) + 1);
+      }
+    }
+    return CANONICAL_GRADES.map((g) => ({
+      value: g,
+      label: g,
+      count: counts.get(g) ?? 0,
+    }));
+  }, [universe.afterProgram, schoolsMaster]);
+  const gradeLabel = grades.length === 0 ? 'All' : grades.join(', ');
+
   /* -------------------- School options ---------------- */
   // School filter: searchable, narrowed to the final filtered universe.
   // With ~1,779 schools this can be heavy — the FilterDropdown's search
@@ -139,44 +226,23 @@ export default function HeaderBar({
       ? schoolsMaster.find((s) => s.dbn === selectedSchoolDbn)?.school_name ?? selectedSchoolDbn
       : 'Any';
 
-  return (
-    <div
-      role="toolbar"
-      aria-label="Filters"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '0 12px',
-        // Fixed height — the header never grows with the filter row. When
-        // filter chips overflow horizontally the inner scroller below
-        // catches them instead of stacking onto a second line.
-        height: 64,
-        borderBottom: '3px solid #F0901F',
-        boxShadow: '0 1px 2px rgba(0, 32, 64, 0.12)',
-        background: '#ffffff',
-        flexWrap: 'nowrap',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Filter cluster — horizontal scroll kicks in only when the chips
-       *  collectively exceed the available width. `minWidth: 0` is the bit
-       *  flexbox needs to let the container actually shrink. */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flex: '1 1 auto',
-          minWidth: 0,
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          scrollbarWidth: 'thin',
-          // Pad the right edge of the scroll area so the last chip never
-          // butts right up against the divider.
-          paddingRight: 4,
-        }}
-      >
+  /* -------------------- Active-filter count (compact badge) --------------- */
+  const totalActiveFilters = useMemo(() => {
+    let n = 0;
+    for (const l of GEO_FILTER_LAYERS) n += geoFilters[l.id]?.length ?? 0;
+    if (schoolType !== 'all') n += 1;
+    if (cohort != null) n += 1;
+    n += programs.length;
+    n += grades.length;
+    if (selectedSchoolDbn != null) n += 1;
+    return n;
+  }, [geoFilters, schoolType, cohort, programs, grades, selectedSchoolDbn]);
+
+  const anyFilterActive = totalActiveFilters > 0;
+
+  /* -------------------- Chip set (rendered inline OR inside popover) ------ */
+  const chips = (
+    <>
       {/* Geo — label + count badge only (no inline summary). */}
       <button
         type="button"
@@ -221,7 +287,6 @@ export default function HeaderBar({
         <span aria-hidden style={{ opacity: 0.6 }}>▾</span>
       </button>
 
-      {/* School Type */}
       <FilterDropdown
         triggerLabel="School Type"
         selectedLabel={schoolTypeLabel}
@@ -233,7 +298,6 @@ export default function HeaderBar({
         onPick={(v) => setSchoolType(v as SchoolType)}
       />
 
-      {/* Cohort */}
       <FilterDropdown
         triggerLabel="Cohort"
         selectedLabel={cohortLabel}
@@ -245,7 +309,34 @@ export default function HeaderBar({
         onPick={(v) => setCohort(v)}
       />
 
-      {/* School */}
+      <FilterDropdown
+        triggerLabel="Program"
+        selectedLabel={programLabel}
+        options={programOptions}
+        searchable
+        prefilterNote={universe.prefilterSummary.forProgram}
+        isAtDefault={programs.length === 0}
+        activeCount={programs.length}
+        multiSelect
+        selectedValues={programs}
+        onReset={() => setPrograms([])}
+        onPick={(v) => setPrograms(togglePicked(programs, v as ProgramFlag))}
+      />
+
+      <FilterDropdown
+        triggerLabel="Grade"
+        selectedLabel={gradeLabel}
+        options={gradeOptions}
+        searchable
+        prefilterNote={universe.prefilterSummary.forGrade}
+        isAtDefault={grades.length === 0}
+        activeCount={grades.length}
+        multiSelect
+        selectedValues={grades}
+        onReset={() => setGrades([])}
+        onPick={(v) => setGrades(togglePicked(grades, v))}
+      />
+
       <FilterDropdown
         triggerLabel="School"
         selectedLabel={selectedSchoolLabel}
@@ -257,19 +348,15 @@ export default function HeaderBar({
         onPick={(v) => setSelectedSchool(v)}
       />
 
-      {/* Reset button sits BEFORE the time slider so its appearance doesn't
-       *  shift the slider's horizontal anchor. Icon-only, bright-yellow chip
-       *  so it's discoverable without taking up a label's worth of space. */}
-      {(Object.keys(geoFilters) as GeoFilterLayerId[]).some((k) => (geoFilters[k]?.length ?? 0) > 0) ||
-      schoolType !== 'all' ||
-      cohort != null ||
-      selectedSchoolDbn != null ? (
+      {anyFilterActive ? (
         <button
           type="button"
           onClick={() => {
             clearGeoFilters();
             setSchoolType('all');
             setCohort(null);
+            setPrograms([]);
+            setGrades([]);
             setSelectedSchool(null);
           }}
           title="Reset all filters"
@@ -294,7 +381,49 @@ export default function HeaderBar({
           ↺
         </button>
       ) : null}
-      </div>{/* /filter cluster */}
+    </>
+  );
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="Filters"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '0 12px',
+        // Fixed height — the header never grows with the filter row. When
+        // filter chips overflow horizontally the inner scroller below
+        // catches them instead of stacking onto a second line.
+        height: 64,
+        borderBottom: '3px solid #F0901F',
+        boxShadow: '0 1px 2px rgba(0, 32, 64, 0.12)',
+        background: '#ffffff',
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Filter cluster. When narrow enough that the chips wouldn't fit
+       *  side-by-side, we collapse into a single "Filters" popover button
+       *  (see CompactFiltersPopover below) instead of horizontal scroll. The
+       *  ResizeObserver on this wrapper drives the switch. */}
+      <div
+        ref={clusterRef}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flex: '1 1 auto',
+          minWidth: 0,
+        }}
+      >
+        {compact ? (
+          <CompactFiltersPopover activeCount={totalActiveFilters}>{chips}</CompactFiltersPopover>
+        ) : (
+          chips
+        )}
+      </div>
 
       {/* Vertical partition between the filter cluster and the time-slider
        *  block. Subtle slate-grey line, ~half the toolbar height, with a
@@ -354,6 +483,170 @@ export default function HeaderBar({
           setGeoOpen(false);
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Single trigger that opens a popover containing every filter chip stacked
+ * vertically — used when the toolbar is too narrow to lay chips out inline.
+ *
+ * Dismissal is explicit (× button or ESC). We don't close on outside-click
+ * because each FilterDropdown's own panel portals to document.body, and an
+ * outside-click handler that fires for clicks inside those portaled panels
+ * would close the parent popover the moment the user picked anything.
+ */
+function CompactFiltersPopover({
+  activeCount,
+  children,
+}: {
+  activeCount: number;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !rootRef.current) return;
+    const update = (): void => {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (r) setTriggerRect(r);
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const active = activeCount > 0;
+  return (
+    <div ref={rootRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="Filters"
+        aria-label="Filters"
+        aria-expanded={open}
+        style={{
+          padding: '4px 10px',
+          background: active ? '#027BC0' : '#ffffff',
+          color: active ? 'white' : '#002040',
+          border: '1px solid #c5cdd6',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer',
+          fontWeight: 500,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Filters
+        </span>
+        {active ? (
+          <span
+            style={{
+              background: 'white',
+              color: '#027BC0',
+              borderRadius: 999,
+              padding: '0 6px',
+              fontSize: 10,
+              fontWeight: 700,
+              minWidth: 16,
+              textAlign: 'center',
+              lineHeight: '14px',
+            }}
+          >
+            {activeCount}
+          </span>
+        ) : null}
+        <span aria-hidden style={{ opacity: 0.6 }}>▾</span>
+      </button>
+
+      {open && triggerRect && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              style={{
+                position: 'fixed',
+                top: triggerRect.bottom + 4,
+                left: triggerRect.left,
+                zIndex: 1000,
+                minWidth: 240,
+                maxWidth: 320,
+                background: 'white',
+                border: '1px solid #c5cdd6',
+                borderRadius: 6,
+                boxShadow: '0 6px 24px rgba(0,32,64,0.15)',
+                padding: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                  paddingBottom: 6,
+                  borderBottom: '1px solid #eef0f3',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#002040',
+                    letterSpacing: 0.4,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Filters
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close filters"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#467c9d',
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 2,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  alignItems: 'flex-start',
+                }}
+              >
+                {children}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
