@@ -508,7 +508,10 @@ function ColorSwatches({ bins }: { bins: ColorBins }): React.JSX.Element {
       </div>
     );
   }
-  const labels = [
+  // Per-bin labels: prefer the explicit list from `bins.labels` (discrete-
+  // value indicators) over synthesised bracket strings. Falls back to the
+  // bracket form for continuous indicators.
+  const labels = bins.labels ?? [
     `≤ ${bins.format(bins.edges[0])}`,
     `${bins.format(bins.edges[0])} – ${bins.format(bins.edges[1])}`,
     `${bins.format(bins.edges[1])} – ${bins.format(bins.edges[2])}`,

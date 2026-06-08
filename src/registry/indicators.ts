@@ -49,7 +49,16 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       categorical_field: 'arts_ed_disciplines',
     },
     format: 'integer',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted' },
+    // arts_ed_score is "N of 4 disciplines taught" — values are exactly
+    // 0, 1, 2, 3, 4. Use discrete_values so each integer gets its own color
+    // and the legend reads "0", "1", "2", "3", "4" instead of nonsensical
+    // bracket ranges (0.8, 1.6, 2.4, 3.2 from equal-interval over [0, 4]).
+    scale: {
+      type: 'diverging',
+      good_direction: 'high',
+      ramp: 'diverging_pugn_muted',
+      discrete_values: [0, 1, 2, 3, 4],
+    },
     geometry: 'point',
     // Discontinuous — only these two years exist. Spec §3.2 #1.
     years: ['2020-21', '2024-25'],

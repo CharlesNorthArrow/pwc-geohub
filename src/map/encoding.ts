@@ -19,6 +19,10 @@ export interface SequentialBins {
   /** Length 4 — internal break points. Bin 0: ≤edges[0]; bin 4: >edges[3]. */
   edges: [number, number, number, number];
   format: (v: number) => string;
+  /** Optional per-bin labels (length 5). When present, the legend renders
+   *  these verbatim instead of synthesising bracket strings from `edges`.
+   *  Used by `discrete_values` indicators where the bins ARE the values. */
+  labels?: [string, string, string, string, string];
 }
 
 export interface CategoricalBins {
@@ -64,13 +68,37 @@ export function colorBinsFor(
     indicator.theme,
     indicator.scale.good_direction,
   );
+  const fmt = formatterFor(indicator);
+
+  // Discrete bin override — one color per value, midpoint edges. Used by
+  // integer-valued indicators (e.g. arts_ed_score 0..4) where bracket
+  // legends would mislead. Short-circuits before quantile / equal-interval.
+  const discrete = indicator.scale.discrete_values;
+  if (discrete && discrete.length === 5) {
+    const sorted = [...discrete].sort((a, b) => a - b);
+    const edges: [number, number, number, number] = [
+      (sorted[0]! + sorted[1]!) / 2,
+      (sorted[1]! + sorted[2]!) / 2,
+      (sorted[2]! + sorted[3]!) / 2,
+      (sorted[3]! + sorted[4]!) / 2,
+    ];
+    const labels: [string, string, string, string, string] = [
+      fmt(sorted[0]!),
+      fmt(sorted[1]!),
+      fmt(sorted[2]!),
+      fmt(sorted[3]!),
+      fmt(sorted[4]!),
+    ];
+    return { type: 'sequential', ramp, edges, format: fmt, labels };
+  }
+
   const wantsQuantile = indicator.scale.bin_method === 'quantile';
   const quantileEdges =
     wantsQuantile && allValues && allValues.length > 0
       ? quintileEdges(allValues)
       : null;
   const edges: [number, number, number, number] = quantileEdges ?? equalIntervalEdges(domain);
-  return { type: 'sequential', ramp, edges, format: formatterFor(indicator) };
+  return { type: 'sequential', ramp, edges, format: fmt };
 }
 
 function equalIntervalEdges(domain: { min: number; max: number }): [number, number, number, number] {

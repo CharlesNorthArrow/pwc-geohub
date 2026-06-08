@@ -78,6 +78,7 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
       good_direction: i.scale.good_direction,
       categories: i.scale.categories,
       bin_method: i.scale.bin_method,
+      discrete_values: i.scale.discrete_values,
     },
     // Phase 1 only renders point + polygon families. Site (deferred crime) is filtered out.
     geometry: i.geometry === 'point' ? 'point' : 'polygon',

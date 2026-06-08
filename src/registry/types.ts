@@ -81,6 +81,15 @@ export interface IndicatorScale {
    * of tracts — better visual contrast across the choropleth.
    */
   bin_method?: BinMethod;
+  /**
+   * Discrete value buckets — one color per listed value. Edges are computed
+   * as midpoints between consecutive entries, so e.g. `[0,1,2,3,4]` puts
+   * each integer in its own color and the legend renders "0", "1", "2", "3",
+   * "4" instead of bracket strings. Length must equal the ramp size (5).
+   * Set on indicators whose values are inherently discrete (e.g.
+   * arts_ed_score counts 0–4 disciplines). Overrides `bin_method` when set.
+   */
+  discrete_values?: number[];
 }
 
 export interface IndicatorRegistryEntry {

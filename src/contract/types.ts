@@ -34,6 +34,9 @@ export interface IndicatorPublic {
     categories?: string[];
     /** 'equal' (default) or 'quantile'. Drives `colorBinsFor` bin placement. */
     bin_method?: 'equal' | 'quantile';
+    /** Discrete value buckets — one color per listed value, edges computed
+     *  at midpoints. When present, overrides `bin_method`. */
+    discrete_values?: number[];
   };
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
