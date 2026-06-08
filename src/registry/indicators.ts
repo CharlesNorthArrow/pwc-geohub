@@ -241,6 +241,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Staff & School Culture',
     label: 'Family Satisfaction with Education (q36)',
     short_label: 'Family Satisfaction',
+    full_question:
+      'I am satisfied with the education my child has received this year.',
     data_source: 'NYC School Survey — Family Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -264,6 +266,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Staff & School Culture',
     label: 'Teacher: Access to Behavioral Supports (q120)',
     short_label: 'Teacher: Supports Access',
+    full_question:
+      'Adults at this school have access to school-based supports to assist in behavioral/emotional escalations.',
     data_source: 'NYC School Survey — Teacher Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -287,6 +291,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Student Experience',
     label: 'Student: Knows Where to Go for Mental-Health Support (q20)',
     short_label: 'Student: MH Support',
+    full_question:
+      'I know where to go at my school if I need additional support with my mental-health.',
     data_source: 'NYC School Survey — Student Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -310,6 +316,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Student Experience',
     label: 'Student: Felt Happy at School (q22)',
     short_label: 'Student: Felt Happy',
+    full_question:
+      'During this school year, most days I have felt happy when at school.',
     data_source: 'NYC School Survey — Student Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',
@@ -335,6 +343,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Staff & School Culture',
     label: 'Teacher: Recognizes Disruptive Behavior as SEL Opportunity (q119)',
     short_label: 'Teacher: SEL View',
+    full_question:
+      'Adults at this school recognize disruptive behavior as social-emotional learning opportunities.',
     data_source: 'NYC School Survey — Teacher Data File',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/nyc-school-survey',

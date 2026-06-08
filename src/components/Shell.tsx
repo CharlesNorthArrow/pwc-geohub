@@ -595,48 +595,74 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   /* -------------------- No-data flags (per-layer, independent) --------------------
    * `resolveActiveLayers` already merged the registry-coverage check with the
    * fetched-and-empty check. Each layer fires its 🗓️ branch independently —
-   * §6.6 acceptance test #3.
+   * §6.6 acceptance test #3. School-side no-data is now handled inside the
+   * merge above (no-coverage years simply produce an FC where every school
+   * has `value_num: null`, which the paint expressions render as hollow rings).
    */
-  const schoolNoData = layers.school?.noData ?? false;
   const communityNoData = layers.community?.noData ?? false;
 
   /**
-   * The school-points feature collection MapView paints. Three modes:
-   *  - school indicator + slider year has data → enrichedSchoolData
-   *  - school indicator + no-data branch       → null (legend handles the 🗓️)
-   *  - no school indicator                     → baselineSchoolData (unicolor)
-   * When `schoolsHidden` is on, the layer is suppressed — but we still want
-   * the user-selected school visible so its pulse marker has something to ring
-   * around. In that case fall back to a one-feature FC containing just that
-   * school, sourced from whichever data set normally would have rendered it.
+   * Merged school-points FC. Always contains every plottable in-view school
+   * (sourced from `baselineSchoolData`) with indicator values folded in where
+   * available (from `enrichedSchoolData`). No-data schools fall through with
+   * `value_num: null` so MapView's hollow-ring branch can render them. The
+   * old "schoolNoData → null" triage is now folded in for free — a no-data
+   * year just produces an FC where every feature has `value_num: null`.
+   */
+  const mergedSchoolData: SchoolsResponse | null = useMemo(() => {
+    if (!schoolIndicator) return baselineSchoolData;
+    if (!baselineSchoolData) return null;
+    if (!enrichedSchoolData || enrichedSchoolData.features.length === 0) {
+      // Indicator selected but the slider year has zero coverage. Render
+      // every school as no-value; downstream paint handles the hollow-ring
+      // branch uniformly.
+      return {
+        type: 'FeatureCollection',
+        indicator_id: schoolIndicator.id,
+        year: enrichedSchoolData?.year ?? baselineSchoolData.year,
+        domain: null,
+        features: baselineSchoolData.features,
+      };
+    }
+    const valuesByDbn = new Map(
+      enrichedSchoolData.features.map((f) => [f.properties.dbn, f.properties]),
+    );
+    const features: SchoolFeature[] = baselineSchoolData.features.map((f) => {
+      const v = valuesByDbn.get(f.properties.dbn);
+      if (!v) return f;
+      return {
+        ...f,
+        properties: {
+          ...f.properties,
+          value_num: v.value_num,
+          value_text: v.value_text,
+          label: v.label,
+        },
+      };
+    });
+    return {
+      type: 'FeatureCollection',
+      indicator_id: enrichedSchoolData.indicator_id,
+      year: enrichedSchoolData.year,
+      domain: enrichedSchoolData.domain,
+      features,
+    };
+  }, [schoolIndicator, baselineSchoolData, enrichedSchoolData]);
+
+  /**
+   * The school-points feature collection MapView paints. Mostly equals
+   * `mergedSchoolData`; the only override is `schoolsHidden`, where we either
+   * suppress everything or — if a school is currently selected — keep a
+   * one-feature FC so the pulse marker still has its target.
    */
   const schoolPointsToRender: SchoolsResponse | null = useMemo(() => {
-    const fullSet: SchoolsResponse | null = schoolIndicator
-      ? schoolNoData
-        ? null
-        : enrichedSchoolData
-      : baselineSchoolData;
+    const fullSet = mergedSchoolData;
     if (!schoolsHidden) return fullSet;
-    if (!selectedSchoolDbn) return null;
-    // Schools hidden but one is selected — find it in whichever data set
-    // would have rendered it (indicator-enriched first, baseline as fallback
-    // when no indicator is active or the school is missing from the indicator
-    // response).
-    const source =
-      enrichedSchoolData?.features.find((f) => f.properties.dbn === selectedSchoolDbn)
-        ? enrichedSchoolData
-        : baselineSchoolData;
-    const feature = source?.features.find((f) => f.properties.dbn === selectedSchoolDbn);
-    if (!source || !feature) return null;
-    return { ...source, features: [feature] };
-  }, [
-    schoolsHidden,
-    selectedSchoolDbn,
-    schoolIndicator,
-    schoolNoData,
-    enrichedSchoolData,
-    baselineSchoolData,
-  ]);
+    if (!selectedSchoolDbn || !fullSet) return null;
+    const feature = fullSet.features.find((f) => f.properties.dbn === selectedSchoolDbn);
+    if (!feature) return null;
+    return { ...fullSet, features: [feature] };
+  }, [schoolsHidden, selectedSchoolDbn, mergedSchoolData]);
 
   return (
     <div

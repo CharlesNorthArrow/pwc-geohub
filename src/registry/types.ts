@@ -92,6 +92,10 @@ export interface IndicatorRegistryEntry {
    *  back to `label` when absent. */
   short_label?: string;
   description?: string;
+  /** Verbatim survey-question wording for the survey indicators (NYC School
+   *  Survey, Public Data Wishlist col C). Rendered in the layer-list info
+   *  bubble and as a sub-line in the legend. Non-survey indicators omit it. */
+  full_question?: string;
   source: IndicatorSource;
   /** Human-friendly upstream provider — surfaced in the info-icon tooltip in
    *  place of the technical `source_description`. Pulled from the Public Data

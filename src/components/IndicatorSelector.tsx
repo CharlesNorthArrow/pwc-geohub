@@ -357,6 +357,9 @@ function IndicatorRow({
         : `${indicator.years[0]} – ${indicator.years[indicator.years.length - 1]}`;
   const tooltip = [
     indicator.label,
+    // Verbatim survey question, when present — registry-driven (col C of
+    // the wishlist). Quoted so it reads as a quoted question.
+    indicator.full_question ? `"${indicator.full_question}"` : null,
     indicator.description ?? null,
     `Source: ${indicator.source_description}`,
     indicator.source_url ?? null,

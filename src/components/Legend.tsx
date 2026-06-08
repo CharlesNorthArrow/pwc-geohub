@@ -162,6 +162,28 @@ function Caption({ children }: { children: React.ReactNode }): React.JSX.Element
   );
 }
 
+/** Italic, slightly-larger-than-caption rendering of the verbatim survey
+ *  question (when the indicator carries one). Sits between the title row
+ *  and the color-ramp swatches; quietly absent for non-survey indicators
+ *  so other indicator types render identically to before. */
+function QuestionLine({ text }: { text: string | undefined }): React.JSX.Element | null {
+  if (!text) return null;
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        fontStyle: 'italic',
+        color: '#467c9d',
+        lineHeight: 1.35,
+        marginTop: 2,
+        marginBottom: 4,
+      }}
+    >
+      &ldquo;{text}&rdquo;
+    </div>
+  );
+}
+
 function BaselineSchoolLegend(): React.JSX.Element {
   return (
     <div>
@@ -334,6 +356,7 @@ function SchoolLegend({
         sliderYear={sliderYear}
         onJump={onJump}
       />
+      <QuestionLine text={indicator.full_question} />
       <Caption>Circle color</Caption>
       <ColorSwatches bins={bins} />
       <NoDataRow />
@@ -444,6 +467,7 @@ function CommunityLegend({
         sliderYear={sliderYear}
         onJump={onJump}
       />
+      <QuestionLine text={indicator.full_question} />
       <Caption>Tract color</Caption>
       <ColorSwatches bins={bins} />
       {bins.type === 'categorical' ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import StripPlot from './StripPlot';
 import {
@@ -16,6 +16,7 @@ import type {
   SchoolMaster,
   SchoolProfile,
 } from '../contract/types';
+import { SLIDER_YEARS } from '../contract/year';
 import type { Format } from '../registry/types';
 import type { LayerState } from '../store/activeLayers';
 import { computePercentile, type PercentileResult } from '../store/percentile';
@@ -244,42 +245,238 @@ export default function SchoolDetailPanel({
         </button>
       </header>
 
-      {/* Three sections separated by a hairline + a subtle background-tone
-       *  shift so each one reads as its own block. */}
-      <div style={{ background: '#ffffff', padding: 12, borderBottom: '1px solid #e5e9ee' }}>
-        <PerformanceSection
-          dbn={dbn}
-          schoolLayer={schoolLayer}
-          communityLayer={communityLayer}
-          schoolSeries={schoolSeries}
-          communitySeries={communitySeries}
-          universeDbns={universeDbns}
-          aggregationArea={aggregationArea}
-        />
-      </div>
-
-      <div style={{ background: '#f7f9fb', padding: 12, borderBottom: '1px solid #e5e9ee' }}>
-        <ProfileSection profile={profile} />
-      </div>
-
-      <div style={{ background: '#ffffff', padding: 12, borderBottom: '1px solid #e5e9ee' }}>
-        <ArtsEdSection artsEd={artsEd} />
-      </div>
-
-      {programLoaded ? (
-        <div style={{ background: '#f7f9fb', padding: 12 }}>
-          <ProgramSection program={program} sliderYear={year} />
-        </div>
-      ) : null}
+      {/* Sections render via an ordered array so the alternating
+       *  white / off-white tone stays consistent even when a section is
+       *  absent (e.g. PWC Programs for non-PWC schools). New top→bottom
+       *  order per the latest spec:
+       *    1. Trendline (5-year history for active indicator(s))
+       *    2. Histogram (Percentile in filtered universe)
+       *    3. PWC Programs (PWC schools only)
+       *    4. School profile / demographics
+       *    5. Arts disciplines
+       */}
+      {(() => {
+        const sections: Array<{ key: string; node: React.ReactNode }> = [
+          {
+            // Trendline + percentile/histogram share one section so the
+            // family + indicator + year-pill header isn't duplicated. Each
+            // active layer renders one block: shared header → full-width
+            // trend chart → self-value + strip plot (or 🗓️ "No data for
+            // the selected year" branch when the slider lands off coverage).
+            key: 'indicators',
+            node: (
+              <IndicatorsSection
+                dbn={dbn}
+                schoolLayer={schoolLayer}
+                communityLayer={communityLayer}
+                schoolSeries={schoolSeries}
+                communitySeries={communitySeries}
+                universeDbns={universeDbns}
+                aggregationArea={aggregationArea}
+              />
+            ),
+          },
+          // ProgramSection itself returns null for non-PWC schools; we also
+          // skip it pre-fetch so the layout doesn't flash an empty stripe.
+          {
+            key: 'program',
+            node: programLoaded && program
+              ? <ProgramSection program={program} sliderYear={year} />
+              : null,
+          },
+          { key: 'profile', node: <ProfileSection profile={profile} /> },
+          { key: 'arts', node: <ArtsEdSection artsEd={artsEd} /> },
+        ];
+        const visible = sections.filter((s) => s.node != null);
+        return visible.map((s, i) => (
+          <div
+            key={s.key}
+            style={{
+              background: i % 2 === 0 ? '#ffffff' : '#f7f9fb',
+              padding: 12,
+              borderBottom: i < visible.length - 1 ? '1px solid #e5e9ee' : undefined,
+            }}
+          >
+            {s.node}
+          </div>
+        ));
+      })()}
     </aside>
   );
 }
 
 /* ========================================================================== */
-/* §1.a Performance                                                           */
+/* Indicators — combined trend + histogram, one block per active layer        */
 /* ========================================================================== */
 
-function PerformanceSection({
+function TrendChart({
+  points,
+  highlightYear,
+  stroke,
+  format,
+}: {
+  points: Array<{ year: string; value: number | null }>;
+  highlightYear: string | null;
+  stroke: string;
+  format: (v: number) => string;
+}): React.JSX.Element {
+  // Natural viewBox; SVG renders at `width="100%"` with no `height` attribute
+  // so the browser computes height from the intrinsic aspect ratio (default
+  // `preserveAspectRatio="xMidYMid meet"`). Result: chart fills its container
+  // width and stays proportionally sized — no stretch artifacts on dots /
+  // labels / line.
+  const width = 320;
+  const height = 100;
+  const padL = 36;
+  const padR = 8;
+  const padT = 8;
+  const padB = 20;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+
+  let dMin = Infinity;
+  let dMax = -Infinity;
+  for (const p of points) {
+    if (p.value == null) continue;
+    if (p.value < dMin) dMin = p.value;
+    if (p.value > dMax) dMax = p.value;
+  }
+  if (!Number.isFinite(dMin)) {
+    return (
+      <svg
+        width="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        aria-hidden
+      />
+    );
+  }
+  const span = Math.max(1e-6, dMax - dMin);
+  const yPad = span * 0.12;
+  const y0 = dMin - yPad;
+  const y1 = dMax + yPad;
+
+  const xAt = (i: number): number =>
+    points.length <= 1 ? padL + innerW / 2 : padL + (i / (points.length - 1)) * innerW;
+  const yAt = (v: number): number =>
+    padT + innerH - ((v - y0) / (y1 - y0)) * innerH;
+
+  // Polyline with gaps — null values break the path into segments rather
+  // than interpolating across them.
+  let path = '';
+  let started = false;
+  points.forEach((p, i) => {
+    if (p.value == null) {
+      started = false;
+      return;
+    }
+    const x = xAt(i);
+    const y = yAt(p.value);
+    path += started
+      ? ` L${x.toFixed(1)},${y.toFixed(1)}`
+      : `M${x.toFixed(1)},${y.toFixed(1)}`;
+    started = true;
+  });
+
+  const dots = points
+    .map((p, i) =>
+      p.value == null
+        ? null
+        : { x: xAt(i), y: yAt(p.value), value: p.value, year: p.year },
+    )
+    .filter((d): d is { x: number; y: number; value: number; year: string } => d != null);
+
+  const highlightIdx = points.findIndex((p) => p.year === highlightYear);
+  const highlightX = highlightIdx >= 0 ? xAt(highlightIdx) : null;
+
+  const yTicks = [y0, y0 + (y1 - y0) / 2, y1];
+
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="5-year trend"
+      style={{ display: 'block' }}
+    >
+      {yTicks.map((v, i) => (
+        <g key={i}>
+          <line
+            x1={padL}
+            y1={yAt(v)}
+            x2={width - padR}
+            y2={yAt(v)}
+            stroke="#eef0f3"
+            strokeWidth={1}
+          />
+          <text
+            x={padL - 4}
+            y={yAt(v) + 3}
+            fontSize="9"
+            fill="#a8b3bf"
+            textAnchor="end"
+          >
+            {format(v)}
+          </text>
+        </g>
+      ))}
+
+      {highlightX != null ? (
+        <line
+          x1={highlightX}
+          y1={padT}
+          x2={highlightX}
+          y2={padT + innerH}
+          stroke="#c5cdd6"
+          strokeWidth={1}
+          strokeDasharray="2,3"
+        />
+      ) : null}
+
+      <path
+        d={path}
+        stroke={stroke}
+        fill="none"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+
+      {dots.map((d) => (
+        <circle
+          key={d.year}
+          cx={d.x}
+          cy={d.y}
+          r={d.year === highlightYear ? 4 : 2.5}
+          fill={d.year === highlightYear ? stroke : '#ffffff'}
+          stroke={stroke}
+          strokeWidth={1.5}
+        />
+      ))}
+
+      {points.length > 0 ? (
+        <>
+          <text x={xAt(0)} y={height - 4} fontSize="9" fill="#a8b3bf" textAnchor="start">
+            {points[0]!.year}
+          </text>
+          <text
+            x={xAt(points.length - 1)}
+            y={height - 4}
+            fontSize="9"
+            fill="#a8b3bf"
+            textAnchor="end"
+          >
+            {points[points.length - 1]!.year}
+          </text>
+        </>
+      ) : null}
+    </svg>
+  );
+}
+
+/* ========================================================================== */
+/* Indicators — one block per active layer, trend + histogram share a header  */
+/* ========================================================================== */
+
+function IndicatorsSection({
   dbn,
   schoolLayer,
   communityLayer,
@@ -295,7 +492,7 @@ function PerformanceSection({
   communitySeries: AnalyticsSeriesRow[] | null;
   universeDbns: Set<string>;
   aggregationArea: AggregationArea;
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   if (!schoolLayer && !communityLayer) {
     return (
       <Section header="Indicators" sub="No active indicator">
@@ -305,35 +502,46 @@ function PerformanceSection({
       </Section>
     );
   }
-  // No section-level year pill — each block carries its own so latest-mode
-  // (where school and community may sit at different years) reads correctly.
+  // No section-level pill — each per-layer block carries its own so
+  // latest-mode (school + community at different years) reads correctly.
   return (
     <Section header="Indicators">
-      {schoolLayer ? (
-        <PercentileBlock
-          family="school"
-          dbn={dbn}
-          layer={schoolLayer}
-          series={schoolSeries}
-          universeDbns={universeDbns}
-          aggregationArea={null}
-        />
-      ) : null}
-      {communityLayer ? (
-        <PercentileBlock
-          family="community"
-          dbn={dbn}
-          layer={communityLayer}
-          series={communitySeries}
-          universeDbns={universeDbns}
-          aggregationArea={aggregationArea}
-        />
-      ) : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {schoolLayer ? (
+          <IndicatorBlock
+            family="school"
+            dbn={dbn}
+            layer={schoolLayer}
+            series={schoolSeries}
+            universeDbns={universeDbns}
+            aggregationArea={null}
+          />
+        ) : null}
+        {communityLayer ? (
+          <IndicatorBlock
+            family="community"
+            dbn={dbn}
+            layer={communityLayer}
+            series={communitySeries}
+            universeDbns={universeDbns}
+            aggregationArea={aggregationArea}
+          />
+        ) : null}
+      </div>
     </Section>
   );
 }
 
-function PercentileBlock({
+/**
+ * One per active layer. Renders, in order, under a SHARED header (family +
+ * indicator name + one year pill — no duplication between trend and histogram):
+ *   1. Full-width 5-year trend chart (community uses the District/NTA-
+ *      aggregated series, same measurement as the percentile below).
+ *   2. Slider-year self-value + StripPlot, OR the 🗓️ no-data branch when
+ *      the slider lands off coverage. Trend still renders above so the
+ *      historical context stays visible.
+ */
+function IndicatorBlock({
   family,
   dbn,
   layer,
@@ -357,16 +565,117 @@ function PercentileBlock({
         ? '· District avg'
         : '· NTA avg'
       : '';
+  const fmt = formatterFor(indicator.format);
 
-  if (layer.noData) {
-    return (
-      <div style={{ marginTop: 4 }}>
-        <div style={{ fontSize: 10, color: '#467c9d', letterSpacing: 0.4, textTransform: 'uppercase', fontWeight: 600 }}>
-          {familyTag} · {indicator.short_label ?? indicator.label} {areaLabel}
+  // Project this school's series onto the 5 slider years; null = no value
+  // for that year (rendered as a path break, not interpolated).
+  const trendPoints = useMemo(() => {
+    const byYear = new Map<string, number>();
+    if (series) {
+      for (const r of series) {
+        if (r.dbn !== dbn) continue;
+        if (r.value_num == null) continue;
+        byYear.set(r.year, r.value_num);
+      }
+    }
+    return SLIDER_YEARS.map((y) => ({ year: y, value: byYear.get(y) ?? null }));
+  }, [series, dbn]);
+  const hasAnyHistory = trendPoints.some((p) => p.value != null);
+  // Trend chart's highlight marker tracks whichever year the histogram is
+  // computing against — same year both visualizations spotlight.
+  const highlightYear: string | null =
+    layer.cohortYear ?? layer.displayYear ?? null;
+
+  const result: PercentileResult | null =
+    !layer.noData && series && layer.cohortYear
+      ? computePercentile({
+          series,
+          year: layer.cohortYear,
+          universeDbns,
+          selectedDbn: dbn,
+          goodDirection: indicator.scale.good_direction,
+        })
+      : null;
+
+  const headlineValue =
+    result?.selfValue != null
+      ? fmt(result.selfValue)
+      : layer.noData
+        ? '—'
+        : result == null
+          ? '…'
+          : '—';
+
+  return (
+    <div>
+      {/* ONE header — family + indicator + year pill. Shared by the value /
+       *  trend chart row and the histogram below; not repeated between them. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 6,
+          flexWrap: 'wrap',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            color: '#467c9d',
+            letterSpacing: 0.4,
+            textTransform: 'uppercase',
+            fontWeight: 600,
+          }}
+        >
+          {familyTag} · {indicator.short_label ?? indicator.label}
+          {areaLabel ? <span style={{ color: '#a8b3bf' }}> {areaLabel}</span> : null}
+        </span>
+        {layer.displayYear ? <YearPill year={layer.displayYear} tone="analytics" /> : null}
+      </div>
+
+      {/* Headline value (left, large) + 5-year trend chart (right, fills the
+       *  remaining width). The trend chart keeps its natural aspect ratio so
+       *  dots, line, and labels stay legible regardless of panel width. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginTop: 6,
+        }}
+      >
+        <div style={{ flex: 'none', minWidth: 56 }}>
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 700,
+              color: '#002040',
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {headlineValue}
+          </div>
         </div>
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          {hasAnyHistory ? (
+            <TrendChart
+              points={trendPoints}
+              highlightYear={highlightYear}
+              stroke={accent}
+              format={fmt}
+            />
+          ) : (
+            <div style={{ fontSize: 10, color: '#a8b3bf' }}>No 5-year history.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Below the value/trend row: histogram (StripPlot) or no-data branch. */}
+      {layer.noData ? (
         <div
           style={{
-            marginTop: 4,
+            marginTop: 8,
             padding: 8,
             border: '1px solid #f3c89a',
             background: '#fff1e3',
@@ -381,46 +690,14 @@ function PercentileBlock({
           <span aria-hidden>🗓️</span>
           <span>No data for the selected year.</span>
         </div>
-      </div>
-    );
-  }
-
-  const result: PercentileResult | null = series && layer.cohortYear
-    ? computePercentile({
-        series,
-        year: layer.cohortYear,
-        universeDbns,
-        selectedDbn: dbn,
-        goodDirection: indicator.scale.good_direction,
-      })
-    : null;
-
-  const fmt = formatterFor(indicator.format);
-
-  return (
-    <div style={{ marginTop: 6 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 6,
-          flexWrap: 'wrap',
-        }}
-      >
-        <span style={{ fontSize: 10, color: '#467c9d', letterSpacing: 0.4, textTransform: 'uppercase', fontWeight: 600 }}>
-          {familyTag} · {indicator.short_label ?? indicator.label}
-          {areaLabel ? <span style={{ color: '#a8b3bf' }}> {areaLabel}</span> : null}
-        </span>
-        {layer.displayYear ? <YearPill year={layer.displayYear} tone="analytics" /> : null}
-      </div>
-      {/* Self-value headline */}
-      <div style={{ fontSize: 18, fontWeight: 700, color: '#002040', lineHeight: 1.1, marginTop: 2 }}>
-        {result?.selfValue != null ? fmt(result.selfValue) : '—'}
-      </div>
-      {result ? (
-        <StripPlot result={result} accent={accent} format={fmt} />
       ) : (
-        <div style={{ fontSize: 11, color: '#a8b3bf', padding: '6px 0' }}>Loading…</div>
+        <div style={{ marginTop: 8 }}>
+          {result ? (
+            <StripPlot result={result} accent={accent} format={fmt} />
+          ) : (
+            <div style={{ fontSize: 11, color: '#a8b3bf', padding: '6px 0' }}>Loading…</div>
+          )}
+        </div>
       )}
     </div>
   );

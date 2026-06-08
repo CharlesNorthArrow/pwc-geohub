@@ -202,13 +202,37 @@ function baseRadiusExpression(): unknown {
  *   z 13   → 1.4×  (NTA / Detail Panel zoom)
  *   z 15   → 2.0×
  *   z 18   → 3.2×
+ *
+ * When `opts.noDataNoSizeRadius` is set, features with BOTH `value_num` AND
+ * `total_enrollment` null paint at that fixed radius (constant across zoom —
+ * the same value injected at every interpolate stop). Used by the indicator-
+ * mode paint setter so no-data-no-size schools read as ghosted ~6px rings
+ * instead of the 2px enrollment fallback. The case lives INSIDE each stop
+ * because `['zoom']` must stay at the top level.
  */
-function zoomScaledRadius(offsetExpr: number | unknown): unknown {
+export interface RadiusOptions {
+  noDataNoSizeRadius?: number;
+}
+
+function zoomScaledRadius(offsetExpr: number | unknown, opts: RadiusOptions): unknown {
   const base = baseRadiusExpression();
-  const factored = (factor: number): unknown =>
-    typeof offsetExpr === 'number' && offsetExpr === 0
-      ? ['*', base, factor]
-      : ['+', ['*', base, factor], offsetExpr];
+  const factored = (factor: number): unknown => {
+    const scaled: unknown =
+      typeof offsetExpr === 'number' && offsetExpr === 0
+        ? ['*', base, factor]
+        : ['+', ['*', base, factor], offsetExpr];
+    if (opts.noDataNoSizeRadius == null) return scaled;
+    return [
+      'case',
+      [
+        'all',
+        ['==', ['get', 'value_num'], null],
+        ['==', ['get', 'total_enrollment'], null],
+      ],
+      opts.noDataNoSizeRadius,
+      scaled,
+    ];
+  };
   return [
     'interpolate', ['exponential', 1.6], ['zoom'],
     11, factored(1.0),
@@ -219,13 +243,13 @@ function zoomScaledRadius(offsetExpr: number | unknown): unknown {
 }
 
 /** Radius for the school-dot layers + halo inner. */
-export function radiusExpression(): unknown {
-  return zoomScaledRadius(0);
+export function radiusExpression(opts: RadiusOptions = {}): unknown {
+  return zoomScaledRadius(0, opts);
 }
 
 /** Radius for the soft drop-shadow backdrop — same zoom curve, plus a 2 px
  *  offset so the shadow always peeks out around the dot. */
-export function backdropRadiusExpression(): unknown {
-  return zoomScaledRadius(2);
+export function backdropRadiusExpression(opts: RadiusOptions = {}): unknown {
+  return zoomScaledRadius(2, opts);
 }
 

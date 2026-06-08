@@ -23,6 +23,10 @@ export interface IndicatorPublic {
    *  "Math proficiency (gr 3–8, % L3+4)". Falls back to `label` when absent. */
   short_label?: string;
   description?: string;
+  /** Verbatim survey-question wording for the 5 survey indicators. Surfaced
+   *  in the layer-list info bubble and as a sub-line in the legend. Absent
+   *  for non-survey indicators. */
+  full_question?: string;
   format: Format;
   scale: {
     type: ScaleType;

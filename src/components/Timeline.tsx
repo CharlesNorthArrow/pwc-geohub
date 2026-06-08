@@ -14,8 +14,12 @@ const SERIES_COLORS = {
   pwc: '#027BC0',          // PWC brand blue — roll-up of every PWC school
   anchor: '#903090',
   healing_arts: '#A0B000', // PWC green — matches map symbology
-  allInView: '#1c3557',    // dark navy — All Schools (filtered universe)
-  citywide: '#467c9d',     // slate — Citywide (static NYC average)
+  // Benchmark lines — distinct from the PWC group palette so they read as
+  // references. All-in-view is orange (matches the community-accent we
+  // already use); citywide is black + dotted so the static-NYC reference
+  // visually contrasts with every filter-responsive line above it.
+  allInView: '#F0901F',    // orange — All Schools (filtered universe)
+  citywide: '#000000',     // black — Citywide (static NYC average)
 } as const;
 
 /** Series-key helper that stays in sync with TimelinePoint. */
@@ -139,14 +143,17 @@ export default function Timeline({
         {/* Lines — paint reference lines (citywide, all-in-view) first so
          *  they sit underneath the PWC group lines, with the PWC roll-up
          *  rendered LAST and thicker so it's the primary signal. The
-         *  citywide line is dashed to signal it's a static reference (vs
-         *  the solid lines, which react to the filter cascade). */}
+         *  citywide line is DOTTED (black) to signal it's a static reference
+         *  vs the solid lines that react to the filter cascade.
+         *  `strokeDasharray="1,3" + strokeLinecap="round"` renders as visible
+         *  round dots instead of tiny dashes. */}
         <path
           d={linePath('citywide')}
           stroke={SERIES_COLORS.citywide}
           fill="none"
           strokeWidth={1.6}
-          strokeDasharray="4,3"
+          strokeDasharray="1,3"
+          strokeLinecap="round"
         />
         <path d={linePath('allInView')} stroke={SERIES_COLORS.allInView} fill="none" strokeWidth={1.6} />
         <path d={linePath('healing_arts')} stroke={SERIES_COLORS.healing_arts} fill="none" strokeWidth={1.6} />
@@ -206,18 +213,18 @@ function LegendDot({
 }: {
   color: string;
   label: string;
+  /** Renders the swatch as a dotted top-border to mirror the chart's
+   *  dotted-line strokeDasharray. Citywide is the only series using this. */
   dashed?: boolean;
 }): React.JSX.Element {
   return (
     <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
       {dashed ? (
-        // Mirror the chart's strokeDasharray="4,3" with a CSS dashed border
-        // so the legend swatch matches the line.
         <span
           style={{
             width: 12,
             height: 0,
-            borderTop: `2px dashed ${color}`,
+            borderTop: `2px dotted ${color}`,
             display: 'inline-block',
           }}
         />

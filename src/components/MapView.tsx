@@ -339,14 +339,23 @@ export default function MapView({
         return;
       }
       source.setData(schoolPoints);
-      const dataRadius = radiusExpression() as unknown;
+      // In indicator mode the merged FC includes no-value schools as well —
+      // some with enrollment (hollow ring sized normally), some without (the
+      // "we don't even know the size" case that gets a fixed small radius +
+      // faded stroke so it reads as more uncertain than the regular hollow ring).
+      const indicatorMode = Boolean(schoolIndicator);
+      const dataRadius = radiusExpression(
+        indicatorMode ? { noDataNoSizeRadius: 6 } : {},
+      ) as unknown;
 
       for (const id of [LAYER_SCHOOLS_NONPWC, LAYER_SCHOOLS_PWC]) {
         map.setPaintProperty(id, 'circle-radius', dataRadius as never);
       }
 
       // Backdrop radius is 2 px wider than the data dot so a soft drop shadow
-      // peeks out from behind each circle.
+      // peeks out from behind each circle. Backdrop is hidden for no-value
+      // schools already (see the circle-opacity case below), so no need to
+      // override the radius for the no-data-no-size branch here.
       map.setPaintProperty(
         LAYER_SCHOOLS_BACKDROP,
         'circle-radius',
@@ -359,6 +368,7 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', BASELINE_FILL);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', '#ffffff');
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', 1);
+        map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-opacity', 1);
         map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', BASELINE_NONPWC_OPACITY);
 
         // Baseline view: PWC identity lives in the fill color, so no halo is
@@ -369,6 +379,7 @@ export default function MapView({
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-color', PWC_BASELINE_FILL_EXPR as never);
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-color', '#ffffff');
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-width', 1);
+        map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-opacity', 1);
         map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 0.95);
 
         map.setPaintProperty(LAYER_SCHOOLS_BACKDROP, 'circle-opacity', 1);
@@ -409,9 +420,20 @@ export default function MapView({
         1,
       ];
 
+      // Stroke opacity: faded to 0.5 for the no-value-AND-no-enrollment branch
+      // (visually says "we don't really know this school's size"); 1.0 for
+      // everything else (including the regular hollow-ring no-value branch).
+      const noDataNoSize: unknown = [
+        'all',
+        ['==', ['get', 'value_num'], null],
+        ['==', ['get', 'total_enrollment'], null],
+      ];
+      const noDataNoSizeStrokeOpacity: unknown = ['case', noDataNoSize, 0.5, 1];
+
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-color', colorExpr as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-color', nonPwcStrokeColor as never);
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-width', nonPwcStrokeWidth as never);
+      map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-stroke-opacity', noDataNoSizeStrokeOpacity as never);
       // Indicator-mode fills are fully opaque so the new bolder ramp lands at
       // full saturation; the prior 0.85 alpha was washing out the mid-bins.
       map.setPaintProperty(LAYER_SCHOOLS_NONPWC, 'circle-opacity', 1);
@@ -432,6 +454,7 @@ export default function MapView({
         'circle-stroke-width',
         (pwcHalosVisible ? PWC_BORDER_WIDTH : nonPwcStrokeWidth) as never,
       );
+      map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-stroke-opacity', noDataNoSizeStrokeOpacity as never);
       map.setPaintProperty(LAYER_SCHOOLS_PWC, 'circle-opacity', 1);
 
       // Backdrop hidden for hollow no-data circles.

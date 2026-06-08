@@ -71,6 +71,7 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
     label: i.label,
     short_label: i.short_label,
     description: i.description,
+    full_question: i.full_question,
     format: i.format,
     scale: {
       type: i.scale.type,
