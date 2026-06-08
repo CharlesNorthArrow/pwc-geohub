@@ -255,7 +255,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted' },
+    // NYC survey % positive values cluster tightly in a narrow band (most
+    // schools 80-100%); equal-interval bins put every school in 1-2 colors
+    // so the choropleth reads as monotone. Quintile binning spreads color
+    // across the distribution. Same rationale applied to the other four
+    // survey indicators below.
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -280,7 +285,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -305,7 +310,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -330,7 +335,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -357,7 +362,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
