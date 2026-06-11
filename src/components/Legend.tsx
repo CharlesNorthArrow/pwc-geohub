@@ -509,13 +509,52 @@ function ColorSwatches({ bins }: { bins: ColorBins }): React.JSX.Element {
     );
   }
   if (bins.type === 'continuous') {
-    // Horizontal gradient bar between adjacent stops. Labels use the indicator
-    // formatter (e.g. "10%" / "20%") with ≤/≥ to signal clamping outside.
+    // Horizontal gradient bar between adjacent stops. Endpoint labels use
+    // ≤/≥ to signal clamping outside. Interior stops (the pivot in a
+    // 3-stop diverging ramp) get a thin tick + value label above the bar
+    // so the diverging-with-pivot semantic is visible.
     const first = bins.stops[0]!;
     const last = bins.stops[bins.stops.length - 1]!;
     const gradient = `linear-gradient(to right, ${bins.stops.map((s) => s.color).join(', ')})`;
+    const span = last.value - first.value;
+    const interior = bins.stops.slice(1, -1);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {interior.length > 0 ? (
+          <div style={{ position: 'relative', height: 14 }}>
+            {interior.map((s) => {
+              const pct = span > 0 ? ((s.value - first.value) / span) * 100 : 50;
+              return (
+                <div
+                  key={s.value}
+                  style={{
+                    position: 'absolute',
+                    left: `${pct}%`,
+                    transform: 'translateX(-50%)',
+                    bottom: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    fontSize: 10,
+                    color: '#467c9d',
+                    lineHeight: 1,
+                  }}
+                >
+                  <span>{bins.format(s.value)}</span>
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 1,
+                      height: 3,
+                      background: 'rgba(0,0,32,0.45)',
+                      marginTop: 1,
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
         <div
           style={{
             height: 12,

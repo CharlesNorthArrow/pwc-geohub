@@ -428,19 +428,23 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    // Continuous stretched ramp — matches the PWC IIT renderer exactly. Hard
-    // class breaks (the prior quantile approach) made too much of the city
-    // read red; a stretch anchored at 10/20 keeps Staten Island pale and
-    // reserves deep brick red for genuinely high-distress tracts. Data spans
-    // ~9–34, mean ~15.4, so 10/20 brackets the meaningful signal range with
-    // clamps at both ends. Re-tunable by editing the `stops` here.
+    // Continuous DIVERGING ramp matching the PWC IIT renderer. Three stops
+    // (10 / 15 / 20) with the citywide mean acting as the PIVOT — so tracts
+    // at ~15% read warm-neutral (not pink), tracts <15% read cool, and only
+    // tracts approaching 20% read clearly brick red. A 2-stop 10→20 linear
+    // stretch (the prior config) painted the mean as #BC7D7E pink, which is
+    // why too much of the city read warm. Data spans ~9–34, mean ~15.4 —
+    // anchors are FIXED (registry constants), never view- or domain-relative.
+    // Re-tunable: edit the three `stops` to swap in the exact IIT renderer
+    // JSON when supplied; the interpolator handles any N ≥ 2 stops.
     scale: {
       type: 'continuous',
       good_direction: 'low',
-      ramp: 'pwc_iit_mh_stretch',
+      ramp: 'pwc_iit_mh_diverging',
       stops: [
-        { value: 10, color: '#D7DEEE' }, // light blue-grey (low distress)
-        { value: 20, color: '#A11C0E' }, // deep brick red (high distress)
+        { value: 10, color: '#C6D0DC' }, // cool blue-grey  (low — clamps below)
+        { value: 15, color: '#C8AAAA' }, // muted neutral   (PIVOT — citywide mean)
+        { value: 20, color: '#A14B4E' }, // muted brick red (high — clamps above)
       ],
     },
     geometry: 'polygon',
