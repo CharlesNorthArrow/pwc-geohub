@@ -37,6 +37,18 @@ export interface IndicatorPublic {
     /** Discrete value buckets — one color per listed value, edges computed
      *  at midpoints. When present, overrides `bin_method`. */
     discrete_values?: number[];
+    /** Continuous stretched-ramp stops (only when `type === 'continuous'`).
+     *  Clamped outside the first/last `value`; linear between adjacent stops. */
+    stops?: Array<{ value: number; color: string }>;
+    /** Per-feature opacity stretch for categorical layers — share → opacity,
+     *  clamped outside the value window. Only consumed by indicators that
+     *  ship a `value_num` alongside the category (e.g. `racial_predominance`). */
+    opacity_stretch?: {
+      value_min: number;
+      value_max: number;
+      opacity_min: number;
+      opacity_max: number;
+    };
   };
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
@@ -169,9 +181,9 @@ export interface PwcHistoryResponse {
 /* Geo filter + schools-master (Phase 3)                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Layers the §6.1 Geo filter spans. NDA / NTA exist in `geographies` but
- *  aren't surfaced here — they're used elsewhere (aggregation toggle, future
- *  overlays). Spec §6.1 lists 6; Congressional was added at user request. */
+/** Layers the §6.1 Geo filter spans. Spec §6.1 lists 6; Congressional was
+ *  added at user request, and NTA was promoted from aggregation-only into
+ *  the Geo filter. NDA still lives in `geographies` for future overlays. */
 export type GeoFilterLayerId =
   | 'county'
   | 'senate'
@@ -179,7 +191,8 @@ export type GeoFilterLayerId =
   | 'congressional'
   | 'council'
   | 'school_district'
-  | 'community_district';
+  | 'community_district'
+  | 'nta_2020';
 
 /** Ordered by administrative hierarchy — Federal → State → Local — and
  *  prefixed accordingly. The order drives the Geo popup tab layout. */
@@ -194,6 +207,9 @@ export const GEO_FILTER_LAYERS: ReadonlyArray<{ id: GeoFilterLayerId; label: str
   { id: 'council', label: 'NYC City Council' },
   { id: 'school_district', label: 'NYC School Districts' },
   { id: 'community_district', label: 'NYC Community Districts' },
+  // NTA is NYC-only and not number-keyed — alphabetical sort by NTAName.
+  // Allow-list does not apply (only Congressional / Senate / Assembly).
+  { id: 'nta_2020', label: 'NYC Neighborhoods (NTAs)' },
 ];
 
 export interface GeoArea {
@@ -208,6 +224,15 @@ export interface GeoArea {
 /** GET /api/geographies → all 6 §6.1 layers in one round-trip. */
 export interface GeographiesResponse {
   layers: Record<GeoFilterLayerId, GeoArea[]>;
+}
+
+/**
+ * GET /api/geo/tract-nta → tract_geoid → containing NTA. Powers the discreet
+ * community-polygon hover tooltip ("Bedford-Stuyvesant — 18.4%"). One-shot
+ * fetch on Shell mount; the mapping doesn't change session-to-session.
+ */
+export interface TractNtaMapResponse {
+  tracts: Record<string, { nta_id: string; nta_name: string }>;
 }
 
 /** One row in the schools master — lightweight identity + crosswalk memberships.

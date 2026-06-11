@@ -277,6 +277,7 @@ function layerShortName(id: GeoFilterLayerId): string {
     case 'council': return 'Council';
     case 'school_district': return 'SD';
     case 'community_district': return 'CD';
+    case 'nta_2020': return 'NTA';
   }
 }
 

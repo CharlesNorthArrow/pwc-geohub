@@ -151,9 +151,9 @@ function computeAcsValue(
     }
     case 'racial_predominance': {
       // Store value_num = share of population in the predominant group (0–100),
-      // value_text = category label. The map's choropleth uses the category for
-      // color and the share for opacity, so tracts with a strong majority read
-      // more saturated than mixed tracts.
+      // value_text = category label. The map paints color from the label
+      // (via RACE_QUALITATIVE) and opacity from the share (via the registry's
+      // `opacity_stretch` 17→94 / 0→1 window). Matches the PWC IIT renderer.
       const total = acsNum(r['B03002_001E']);
       // Uninhabited / water-only tracts (Central Park, harbors, airport
       // edges) report total population 0. Without a denominator there's no
@@ -163,16 +163,37 @@ function computeAcsValue(
       if (total == null || total <= 0) {
         return { value_num: null, value_text: null, label: 'No population' };
       }
-      const groups: Array<{ label: string; n: number | null }> = [
-        { label: 'White', n: acsNum(r['B03002_003E']) },
-        { label: 'Black', n: acsNum(r['B03002_004E']) },
-        { label: 'Asian', n: acsNum(r['B03002_006E']) },
-        { label: 'Hispanic', n: acsNum(r['B03002_012E']) },
+      // Argmax across ALL 8 B03002 race/ethnicity groups — we need every
+      // group in the running so we can correctly detect when the winner is
+      // an "Other" bucket (American Indian alone or Some Other Race alone)
+      // and suppress those tracts to no-data, matching the PWC IIT renderer.
+      // `rendered` flags whether the winning label is one of the 6 categories
+      // we actually paint; the two non-rendered winners both collapse to null
+      // and re-use the existing zero-pop / no-data branch.
+      const groups: Array<{ label: string; n: number | null; rendered: boolean }> = [
+        { label: 'White', n: acsNum(r['B03002_003E']), rendered: true },
+        { label: 'Black', n: acsNum(r['B03002_004E']), rendered: true },
+        { label: 'American Indian', n: acsNum(r['B03002_005E']), rendered: false },
+        { label: 'Asian', n: acsNum(r['B03002_006E']), rendered: true },
+        { label: 'Pacific Islander', n: acsNum(r['B03002_007E']), rendered: true },
+        { label: 'Some Other Race', n: acsNum(r['B03002_008E']), rendered: false },
+        { label: 'Two or More Races', n: acsNum(r['B03002_009E']), rendered: true },
+        { label: 'Latinx', n: acsNum(r['B03002_012E']), rendered: true },
       ];
-      const valid = groups.filter((g) => g.n != null) as Array<{ label: string; n: number }>;
+      const valid = groups.filter((g) => g.n != null) as Array<{ label: string; n: number; rendered: boolean }>;
       if (valid.length === 0) return { value_num: null, value_text: null, label: null };
       const top = valid.reduce((best, g) => (g.n > best.n ? g : best));
       const ratio = (top.n / total) * 100;
+      if (!top.rendered) {
+        // "Other" predominance — not in the IIT category set, so we don't
+        // paint these. value_num/value_text both null → no-data branch on the
+        // map, same as zero-pop tracts.
+        return {
+          value_num: null,
+          value_text: null,
+          label: `${top.label} predominance (${ratio.toFixed(0)}% of population) — not rendered`,
+        };
+      }
       return {
         value_num: ratio,
         value_text: top.label,
@@ -196,9 +217,16 @@ async function upsertRows(rows: CommunityRow[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const indicators = activeAcsIndicators();
+  // Optional `ONLY_INDICATOR=...` filter for targeted re-runs (e.g. after a
+  // single indicator's compute logic changes). When unset, processes the full
+  // registry as before.
+  const only = process.env.ONLY_INDICATOR?.trim() || null;
+  const indicators = activeAcsIndicators().filter((i) => (only ? i.id === only : true));
+  if (only && indicators.length === 0) {
+    throw new Error(`ONLY_INDICATOR=${only} matched no active ACS indicator`);
+  }
   console.log(
-    `[etl:acs] processing ${indicators.length} ACS indicators × ${ACS_YEARS.length} vintages`,
+    `[etl:acs] processing ${indicators.length} ACS indicator(s)${only ? ` (filtered: ${only})` : ''} × ${ACS_YEARS.length} vintages`,
   );
 
   // Outer loop: year. Inner loop: indicator. A per-(indicator,year) failure is

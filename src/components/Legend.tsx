@@ -508,6 +508,37 @@ function ColorSwatches({ bins }: { bins: ColorBins }): React.JSX.Element {
       </div>
     );
   }
+  if (bins.type === 'continuous') {
+    // Horizontal gradient bar between adjacent stops. Labels use the indicator
+    // formatter (e.g. "10%" / "20%") with ≤/≥ to signal clamping outside.
+    const first = bins.stops[0]!;
+    const last = bins.stops[bins.stops.length - 1]!;
+    const gradient = `linear-gradient(to right, ${bins.stops.map((s) => s.color).join(', ')})`;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div
+          style={{
+            height: 12,
+            width: '100%',
+            background: gradient,
+            border: '1px solid rgba(0,0,0,0.1)',
+            borderRadius: SWATCH_RADIUS,
+          }}
+        />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 10,
+            color: '#467c9d',
+          }}
+        >
+          <span>{`≤ ${bins.format(first.value)}`}</span>
+          <span>{`≥ ${bins.format(last.value)}`}</span>
+        </div>
+      </div>
+    );
+  }
   // Per-bin labels: prefer the explicit list from `bins.labels` (discrete-
   // value indicators) over synthesised bracket strings. Falls back to the
   // bracket form for continuous indicators.

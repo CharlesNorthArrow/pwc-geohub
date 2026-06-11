@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl, {
   type GeoJSONSource,
   type Map as MapLibreMap,
@@ -17,6 +17,8 @@ import {
   backdropRadiusExpression,
   colorBinsFor,
   colorExpression,
+  formatterFor,
+  interpolateContinuous,
   radiusExpression,
 } from '../map/encoding';
 import type { SchoolType } from '../store/useHubStore';
@@ -54,6 +56,10 @@ interface Props {
   selectedSchool?: { dbn: string; coords: [number, number] } | null;
   /** Polygons of the currently-selected Geo filter areas. */
   geoSelection: GeoSelectionResponse | null;
+  /** tract_geoid → containing NTA name, used by the discreet community-polygon
+   *  hover tooltip. Null until the one-shot fetch lands in Shell; tooltip
+   *  shows "—" for missing tracts. */
+  tractNtaMap: Record<string, { nta_id: string; nta_name: string }> | null;
   /** When false, drop the colored stroke/halo around PWC schools so they
    *  blend with non-PWC dots. Fills stay PWC-colored in baseline mode so
    *  schools remain identifiable; in indicator mode they read identically
@@ -172,10 +178,23 @@ export default function MapView({
   selectedSchool,
   geoSelection,
   pwcHalosVisible,
+  tractNtaMap,
 }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleReadyRef = useRef(false);
+
+  // --- Community-polygon hover tooltip state ----------------------------
+  // Discreet, non-interactive: pointer-events:none, no click handler. State
+  // lives at the component level so the JSX can render a plain absolutely-
+  // positioned div alongside the map canvas.
+  interface HoverState {
+    x: number;
+    y: number;
+    name: string;
+    value: string;
+  }
+  const [hover, setHover] = useState<HoverState | null>(null);
 
   // --- Initialize once ----------------------------------------------------
   useEffect(() => {
@@ -655,6 +674,11 @@ export default function MapView({
       const bins = colorBinsFor(communityIndicator, communityValues.domain, communityValueList);
       const intensities = communityValues.intensities;
 
+      // Transparency-by-predominance is driven by the registry's
+      // `scale.opacity_stretch` — share → opacity, linear and clamped.
+      // Falls back to the layer's flat default opacity when absent, so
+      // non-categorical and unconfigured indicators are unaffected.
+      const stretch = communityIndicator.scale.opacity_stretch;
       for (const [geoid, raw] of Object.entries(communityValues.values)) {
         const color = colorFor(bins, raw);
         if (color == null) continue;
@@ -663,9 +687,11 @@ export default function MapView({
           color,
         };
         const intensity = intensities?.[geoid];
-        if (typeof intensity === 'number' && Number.isFinite(intensity)) {
-          const clamped = Math.max(25, Math.min(100, intensity));
-          state.opacity = 0.3 + ((clamped - 25) / 75) * 0.55;
+        if (stretch && typeof intensity === 'number' && Number.isFinite(intensity)) {
+          const { value_min, value_max, opacity_min, opacity_max } = stretch;
+          const span = value_max - value_min;
+          const t = span > 0 ? Math.max(0, Math.min(1, (intensity - value_min) / span)) : 0;
+          state.opacity = opacity_min + t * (opacity_max - opacity_min);
         }
         map.setFeatureState({ source: SOURCE_TRACTS, id: geoid }, state);
       }
@@ -675,12 +701,122 @@ export default function MapView({
     else map.once('phase1-style-ready', apply);
   }, [communityIndicator, communityValues]);
 
+  // --- Community-polygon hover tooltip ----------------------------------
+  // Binds mousemove/mouseleave on the tract fill layer only — no click
+  // handler, so the layer remains non-interactive (per goal scope fence).
+  // dragstart hides the tooltip to avoid jitter during pan.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // No active community layer → nothing to hover. Eagerly clear any
+    // lingering tooltip from a previous indicator pick.
+    if (!communityIndicator || !communityValues) {
+      setHover(null);
+      return;
+    }
+    const fmt = formatterFor(communityIndicator);
+    const formatValue = (raw: number | string | null | undefined): string => {
+      if (raw == null) return 'no data';
+      if (typeof raw === 'string') return raw; // categorical (e.g. "Latinx")
+      if (typeof raw === 'number' && Number.isFinite(raw)) return fmt(raw);
+      return 'no data';
+    };
+
+    const onMove = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }): void => {
+      const f = e.features?.[0];
+      const geoid = f?.id as string | number | undefined;
+      if (geoid == null) {
+        setHover(null);
+        return;
+      }
+      const key = String(geoid);
+      const ntaEntry = tractNtaMap?.[key];
+      const name = ntaEntry?.nta_name ?? '—';
+      const raw = communityValues.values[key];
+      setHover({ x: e.point.x, y: e.point.y, name, value: formatValue(raw) });
+    };
+    const onLeave = (): void => {
+      setHover(null);
+    };
+    const onDragStart = (): void => {
+      setHover(null);
+    };
+
+    const bind = (): void => {
+      if (!map.getLayer(LAYER_TRACTS_FILL)) return;
+      map.on('mousemove', LAYER_TRACTS_FILL, onMove);
+      map.on('mouseleave', LAYER_TRACTS_FILL, onLeave);
+      map.on('dragstart', onDragStart);
+    };
+    if (styleReadyRef.current) bind();
+    else map.once('phase1-style-ready', bind);
+    return () => {
+      map.off('mousemove', LAYER_TRACTS_FILL, onMove);
+      map.off('mouseleave', LAYER_TRACTS_FILL, onLeave);
+      map.off('dragstart', onDragStart);
+    };
+  }, [communityIndicator, communityValues, tractNtaMap]);
+
   return (
     <div
       style={{ position: 'absolute', inset: 0, background: '#f5f7fa' }}
       aria-label="Map of NYC"
     >
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {hover ? <CommunityHoverTooltip hover={hover} /> : null}
+    </div>
+  );
+}
+
+/** Discreet hover tooltip for community polygons — pointer-events disabled so
+ *  it never blocks map pan or school-dot clicks. Edge-aware: flips left of the
+ *  cursor when there's < 240px to the container's right edge. */
+function CommunityHoverTooltip({
+  hover,
+}: {
+  hover: { x: number; y: number; name: string; value: string };
+}): React.JSX.Element {
+  // Best-effort right-edge flip — we don't have a ref to the container, so we
+  // approximate against window width. Good enough since the map container fills
+  // the right pane. Off by a few px on small screens; doesn't affect usability.
+  const containerWidth = typeof window === 'undefined' ? 2000 : window.innerWidth;
+  const TOOLTIP_WIDTH = 220;
+  const flipLeft = hover.x + 14 + TOOLTIP_WIDTH > containerWidth;
+  const left = flipLeft ? hover.x - 14 - TOOLTIP_WIDTH : hover.x + 14;
+  return (
+    <div
+      role="presentation"
+      style={{
+        position: 'absolute',
+        left,
+        top: hover.y + 14,
+        maxWidth: TOOLTIP_WIDTH,
+        padding: '6px 8px',
+        fontFamily: "'Open Sans', sans-serif",
+        background: 'rgba(255,255,255,0.96)',
+        backdropFilter: 'blur(2px)',
+        WebkitBackdropFilter: 'blur(2px)',
+        border: '1px solid rgba(0,0,32,0.08)',
+        borderRadius: 6,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        pointerEvents: 'none',
+        zIndex: 5,
+        lineHeight: 1.25,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#002040',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {hover.name}
+      </div>
+      <div style={{ fontSize: 10, color: '#467c9d' }}>{hover.value}</div>
     </div>
   );
 }
@@ -740,6 +876,9 @@ function colorFor(
     return typeof raw === 'string' ? bins.colorFor(raw) : null;
   }
   if (typeof raw !== 'number') return null;
+  if (bins.type === 'continuous') {
+    return interpolateContinuous(bins.stops, raw);
+  }
   const { ramp, edges } = bins;
   if (raw < edges[0]) return ramp[0] ?? null;
   if (raw < edges[1]) return ramp[1] ?? null;

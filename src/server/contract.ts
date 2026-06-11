@@ -79,6 +79,8 @@ function toPublic(i: IndicatorRegistryEntry): IndicatorPublic {
       categories: i.scale.categories,
       bin_method: i.scale.bin_method,
       discrete_values: i.scale.discrete_values,
+      stops: i.scale.stops,
+      opacity_stretch: i.scale.opacity_stretch,
     },
     // Phase 1 only renders point + polygon families. Site (deferred crime) is filtered out.
     geometry: i.geometry === 'point' ? 'point' : 'polygon',
@@ -426,6 +428,7 @@ export async function getGeographies(): Promise<GeographiesResponse> {
     council: [],
     school_district: [],
     community_district: [],
+    nta_2020: [],
   };
   for (const r of rows) {
     layers[r.geo_layer]?.push({
@@ -869,6 +872,51 @@ interface TractFinding {
  * `scripts/etl/22-fetch-tracts.ts`. We read it from `data_quality_findings`
  * so there's no env-var dance — the URL is already persisted from the ETL run.
  */
+/* -------------------------------------------------------------------------- */
+/* Tract → NTA crosswalk (Phase 4 hover tooltip)                              */
+/* -------------------------------------------------------------------------- */
+
+interface TractNtaRow {
+  tract_geoid: string;
+  nta_id: string | null;
+  nta_name: string | null;
+}
+
+export interface TractNtaEntry {
+  nta_id: string;
+  nta_name: string;
+}
+
+/**
+ * One row per tract → the NTA whose polygon contains the tract's centroid.
+ * Centroid-within (vs ST_Intersects) yields a deterministic 1:1 map, which is
+ * what the hover tooltip wants — "this tract sits in this neighborhood". The
+ * area_tract_crosswalk table can't be used directly because it's
+ * Intersects-based (a single tract spans multiple NTAs along boundary edges).
+ *
+ * Tracts whose centroid falls outside every NTA (e.g. water-only tracts at
+ * harbor edges) are excluded from the result; the client maps them to "—".
+ */
+export async function getTractNtaCrosswalk(): Promise<Record<string, TractNtaEntry>> {
+  const rows = await sql<TractNtaRow>`
+    SELECT
+      t.area_id AS tract_geoid,
+      n.area_id AS nta_id,
+      n.label   AS nta_name
+    FROM geographies t
+    JOIN geographies n
+      ON n.geo_layer = 'nta_2020'
+     AND ST_Within(ST_Centroid(t.geom), n.geom)
+    WHERE t.geo_layer = 'tract'
+  `;
+  const out: Record<string, TractNtaEntry> = {};
+  for (const r of rows) {
+    if (!r.nta_id || !r.nta_name) continue;
+    out[r.tract_geoid] = { nta_id: r.nta_id, nta_name: r.nta_name };
+  }
+  return out;
+}
+
 export async function getTractBlobUrl(): Promise<string | null> {
   const rows = await sql<{ details: TractFinding }>`
     SELECT details

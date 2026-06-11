@@ -144,7 +144,11 @@ export const useHubStore = create<HubState>((set) => ({
   schoolsHidden: false,
   communityHidden: false,
   pwcHalosVisible: true,
-  latestPerLayer: false,
+  // Default ON — each indicator opens at its own latest registry year so the
+  // dashboard never lands in a 🗓️ no-data state on first load (community
+  // indicators in particular don't all have a 2024-25 row). User toggles off
+  // via the "Latest" pill in HeaderBar to take manual control of the slider.
+  latestPerLayer: true,
   setSchoolIndicator: (id) => set({ activeSchoolIndicator: id }),
   setCommunityIndicator: (id) => set({ activeCommunityIndicator: id }),
   setYear: (year) => set({ year }),

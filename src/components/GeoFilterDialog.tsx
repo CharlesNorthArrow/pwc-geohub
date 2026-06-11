@@ -71,6 +71,7 @@ export default function GeoFilterDialog({
       council: new Map(),
       school_district: new Map(),
       community_district: new Map(),
+      nta_2020: new Map(),
     };
     for (const s of schoolsMaster) {
       for (const layer of GEO_FILTER_LAYERS) {
@@ -96,6 +97,7 @@ export default function GeoFilterDialog({
       council: new Map(),
       school_district: new Map(),
       community_district: new Map(),
+      nta_2020: new Map(),
     };
     if (pwcMembers.length === 0) return out;
     const pwcDbns = new Set(pwcMembers.map((m) => m.dbn));

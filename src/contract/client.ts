@@ -17,6 +17,7 @@ import type {
   SchoolProfileResponse,
   SchoolsMasterResponse,
   SchoolsResponse,
+  TractNtaMapResponse,
 } from './types';
 import type { GeoFilterLayerId } from './types';
 
@@ -54,6 +55,10 @@ export function fetchCommunityValues(
 export async function fetchTractGeoJsonUrl(): Promise<string> {
   const { url } = await getJson<{ url: string }>('/api/geo/tracts');
   return url;
+}
+
+export function fetchTractNtaMap(): Promise<TractNtaMapResponse> {
+  return getJson<TractNtaMapResponse>('/api/geo/tract-nta');
 }
 
 export function fetchPwcMembership(year: string): Promise<PwcResponse> {

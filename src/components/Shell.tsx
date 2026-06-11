@@ -19,6 +19,7 @@ import {
   fetchSchoolFeatures,
   fetchSchoolsMaster,
   fetchTractGeoJsonUrl,
+  fetchTractNtaMap,
 } from '../contract/client';
 import type {
   AnalyticsSeriesResponse,
@@ -64,6 +65,7 @@ const KNOWN_COHORTS = ['Brownsville', 'East Harlem', 'Fort Greene', 'Morrisania'
 export default function Shell({ initialIndicators }: InitialProps): React.JSX.Element {
   const [indicators, setIndicators] = useState<IndicatorPublic[]>(initialIndicators);
   const [tractUrl, setTractUrl] = useState<string | null>(null);
+  const [tractNtaMap, setTractNtaMap] = useState<Record<string, { nta_id: string; nta_name: string }> | null>(null);
   const [schoolData, setSchoolData] = useState<SchoolsResponse | null>(null);
   const [communityData, setCommunityData] = useState<CommunityResponse | null>(null);
   const [pwcMembers, setPwcMembers] = useState<PwcMember[] | null>(null);
@@ -105,6 +107,9 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     fetchTractGeoJsonUrl()
       .then(setTractUrl)
       .catch((err) => console.warn('[Shell] tract URL fetch failed', err));
+    fetchTractNtaMap()
+      .then((r) => setTractNtaMap(r.tracts))
+      .catch((err) => console.warn('[Shell] tract-NTA fetch failed', err));
     fetchSchoolsMaster()
       .then((r) => setSchoolsMaster(r.schools))
       .catch((err) => console.warn('[Shell] schools-master fetch failed', err));
@@ -725,6 +730,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
               communityHidden ? null : communityNoData ? null : communityData
             }
             tractGeoJsonUrl={tractUrl}
+            tractNtaMap={tractNtaMap}
             schoolType={schoolType}
             filteredSchoolDbns={universe.schoolDbns}
             flyToCoords={selectedSchoolCoords}

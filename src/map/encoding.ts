@@ -32,7 +32,23 @@ export interface CategoricalBins {
   colorFor: (cat: string) => string;
 }
 
-export type ColorBins = SequentialBins | CategoricalBins | { type: 'none' };
+export interface ContinuousStop {
+  value: number;
+  color: string;
+}
+
+export interface ContinuousBins {
+  type: 'continuous';
+  /** Ordered ascending by `value`. Length ≥ 2. */
+  stops: ContinuousStop[];
+  format: (v: number) => string;
+}
+
+export type ColorBins =
+  | SequentialBins
+  | CategoricalBins
+  | ContinuousBins
+  | { type: 'none' };
 
 /**
  * Build the bin scale for an indicator + its observed domain. Sequential
@@ -59,6 +75,18 @@ export function colorBinsFor(
       categories,
       colorFor: (cat: string) => RACE_QUALITATIVE[cat] ?? '#999999',
     };
+  }
+  // Continuous stretched ramp — registry-driven `stops`, no observed-domain
+  // dependency (that's the point of "stretched"). Values outside the first /
+  // last stop clamp to their colors. Used today by `adult_mental_health` to
+  // match the PWC IIT renderer.
+  if (indicator.scale.type === 'continuous') {
+    const stops = indicator.scale.stops ?? [];
+    if (stops.length >= 2) {
+      const sorted = [...stops].sort((a, b) => a.value - b.value);
+      return { type: 'continuous', stops: sorted, format: formatterFor(indicator) };
+    }
+    return { type: 'none' };
   }
   if (!domain || !Number.isFinite(domain.min) || !Number.isFinite(domain.max) || domain.min === domain.max) {
     return { type: 'none' };
@@ -141,7 +169,7 @@ function trim(v: string): string {
   return v.replace(/\.0+(?=[^\d]|$)/, '');
 }
 
-function formatterFor(indicator: IndicatorPublic): (v: number) => string {
+export function formatterFor(indicator: IndicatorPublic): (v: number) => string {
   switch (indicator.format) {
     case 'percent':
     case 'rate_per_100':
@@ -165,6 +193,14 @@ export function colorExpression(bins: ColorBins, valueAccessor: unknown[]): unkn
     match.push('#999999');
     return match;
   }
+  if (bins.type === 'continuous') {
+    // ['interpolate', ['linear'], value, v0, c0, v1, c1, ...]
+    const expr: unknown[] = ['interpolate', ['linear'], valueAccessor];
+    for (const s of bins.stops) {
+      expr.push(s.value, s.color);
+    }
+    return expr;
+  }
   // Sequential: ['step', value, color0, edge0, color1, edge1, color2, edge2, color3, edge3, color4]
   return [
     'step',
@@ -175,6 +211,47 @@ export function colorExpression(bins: ColorBins, valueAccessor: unknown[]): unkn
     bins.edges[2], bins.ramp[3],
     bins.edges[3], bins.ramp[4],
   ];
+}
+
+/**
+ * Interpolate a value through a sorted-ascending continuous-stop list using
+ * sRGB linear interpolation between adjacent stops (matches MapLibre's
+ * `interpolate ['linear']` behavior closely enough for a 2-stop ramp). Values
+ * outside the first/last stop clamp to their colors. Lives here so the
+ * Legend gradient swatch and the MapView feature-state writer agree.
+ */
+export function interpolateContinuous(stops: ContinuousStop[], v: number): string {
+  if (stops.length === 0) return '#cccccc';
+  if (v <= stops[0]!.value) return stops[0]!.color;
+  const last = stops[stops.length - 1]!;
+  if (v >= last.value) return last.color;
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const a = stops[i]!;
+    const b = stops[i + 1]!;
+    if (v >= a.value && v <= b.value) {
+      const t = (v - a.value) / (b.value - a.value);
+      return mixHex(a.color, b.color, t);
+    }
+  }
+  return last.color;
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseHex(a);
+  const pb = parseHex(b);
+  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t);
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`;
+}
+
+function parseHex(h: string): [number, number, number] {
+  const s = h.replace('#', '');
+  return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+}
+
+function toHex(n: number): string {
+  return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
 }
 
 /* -------------------------------------------------------------------------- */

@@ -428,12 +428,21 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    // CDC PLACES MHLTH values cluster tightly in the 15–25% band across most
-    // NYC tracts, so equal-interval bins (over the full min→max range) leave
-    // the whole choropleth in the lower 1–2 buckets and the map reads as a
-    // single pink wash. Quantile binning splits the population into 5 equal
-    // groups by value count, surfacing within-range variation.
-    scale: { type: 'sequential', good_direction: 'low', ramp: 'rocket_r', bin_method: 'quantile' },
+    // Continuous stretched ramp — matches the PWC IIT renderer exactly. Hard
+    // class breaks (the prior quantile approach) made too much of the city
+    // read red; a stretch anchored at 10/20 keeps Staten Island pale and
+    // reserves deep brick red for genuinely high-distress tracts. Data spans
+    // ~9–34, mean ~15.4, so 10/20 brackets the meaningful signal range with
+    // clamps at both ends. Re-tunable by editing the `stops` here.
+    scale: {
+      type: 'continuous',
+      good_direction: 'low',
+      ramp: 'pwc_iit_mh_stretch',
+      stops: [
+        { value: 10, color: '#D7DEEE' }, // light blue-grey (low distress)
+        { value: 20, color: '#A11C0E' }, // deep brick red (high distress)
+      ],
+    },
     geometry: 'polygon',
     years: [...CDC_PLACES_YEARS],
     status: 'active',
@@ -605,23 +614,37 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'racial_predominance',
     family: 'community',
     theme: 'Demographics',
-    label: 'Racial Predominance (Argmax of Black/White/Asian/Hispanic)',
+    label: 'Racial Predominance',
     short_label: 'Racial Predominance',
     source: {
       type: 'api',
       provider: 'acs5',
       endpoint: 'acs5',
       table: 'B03002',
-      // B03002_003E=White NH; _004E=Black NH; _006E=Asian NH; _012E=Hispanic any race.
-      fields: ['B03002_001E', 'B03002_003E', 'B03002_004E', 'B03002_006E', 'B03002_012E'],
+      // B03002 cells used for the 6-way argmax that matches the PWC IIT
+      // renderer. _001E=total denominator; _003E=White NH; _004E=Black NH;
+      // _005E=Am Indian / Alaska Native NH; _006E=Asian NH; _007E=Native
+      // Hawaiian / Pacific Islander NH; _008E=Some Other Race NH;
+      // _009E=Two or More Races NH; _012E=Hispanic / Latinx (any race).
+      // _005E and _008E feed the argmax but their winners are suppressed to
+      // no-data ("Other" → not rendered) — matches PWC's IIT convention.
+      fields: [
+        'B03002_001E', 'B03002_003E', 'B03002_004E', 'B03002_005E',
+        'B03002_006E', 'B03002_007E', 'B03002_008E', 'B03002_009E', 'B03002_012E',
+      ],
       geo: 'tract',
     },
     format: 'categorical',
     scale: {
       type: 'categorical',
       good_direction: 'none',
-      ramp: 'qualitative_d3_category10',
-      categories: ['White', 'Black', 'Asian', 'Hispanic'],
+      ramp: 'qualitative_pwc_iit',
+      categories: ['White', 'Latinx', 'Black', 'Asian', 'Pacific Islander', 'Two or More Races'],
+      // Transparency by predominance — share of population in the predominant
+      // group is mapped linearly to opacity, clamped outside [17%, 94%].
+      // Tracts where one group only barely leads fade out; strongly-
+      // predominant tracts render solid. Matches PWC's IIT renderer.
+      opacity_stretch: { value_min: 17, value_max: 94, opacity_min: 0, opacity_max: 1 },
     },
     geometry: 'polygon',
     years: [...ACS_YEARS],

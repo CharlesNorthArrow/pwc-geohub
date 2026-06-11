@@ -82,12 +82,20 @@ export const COMMUNITY_GREY_RED = [
   '#932B25', // bin 4 — deep brick red (user anchor, high/intense)
 ] as const;
 
-/** Stable category → color map for the 4 race categories the registry ships. */
+/**
+ * Stable category → color map for `racial_predominance`. Hex codes sampled
+ * from PWC's authoritative ArcGIS Story Map / IIT renderer so this map reads
+ * identically when Wes presents alongside it. AmInd / Some Other Race
+ * winners are suppressed at ETL time, so any tract whose `value_text` is not
+ * a key here will fall through to the no-data path.
+ */
 export const RACE_QUALITATIVE: Readonly<Record<string, string>> = {
-  White: '#1f77b4',
-  Black: '#ff7f0e',
-  Asian: '#2ca02c',
-  Hispanic: '#d62728',
+  White: '#D5D5D5',
+  Latinx: '#D8B600',
+  Black: '#6FA980',
+  Asian: '#3761C3',
+  'Pacific Islander': '#B49A7F',
+  'Two or More Races': '#9A6BA2',
 };
 
 export type Ramp = readonly string[];

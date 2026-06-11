@@ -8,7 +8,7 @@
 
 export type IndicatorFamily = 'school' | 'community';
 export type Geometry = 'point' | 'polygon' | 'site';
-export type ScaleType = 'sequential' | 'diverging' | 'categorical';
+export type ScaleType = 'sequential' | 'diverging' | 'categorical' | 'continuous';
 export type GoodDirection = 'high' | 'low' | 'none';
 export type Format =
   | 'percent'
@@ -90,6 +90,31 @@ export interface IndicatorScale {
    * arts_ed_score counts 0–4 disciplines). Overrides `bin_method` when set.
    */
   discrete_values?: number[];
+  /**
+   * Continuous stretched-ramp stops (only used when `type === 'continuous'`).
+   * Values BELOW the first stop clamp to its color; values ABOVE the last
+   * stop clamp to its color; between any two adjacent stops the color is
+   * linearly interpolated. Tuned by editing here — no code changes needed.
+   * Currently used by `adult_mental_health` to match the PWC IIT renderer
+   * (anchored at 10% and 20%) without binning.
+   */
+  stops?: Array<{ value: number; color: string }>;
+  /**
+   * Per-feature opacity stretch for categorical layers. The map paints the
+   * category color from `value_text` and reads `value_num` as the predominant
+   * group's share; we linearly stretch share → opacity here, clamped outside
+   * [value_min, value_max]. Used by `racial_predominance` to fade tracts
+   * where one group only barely leads (low share → translucent) and saturate
+   * tracts where one group dominates (high share → solid). When absent the
+   * map falls back to its flat default opacity, so other categorical
+   * indicators are unaffected.
+   */
+  opacity_stretch?: {
+    value_min: number;
+    value_max: number;
+    opacity_min: number;
+    opacity_max: number;
+  };
 }
 
 export interface IndicatorRegistryEntry {
