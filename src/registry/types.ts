@@ -115,6 +115,15 @@ export interface IndicatorScale {
     opacity_min: number;
     opacity_max: number;
   };
+  /**
+   * Uniform per-indicator layer opacity. When set, every tract with a value
+   * paints at this opacity instead of the map's 0.65 fill-opacity default.
+   * Lets a single indicator (e.g. `adult_mental_health` at 0.85 per the PWC
+   * IIT renderer JSON) own its layer opacity without changing the global
+   * default. Ignored when `opacity_stretch` applies — per-tract stretch wins.
+   * No-data tracts are still hidden via the fill-opacity:0 no-data branch.
+   */
+  layer_opacity?: number;
 }
 
 export interface IndicatorRegistryEntry {

@@ -674,11 +674,16 @@ export default function MapView({
       const bins = colorBinsFor(communityIndicator, communityValues.domain, communityValueList);
       const intensities = communityValues.intensities;
 
-      // Transparency-by-predominance is driven by the registry's
-      // `scale.opacity_stretch` — share → opacity, linear and clamped.
-      // Falls back to the layer's flat default opacity when absent, so
-      // non-categorical and unconfigured indicators are unaffected.
+      // Opacity precedence:
+      //   1. `scale.opacity_stretch` — per-tract stretch (categorical with
+      //      a value_num side, e.g. racial_predominance).
+      //   2. `scale.layer_opacity`   — uniform per-indicator opacity
+      //      (e.g. adult_mental_health at 0.85 per the PWC IIT JSON).
+      //   3. Fallback `0.65`         — the map's fill-opacity default.
+      // No-data tracts are still hidden via the fill-opacity:0 branch
+      // (feature-state.v stays unset because colorFor returns null below).
       const stretch = communityIndicator.scale.opacity_stretch;
+      const layerOpacity = communityIndicator.scale.layer_opacity;
       for (const [geoid, raw] of Object.entries(communityValues.values)) {
         const color = colorFor(bins, raw);
         if (color == null) continue;
@@ -692,6 +697,8 @@ export default function MapView({
           const span = value_max - value_min;
           const t = span > 0 ? Math.max(0, Math.min(1, (intensity - value_min) / span)) : 0;
           state.opacity = opacity_min + t * (opacity_max - opacity_min);
+        } else if (typeof layerOpacity === 'number' && Number.isFinite(layerOpacity)) {
+          state.opacity = layerOpacity;
         }
         map.setFeatureState({ source: SOURCE_TRACTS, id: geoid }, state);
       }

@@ -428,23 +428,25 @@ const COMMUNITY_INDICATORS: IndicatorRegistryEntry[] = [
       geo: 'tract',
     },
     format: 'percent',
-    // Continuous DIVERGING ramp matching the PWC IIT renderer. Three stops
-    // (10 / 15 / 20) with the citywide mean acting as the PIVOT — so tracts
-    // at ~15% read warm-neutral (not pink), tracts <15% read cool, and only
-    // tracts approaching 20% read clearly brick red. A 2-stop 10→20 linear
-    // stretch (the prior config) painted the mean as #BC7D7E pink, which is
-    // why too much of the city read warm. Data spans ~9–34, mean ~15.4 —
-    // anchors are FIXED (registry constants), never view- or domain-relative.
-    // Re-tunable: edit the three `stops` to swap in the exact IIT renderer
-    // JSON when supplied; the interpolator handles any N ≥ 2 stops.
+    // Continuous 5-stop ramp transcribed VERBATIM from the PWC IIT renderer
+    // JSON (colorInfo on MHLTH_CrudePrev). The first THREE stops are all
+    // cool blue-grey — that's what keeps the citywide mean (~15.4) reading
+    // cool. The warm turn happens between 15 and 17.5; deep brick only
+    // appears near/above 20. Below 10 clamps to #D7E1EE, above 20 clamps to
+    // #991F17. Anchors are FIXED registry constants — never view- or
+    // domain-relative. `layer_opacity: 0.85` matches the IIT layer setting
+    // (overrides the map's 0.65 default for this indicator only).
     scale: {
       type: 'continuous',
       good_direction: 'low',
-      ramp: 'pwc_iit_mh_diverging',
+      ramp: 'pwc_iit_mh_5stop',
+      layer_opacity: 0.85,
       stops: [
-        { value: 10, color: '#C6D0DC' }, // cool blue-grey  (low — clamps below)
-        { value: 15, color: '#C8AAAA' }, // muted neutral   (PIVOT — citywide mean)
-        { value: 20, color: '#A14B4E' }, // muted brick red (high — clamps above)
+        { value: 10.0, color: '#D7E1EE' }, // cool light blue   (clamps below)
+        { value: 12.5, color: '#CBD6E4' }, // cool
+        { value: 15.0, color: '#B3BFD1' }, // STILL cool — pale steel-blue
+        { value: 17.5, color: '#C86558' }, // warm (red)
+        { value: 20.0, color: '#991F17' }, // deep brick        (clamps above)
       ],
     },
     geometry: 'polygon',

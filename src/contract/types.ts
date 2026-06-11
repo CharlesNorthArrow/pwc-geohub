@@ -49,6 +49,10 @@ export interface IndicatorPublic {
       opacity_min: number;
       opacity_max: number;
     };
+    /** Uniform per-indicator layer opacity. Overrides the map's 0.65 fill
+     *  default when set; ignored when `opacity_stretch` applies (per-tract
+     *  stretch wins). */
+    layer_opacity?: number;
   };
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
