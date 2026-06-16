@@ -32,6 +32,11 @@
  *     is a no-op. Slide to a different year and the chart re-anchors to that
  *     year's roster (which is the honest answer: the PWC line shows the
  *     trajectory of the schools that are PWC AT the year you're examining).
+ *     CRITICAL: the membership lookup year is `pwcMembershipYear`, which is
+ *     the slider year — NOT `year`. In Latest-mode `year` can be the focused
+ *     family's own latest year (decoupled from the slider), but the universe
+ *     is still built from slider-year membership, so the PWC roll-up must use
+ *     the same year or the Only-PWC invariant breaks (PWC ≠ All in view).
  *   - Anchor-wins: both-category schools count ONLY in the Anchor group
  *     (see `belongsToPwcGroup` — the Healing Arts group is disjoint from
  *     Anchor, never an overlap). pwc_other is part of the PWC roll-up but is
@@ -106,6 +111,14 @@ interface DeriveInput {
   /** All years to show on the timeline — typically the 5 slider years
    *  (the call site decides; usually `SLIDER_YEARS`). */
   timelineYears: readonly string[];
+  /** Year used to look up PWC membership for the KPI roll-up, timeline
+   *  PWC/Anchor/HA lines, and the ranked list. Should be the SLIDER YEAR —
+   *  the same year `universe` was built from — so the PWC ⊆ universe
+   *  invariant holds. Defaults to `year` for back-compat with call sites
+   *  where slider year == KPI year (i.e. Latest-mode off). In Latest-mode
+   *  `year` can be the focused family's own latest year while membership
+   *  must stay anchored to the slider. */
+  pwcMembershipYear?: string;
 }
 
 export function deriveAnalytics({
@@ -115,6 +128,7 @@ export function deriveAnalytics({
   pwcByYear,
   universe,
   timelineYears,
+  pwcMembershipYear,
 }: DeriveInput): Analytics {
   // Index series by (year, dbn) for O(1) lookup.
   const byYear = new Map<string, Map<string, number>>();
@@ -137,7 +151,10 @@ export function deriveAnalytics({
 
   /* -------------------- KPIs at the active year -------------------- */
   const valuesNow = valuesAt(year);
-  const pwcNow = pwcAt(year);
+  // Membership lookup is anchored to the SLIDER year (pwcMembershipYear),
+  // NOT `year` — see header comment. Falls back to `year` when the caller
+  // hasn't separated the two (back-compat).
+  const pwcNow = pwcAt(pwcMembershipYear ?? year);
 
   // All-in-view = full filter cascade applied (Geo + School Type + Cohort).
   const allValuesInUniverse: number[] = [];

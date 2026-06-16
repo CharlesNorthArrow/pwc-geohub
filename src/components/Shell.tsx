@@ -460,6 +460,12 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       pwcByYear: pwcHistory.byYear,
       universe,
       timelineYears: SLIDER_YEARS,
+      // Membership stays anchored to the slider year — that's the year
+      // `universe` (and `pwcMembers`) was built from. In Latest-mode the
+      // KPI lookup year (`analyticsYear`) can drift to the focused family's
+      // own latest, but the PWC roll-up must keep using the slider-year
+      // roster or "PWC schools" diverges from "All in view" under Only-PWC.
+      pwcMembershipYear: year,
     });
   }, [
     analyticsIndicator,
@@ -469,6 +475,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
     analyticsYear,
     universe,
     analyticsUnavailable,
+    year,
   ]);
 
   /* -------------------- Selected school + flyTo -------------------- */
