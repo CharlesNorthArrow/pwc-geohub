@@ -227,3 +227,58 @@ CREATE TABLE IF NOT EXISTS pwc_program_current (
   version_id INTEGER NOT NULL REFERENCES pwc_program_versions(version_id),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- =============================================================================
+-- Community Indicators — per-provider versioning + availability status.
+-- Provider ∈ {'acs', 'cdc_places'}. The live read view stays
+-- `community_indicator_values`; admin "apply" swaps a provider's slice in
+-- one Postgres tx. Rollback writes a NEW version row whose payload set
+-- equals an older version's, mirroring the pwc pattern.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS community_provider_versions (
+  version_id  SERIAL PRIMARY KEY,
+  provider    TEXT NOT NULL,            -- 'acs' | 'cdc_places'
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT NOT NULL,
+  source      TEXT NOT NULL,            -- 'sync:acs:2025' | 'rollback:v42' | 'seed'
+  notes       TEXT,
+  row_count   INTEGER NOT NULL,
+  -- Quick "what's in here" index, without scanning version_rows:
+  --   {"<indicator_id>": ["2020", "2021", ...]}
+  vintages    JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS cpv_provider_idx ON community_provider_versions (provider, version_id DESC);
+
+CREATE TABLE IF NOT EXISTS community_provider_version_rows (
+  version_id   INTEGER NOT NULL REFERENCES community_provider_versions(version_id) ON DELETE CASCADE,
+  area_id      TEXT NOT NULL,
+  geo_layer    TEXT NOT NULL,
+  indicator_id TEXT NOT NULL,
+  year         TEXT NOT NULL,
+  payload      JSONB NOT NULL,          -- {value_num, value_text, label, source_year}
+  PRIMARY KEY (version_id, area_id, geo_layer, indicator_id, year)
+);
+CREATE INDEX IF NOT EXISTS cpvr_version_idx ON community_provider_version_rows (version_id);
+
+-- One row per provider. Forks are prevented by the PK.
+CREATE TABLE IF NOT EXISTS community_provider_current (
+  provider    TEXT PRIMARY KEY,
+  version_id  INTEGER NOT NULL REFERENCES community_provider_versions(version_id),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Availability status — read by the badge, written by the monthly cron and
+-- the "Check now" button. NEVER written by the sync apply path (sync
+-- updates `loaded_vintage` + `update_available` via its own apply tx so
+-- the status row stays consistent with the live data).
+CREATE TABLE IF NOT EXISTS community_provider_status (
+  provider               TEXT PRIMARY KEY,        -- 'acs' | 'cdc_places'
+  loaded_vintage         TEXT,
+  cdc_loaded_updated_at  TEXT,                    -- CDC only — Socrata rowsUpdatedAt at last sync
+  latest_vintage         TEXT,                    -- what the check found upstream
+  cdc_latest_updated_at  TEXT,                    -- CDC only — Socrata rowsUpdatedAt at last check
+  last_checked_at        TIMESTAMPTZ,
+  last_check_ok          BOOLEAN NOT NULL DEFAULT FALSE,
+  last_check_error       TEXT,
+  update_available       BOOLEAN NOT NULL DEFAULT FALSE
+);

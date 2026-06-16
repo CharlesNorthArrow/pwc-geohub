@@ -1,6 +1,7 @@
 import { getActiveSchema } from '../../src/server/adminDb';
 import ProgrammaticSection from './ProgrammaticSection';
 import StubCard from './StubCard';
+import CommunitySection from './CommunitySection';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,6 @@ const SCHOOL_STUB_CARDS = [
   { id: 'family_survey', title: 'Family Survey', description: 'NYC DOE Family Survey responses.' },
   { id: 'teacher_survey', title: 'Teacher Survey', description: 'NYC DOE Teacher Survey responses.' },
   { id: 'student_survey', title: 'Student Survey', description: 'NYC DOE Student Survey responses (incl. mental-health items).' },
-];
-
-const COMMUNITY_STUB_CARDS = [
-  { id: 'acs', title: 'ACS 5-yr (Census)', description: 'US Census American Community Survey — child poverty, single-parent HH, single-young-adults, foreign-born, unemployment, units-per-bedroom.' },
-  { id: 'cdc_places', title: 'CDC PLACES', description: 'CDC PLACES — mental-health & housing-insecurity prevalence by tract.' },
 ];
 
 export default async function AdminPage(): Promise<React.JSX.Element> {
@@ -57,11 +53,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
         title="Community indicators"
         subtitle="Federal data sources — synced on schedule."
       >
-        <CardGrid>
-          {COMMUNITY_STUB_CARDS.map((c) => (
-            <StubCard key={c.id} title={c.title} description={c.description} family="community" />
-          ))}
-        </CardGrid>
+        <CommunitySection />
       </Section>
     </div>
   );

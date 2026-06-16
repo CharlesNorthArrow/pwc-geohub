@@ -13,6 +13,8 @@ interface CdcOptions {
   resource: 'cwsq-ngmh';
   measureId: string;
   stateAbbr?: string;
+  /** Skip the api_cache read. Cache is still WRITTEN. Used by admin sync. */
+  forceFresh?: boolean;
 }
 
 export interface CdcPlacesRow {
@@ -33,8 +35,10 @@ const PAGE_SIZE = 50_000;
 export async function fetchCdcPlaces(opts: CdcOptions): Promise<CdcPlacesRow[]> {
   const stateAbbr = opts.stateAbbr ?? 'NY';
   const cacheKey = `cdc:${opts.resource}:${opts.measureId}:${stateAbbr}`;
-  const cached = await readCache(cacheKey);
-  if (cached) return cached;
+  if (!opts.forceFresh) {
+    const cached = await readCache(cacheKey);
+    if (cached) return cached;
+  }
 
   const rows: CdcPlacesRow[] = [];
   let offset = 0;

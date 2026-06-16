@@ -22,14 +22,20 @@ interface AcsFetchOptions {
   fields: string[];
   /** Default: `for=tract:*&in=state:36`. */
   geo?: string;
+  /** Skip the api_cache read and always re-fetch from Census. Cache is still
+   *  WRITTEN so subsequent ETL runs benefit. Used by the admin sync path so
+   *  the admin can never be misled by a stale cached vintage. */
+  forceFresh?: boolean;
 }
 
 export async function acsFetch(
   opts: AcsFetchOptions,
 ): Promise<Array<Record<string, string>>> {
   const cacheKey = buildCacheKey(opts);
-  const cached = await readCache(cacheKey);
-  if (cached) return cached;
+  if (!opts.forceFresh) {
+    const cached = await readCache(cacheKey);
+    if (cached) return cached;
+  }
 
   const url = buildUrl(opts);
   const key = process.env.CENSUS_API_KEY;

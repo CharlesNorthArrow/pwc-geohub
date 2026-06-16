@@ -32,12 +32,15 @@ Marketplace integrations:
    as `CENSUS_API_KEY` (Environment = Production + Preview + Development).
 5. _(Optional)_ Get a **CDC PLACES app token** to raise CDC rate limits at
    <https://data.cdc.gov/profile/app_tokens>. Add as `CDC_APP_TOKEN`.
-6. **Admin Panel password.** Set `ADMIN_PASSWORD` in Vercel project env
+6. **Admin Panel password + cron secret.** Set `ADMIN_PASSWORD` AND
+   `CRON_SECRET` in Vercel project env. The cron secret authenticates the
+   monthly community availability cron without an admin session.
    (Production + Preview, NOT Development unless you want the panel live
    locally too):
    ```pwsh
    vercel env add ADMIN_PASSWORD production
    vercel env add ADMIN_PASSWORD preview
+   vercel env add CRON_SECRET production
    ```
    Rotate by re-running `vercel env add` — every existing admin session
    becomes invalid on the next request. **Never commit this value.** The
@@ -73,6 +76,7 @@ This runs, in order:
 | `etl:cdc`         | `31-fetch-cdc-places.ts`     | `community_indicator_values` (2 CDC indicators) |
 | `etl:report`      | `90-data-quality-report.ts`  | `reports/data-quality.{md,json}` |
 | `etl:admin-init`  | `40-init-admin-versioning.ts` | Admin Panel version tables + seeds v1 from live `pwc_school_program` |
+| `etl:community-init` | `41-init-community-versioning.ts` | Community provider version tables + seeds v1 (per provider) from live `community_indicator_values` |
 
 ## 5. Verify Phase 0 acceptance tests
 
@@ -101,8 +105,12 @@ npm run etl:indicators && npm run etl:report
 # Run the Admin Panel merge / column-reconciliation tests.
 npm run test:admin-merge
 
-# Seed the Admin Panel version table (one-time after etl:pwc).
+# Run the Community sync tests (merge invariants + isNewer logic).
+npm run test:community
+
+# Seed the Admin Panel version tables (one-time after the data ETLs).
 npm run etl:admin-init
+npm run etl:community-init
 ```
 
 ## 7. Admin Panel
@@ -135,6 +143,33 @@ Safety invariants enforced by the merge layer (see `scripts/test-admin-merge.ts`
 - missing data column blocks until acknowledged;
 - extra columns default to Ignore;
 - all-null data rows are valid (inactive-year).
+
+### Community Indicators (ACS + CDC)
+
+Two functional cards (Census ACS, CDC PLACES) with the same versioning +
+rollback machinery as the programmatic feature plus a "new data available"
+check decoupled from sync:
+
+- **Monthly cron** (`/api/cron/community-availability-check` — schedule
+  `0 6 1 * *` in `vercel.json`) probes each source for the latest vintage
+  AND, for CDC, the Socrata `rowsUpdatedAt`. The cron writes ONLY a row in
+  `community_provider_status`; it never fetches indicator data. Endpoint
+  auth: `Authorization: Bearer ${CRON_SECRET}` (Vercel Cron passes it
+  automatically) OR admin session.
+- **"Check now"** button on the Community section runs the same probe on
+  demand; admin-session gated.
+- **Sync** per provider: previews the diff against the active version
+  (added/updated/unchanged/retained per indicator), then on confirm writes
+  a new immutable version, replaces the live `community_indicator_values`
+  slice for that provider in a single Postgres tx, and clears the
+  `update_available` flag.
+- **Fail-safe**: a failed availability check writes only `last_check_ok=false`
+  + the error message. `loaded_vintage`, `latest_vintage`, and
+  `update_available` are not touched — a transient blip can NEVER present
+  as a false "up to date". See `src/server/communityAdminDb.ts`
+  (`recordCheckFailure`).
+- **Update & append, never delete**: a sync that pulls vintage 2025 leaves
+  vintages 2020-2024 intact. Locked in `scripts/test-community.ts`.
 
 ## Open questions surfaced to PWC
 
