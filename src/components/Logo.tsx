@@ -352,20 +352,26 @@ function BackToDashboardButton(): React.JSX.Element | null {
   );
 }
 
-/** Placeholder admin gear — future data-update panel. */
+/** Admin gear — opens the Admin Panel (/admin). Mirrors ScorecardButton:
+ *  active styling when already on /admin, and the href flips to "/" so a
+ *  second click brings the user back to the dashboard. */
 function AdminButton(): React.JSX.Element {
+  const pathname = usePathname();
+  const isActive = pathname?.startsWith('/admin') ?? false;
+  const href = isActive ? '/' : '/admin';
+  const label = isActive ? 'Back to dashboard' : 'Open Admin Panel';
   return (
-    <button
-      type="button"
-      onClick={() => {
-        // Placeholder. The future Admin Panel ships separately (spec §10).
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      style={{
+        ...iconBtnStyle(isActive),
+        textDecoration: 'none',
       }}
-      aria-label="Admin data updates (coming soon)"
-      title="Admin data updates (coming soon)"
-      style={iconBtnStyle(false)}
     >
       <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>⚙</span>
-    </button>
+    </Link>
   );
 }
 
