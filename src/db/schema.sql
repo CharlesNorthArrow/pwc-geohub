@@ -193,3 +193,37 @@ CREATE TABLE IF NOT EXISTS data_quality_findings (
   PRIMARY KEY (run_id, category, subject)
 );
 CREATE INDEX IF NOT EXISTS dqf_category_idx ON data_quality_findings (category);
+
+-- =============================================================================
+-- Admin Panel — versioned, append-only history of pwc_school_program uploads.
+-- The live read view (`pwc_school_program`) is untouched by the dashboard.
+-- Admin "apply" wraps the swap in a single tx so readers either see the old
+-- or the new version, never a partial state. "Rollback" writes a NEW version
+-- whose payload set equals an older version's — history stays append-only.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS pwc_program_versions (
+  version_id  SERIAL PRIMARY KEY,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT NOT NULL,           -- 'admin' until real users exist
+  source      TEXT NOT NULL,           -- 'upload:<filename>' | 'rollback:v<id>' | 'seed'
+  notes       TEXT,
+  row_count   INTEGER NOT NULL,
+  csv_url     TEXT                     -- Vercel Blob immutable snapshot
+);
+
+CREATE TABLE IF NOT EXISTS pwc_program_version_rows (
+  version_id  INTEGER NOT NULL REFERENCES pwc_program_versions(version_id) ON DELETE CASCADE,
+  dbn         TEXT NOT NULL,
+  school_year TEXT NOT NULL,
+  payload     JSONB NOT NULL,          -- full row's data columns, schema-shaped
+  PRIMARY KEY (version_id, dbn, school_year)
+);
+CREATE INDEX IF NOT EXISTS pwc_pvr_version_idx ON pwc_program_version_rows (version_id);
+
+-- Singleton pointer at the currently-active version. CHECK(pin=1) keeps it
+-- to one row so concurrent inserts can't fork the "current" identity.
+CREATE TABLE IF NOT EXISTS pwc_program_current (
+  pin        INTEGER PRIMARY KEY DEFAULT 1 CHECK (pin = 1),
+  version_id INTEGER NOT NULL REFERENCES pwc_program_versions(version_id),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

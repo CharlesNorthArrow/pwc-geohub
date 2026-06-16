@@ -32,6 +32,17 @@ Marketplace integrations:
    as `CENSUS_API_KEY` (Environment = Production + Preview + Development).
 5. _(Optional)_ Get a **CDC PLACES app token** to raise CDC rate limits at
    <https://data.cdc.gov/profile/app_tokens>. Add as `CDC_APP_TOKEN`.
+6. **Admin Panel password.** Set `ADMIN_PASSWORD` in Vercel project env
+   (Production + Preview, NOT Development unless you want the panel live
+   locally too):
+   ```pwsh
+   vercel env add ADMIN_PASSWORD production
+   vercel env add ADMIN_PASSWORD preview
+   ```
+   Rotate by re-running `vercel env add` — every existing admin session
+   becomes invalid on the next request. **Never commit this value.** The
+   admin route is at `/admin`; without `ADMIN_PASSWORD` set, every login
+   request fails closed.
 
 ## 3. Pull env vars locally
 
@@ -61,6 +72,7 @@ This runs, in order:
 | `etl:acs`         | `30-fetch-acs.ts`            | `community_indicator_values` (6 ACS indicators) |
 | `etl:cdc`         | `31-fetch-cdc-places.ts`     | `community_indicator_values` (2 CDC indicators) |
 | `etl:report`      | `90-data-quality-report.ts`  | `reports/data-quality.{md,json}` |
+| `etl:admin-init`  | `40-init-admin-versioning.ts` | Admin Panel version tables + seeds v1 from live `pwc_school_program` |
 
 ## 5. Verify Phase 0 acceptance tests
 
@@ -85,7 +97,44 @@ npm run typecheck
 
 # Re-run only the indicator ETL (e.g. after editing the registry).
 npm run etl:indicators && npm run etl:report
+
+# Run the Admin Panel merge / column-reconciliation tests.
+npm run test:admin-merge
+
+# Seed the Admin Panel version table (one-time after etl:pwc).
+npm run etl:admin-init
 ```
+
+## 7. Admin Panel
+
+Live at `/admin` once `ADMIN_PASSWORD` is set in env. Three sections:
+**Programmatic** (functional — upload pwc_schools CSV), **School Indicators**
+(11 stub cards), **Community Indicators** (2 stub cards). The functional
+upload flow:
+
+1. Pick CSV → server parses + classifies columns against the canonical schema
+   (`src/admin/pwcSchema.ts`).
+2. If anything is unmatched / missing / extra → the admin walks the
+   reconciliation dialog. Renames map to schema fields (never auto-applied);
+   missing data columns require explicit acknowledgment; missing KEY column
+   = hard block.
+3. Diff preview shows new / updated / unchanged / retained counts, the list
+   of changed columns per row, and any DBNs not present in the schools
+   master (which would FK-fail on apply → Apply disabled until resolved).
+4. Apply writes a new immutable version (single Postgres tx: insert version,
+   insert rows, replace `pwc_school_program`, swap current pointer, then
+   uploads an immutable CSV snapshot to Vercel Blob).
+5. Version history (date, who, source, row count, notes) with one-click
+   rollback. Rollback writes a NEW version row whose payload set equals the
+   target's — history stays append-only.
+
+Safety invariants enforced by the merge layer (see `scripts/test-admin-merge.ts`):
+- update & append, never delete (rows present today but absent from the
+  upload are retained verbatim);
+- missing KEY column hard-blocks;
+- missing data column blocks until acknowledged;
+- extra columns default to Ignore;
+- all-null data rows are valid (inactive-year).
 
 ## Open questions surfaced to PWC
 
