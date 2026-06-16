@@ -17,11 +17,78 @@
  *     module is purely "raw vintage → normalized community rows".
  */
 
-import { acsFetch, buildTractGeoid } from '../../scripts/lib/acs.js';
-import { fetchCdcPlaces } from '../../scripts/lib/cdc.js';
 import { NYC_COUNTY_FIPS } from '../registry/geographies.js';
 import { activeAcsIndicators, activeCdcIndicators } from '../registry/indicators.js';
 import type { AcsSource, CdcPlacesSource, IndicatorRegistryEntry } from '../registry/types.js';
+
+/* ---------- inline fetch helpers (no cache; admin sync is always fresh) ----------
+ * Cached variants live in scripts/lib/{acs,cdc}.ts for ETL replay — we can't
+ * import those from Next routes (they're outside the app's bundler root).
+ */
+
+type AcsEndpoint = 'acs5' | 'acs5/subject' | 'acs5/profile';
+
+async function acsFetchFresh(opts: { year: string; endpoint: AcsEndpoint; fields: string[] }): Promise<Array<Record<string, string>>> {
+  const url = new URL(`https://api.census.gov/data/${opts.year}/acs/${opts.endpoint}`);
+  url.searchParams.set('get', ['NAME', ...opts.fields].join(','));
+  url.searchParams.set('for', 'tract:*');
+  url.searchParams.set('in', 'state:36');
+  const key = process.env.CENSUS_API_KEY;
+  if (key) url.searchParams.set('key', key);
+  const res = await fetch(url.toString());
+  const body = await res.text();
+  if (!res.ok) throw new Error(`ACS fetch failed (${res.status}) for ${url.toString()}: ${body.slice(0, 200)}`);
+  const matrix = JSON.parse(body) as string[][];
+  const [header, ...rest] = matrix;
+  if (!header) return [];
+  return rest.map((row) => {
+    const o: Record<string, string> = {};
+    for (let i = 0; i < header.length; i++) o[header[i]!] = row[i] ?? '';
+    return o;
+  });
+}
+
+interface CdcPlacesRow {
+  stateabbr: string;
+  countyname: string;
+  countyfips: string;
+  locationname: string;
+  data_value: string;
+  measureid: string;
+  measure: string;
+  year: string;
+  short_question_text?: string;
+}
+
+async function fetchCdcPlacesFresh(opts: { resource: 'cwsq-ngmh'; measureId: string }): Promise<CdcPlacesRow[]> {
+  const PAGE = 50_000;
+  const rows: CdcPlacesRow[] = [];
+  let offset = 0;
+  for (;;) {
+    const url = new URL(`https://data.cdc.gov/resource/${opts.resource}.json`);
+    url.searchParams.set('$where', `measureid='${opts.measureId}' AND stateabbr='NY'`);
+    url.searchParams.set('$limit', String(PAGE));
+    url.searchParams.set('$offset', String(offset));
+    const headers: Record<string, string> = {};
+    const token = process.env.CDC_APP_TOKEN;
+    if (token) headers['X-App-Token'] = token;
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`CDC fetch failed (${res.status}): ${body.slice(0, 200)}`);
+    }
+    const page = (await res.json()) as CdcPlacesRow[];
+    if (!Array.isArray(page) || page.length === 0) break;
+    rows.push(...page);
+    if (page.length < PAGE) break;
+    offset += page.length;
+  }
+  return rows;
+}
+
+function buildTractGeoid(state: string, county: string, tract: string): string {
+  return `${state.padStart(2, '0')}${county.padStart(3, '0')}${tract.padStart(6, '0')}`;
+}
 
 export interface CommunityRow {
   area_id: string;
@@ -57,11 +124,11 @@ export function acsNum(raw: string | undefined): number | null {
 /* ACS                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchAcsVintage(year: string, indicators: IndicatorRegistryEntry[], forceFresh = false): Promise<CommunityRow[]> {
+export async function fetchAcsVintage(year: string, indicators: IndicatorRegistryEntry[], _forceFresh = true): Promise<CommunityRow[]> {
   const out: CommunityRow[] = [];
   for (const ind of indicators) {
     const src = ind.source as AcsSource;
-    const records = await acsFetch({ year, endpoint: src.endpoint, fields: src.fields, forceFresh });
+    const records = await acsFetchFresh({ year, endpoint: src.endpoint, fields: src.fields });
     const nyc = records.filter(isNycTract);
     for (const r of nyc) {
       const geoid = buildTractGeoid(r['state']!, r['county']!, r['tract']!);
@@ -162,11 +229,11 @@ export function computeAcsValue(
  * CDC's feed ships every vintage in one response. We return the rows grouped
  * by their own `year` column so each vintage lands under its true tag.
  */
-export async function fetchCdcAllVintages(indicators: IndicatorRegistryEntry[], forceFresh = false): Promise<Map<string, CommunityRow[]>> {
+export async function fetchCdcAllVintages(indicators: IndicatorRegistryEntry[], _forceFresh = true): Promise<Map<string, CommunityRow[]>> {
   const byYear = new Map<string, CommunityRow[]>();
   for (const ind of indicators) {
     const src = ind.source as CdcPlacesSource;
-    const all = await fetchCdcPlaces({ resource: src.resource, measureId: src.measure_id, forceFresh });
+    const all = await fetchCdcPlacesFresh({ resource: src.resource, measureId: src.measure_id });
     const nyc = all.filter((r) => {
       const fips = (r.countyfips ?? '').padStart(5, '0');
       const county = fips.slice(2);
@@ -202,7 +269,7 @@ export async function fetchCdcAllVintages(indicators: IndicatorRegistryEntry[], 
  * Socrata endpoint (it has no per-year filter that's both efficient and
  * complete), then keep only the requested year's rows.
  */
-export async function fetchCdcVintage(year: string, indicators: IndicatorRegistryEntry[], forceFresh = false): Promise<CommunityRow[]> {
-  const byYear = await fetchCdcAllVintages(indicators, forceFresh);
+export async function fetchCdcVintage(year: string, indicators: IndicatorRegistryEntry[], _forceFresh = true): Promise<CommunityRow[]> {
+  const byYear = await fetchCdcAllVintages(indicators);
   return byYear.get(year) ?? [];
 }
