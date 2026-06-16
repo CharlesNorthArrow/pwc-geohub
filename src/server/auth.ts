@@ -78,7 +78,10 @@ export async function startAdminSession(submitted: string): Promise<{ ok: boolea
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    path: '/admin',
+    // path='/' so the cookie is sent with both the /admin page AND the
+    // /api/admin/* routes the page calls. Scoping to /admin would gate the
+    // page but 401 every XHR — they're different path prefixes.
+    path: '/',
     maxAge: COOKIE_MAX_AGE_S,
   });
   return { ok: true };
@@ -86,7 +89,10 @@ export async function startAdminSession(submitted: string): Promise<{ ok: boolea
 
 export async function endAdminSession(): Promise<void> {
   const store = await cookies();
-  store.delete(ADMIN_COOKIE);
+  // Clear at the current ('/') path AND at the legacy ('/admin') path so
+  // pre-fix sessions get fully reaped on next sign-out.
+  store.set({ name: ADMIN_COOKIE, value: '', path: '/', maxAge: 0 });
+  store.set({ name: ADMIN_COOKIE, value: '', path: '/admin', maxAge: 0 });
 }
 
 /**
