@@ -17,9 +17,9 @@
  *     module is purely "raw vintage → normalized community rows".
  */
 
-import { NYC_COUNTY_FIPS } from '../registry/geographies.js';
-import { activeAcsIndicators, activeCdcIndicators } from '../registry/indicators.js';
-import type { AcsSource, CdcPlacesSource, IndicatorRegistryEntry } from '../registry/types.js';
+import { NYC_COUNTY_FIPS } from '../registry/geographies';
+import { activeAcsIndicators, activeCdcIndicators } from '../registry/indicators';
+import type { AcsSource, CdcPlacesSource, IndicatorRegistryEntry } from '../registry/types';
 
 /* ---------- inline fetch helpers (no cache; admin sync is always fresh) ----------
  * Cached variants live in scripts/lib/{acs,cdc}.ts for ETL replay — we can't
