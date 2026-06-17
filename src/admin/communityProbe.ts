@@ -62,17 +62,32 @@ export async function probeAcs(now: Date = new Date()): Promise<AcsProbe> {
 }
 
 async function probeAcsYear(year: string): Promise<boolean> {
-  const url = `https://api.census.gov/data/${year}/acs/acs5?get=NAME&for=us:1`;
+  const url = new URL(`https://api.census.gov/data/${year}/acs/acs5`);
+  url.searchParams.set('get', 'NAME');
+  url.searchParams.set('for', 'us:1');
+  // Census now gates effectively every request behind an API key — keyless
+  // requests return 200 OK with an HTML "Missing Key" page, which is
+  // indistinguishable from "year doesn't exist" if we only look at status.
+  // Use the existing server-side key (same one ETL uses) so the probe is
+  // a single round-trip and produces a reliable JSON answer.
+  const key = process.env.CENSUS_API_KEY;
+  if (key) url.searchParams.set('key', key);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ACS_PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url.toString(), { signal: ctrl.signal });
     if (res.status === 404) return false;
     if (!res.ok) throw new Error(`ACS probe ${year}: HTTP ${res.status}`);
     const body = await res.text();
-    // Census happy responses are matrix-JSON: [["NAME","us"],[ "United States","1"]]
-    if (!body.startsWith('[')) return false;
-    return true;
+    // Census happy responses are matrix-JSON: [["NAME","us"],["United States","1"]].
+    if (body.startsWith('[')) return true;
+    // Missing/invalid key path returns a 200 HTML page — surface as a probe
+    // error (NOT "year doesn't exist") so the badge says "Couldn't check"
+    // instead of silently walking past every vintage.
+    if (body.includes('Missing Key') || body.includes('valid key') || body.includes('<html')) {
+      throw new Error(`ACS probe ${year}: Census rejected request (missing/invalid CENSUS_API_KEY)`);
+    }
+    return false;
   } finally {
     clearTimeout(t);
   }
@@ -150,7 +165,16 @@ export function isNewer(
   if (compareVintage(probe.latestVintage, loaded.vintage) > 0) {
     return { newer: true, reason: 'newer_vintage' };
   }
-  if (probe.provider === 'cdc_places' && loaded.cdcUpdatedAt !== probe.rowsUpdatedAt) {
+  // CDC re-issue check: only when BOTH sides have a recorded updatedAt and
+  // they differ. NULL loaded.cdcUpdatedAt means we never recorded it (e.g.
+  // initial seed pre-dates the admin sync path) — treat as "unknown" so the
+  // badge doesn't claim a re-issue on every check just because the seed
+  // didn't capture it.
+  if (
+    probe.provider === 'cdc_places' &&
+    loaded.cdcUpdatedAt != null &&
+    loaded.cdcUpdatedAt !== probe.rowsUpdatedAt
+  ) {
     return { newer: true, reason: 'cdc_reissue' };
   }
   return { newer: false, reason: 'already_latest' };

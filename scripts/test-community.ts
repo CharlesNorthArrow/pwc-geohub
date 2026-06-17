@@ -102,6 +102,14 @@ console.log('\n== isNewer ==');
   // ACS retracted (loaded > probe) — treat as already_latest, NOT newer.
   r = isNewer({ vintage: '2024', cdcUpdatedAt: null }, { provider: 'acs', latestVintage: '2023', probedYears: [] });
   check('ACS loaded > probe → not newer (no auto-rollback)', !r.newer);
+
+  // CDC seed (loaded cdcUpdatedAt is NULL) — same vintage, probe has a
+  // rowsUpdatedAt. Should NOT claim newer; NULL means "never recorded".
+  r = isNewer(
+    { vintage: '2024', cdcUpdatedAt: null },
+    { provider: 'cdc_places', latestVintage: '2024', rowsUpdatedAt: '1750000000' },
+  );
+  check('CDC NULL loaded.cdcUpdatedAt + same vintage → not newer (seed semantics)', !r.newer);
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);

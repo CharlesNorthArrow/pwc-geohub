@@ -48,7 +48,7 @@ export async function computePreview(provider: Provider): Promise<SyncPreview> {
   const newer =
     loadedVintage == null ||
     compareVintage(probe.latestVintage, loadedVintage) > 0 ||
-    (provider === 'cdc_places' && loadedCdcUpd !== cdcUpd);
+    (provider === 'cdc_places' && loadedCdcUpd != null && loadedCdcUpd !== cdcUpd);
 
   if (!newer) {
     return emptyPreview({
@@ -160,7 +160,7 @@ export async function applyProvider(provider: Provider, notes: string | null): P
   const newer =
     loadedVintage == null ||
     compareVintage(probe.latestVintage, loadedVintage) > 0 ||
-    (provider === 'cdc_places' && loadedCdcUpd !== cdcUpd);
+    (provider === 'cdc_places' && loadedCdcUpd != null && loadedCdcUpd !== cdcUpd);
   if (!newer) return { versionId: null, alreadyLatest: true };
 
   const indicators = indicatorsForProvider(provider);

@@ -190,7 +190,14 @@ function isNewerThanLoaded(
 ): boolean {
   if (loaded.vintage == null) return true;
   if (compareVintage(probe.latestVintage, loaded.vintage) > 0) return true;
-  if (probe.provider === 'cdc_places' && loaded.cdcUpdatedAt !== probe.cdcUpdatedAt) return true;
+  // Only flip "newer" on a CDC re-issue when we have a baseline to compare
+  // against. NULL loaded.cdcUpdatedAt means "never recorded" (e.g. seed) —
+  // treat as unknown, NOT as automatically stale.
+  if (
+    probe.provider === 'cdc_places' &&
+    loaded.cdcUpdatedAt != null &&
+    loaded.cdcUpdatedAt !== probe.cdcUpdatedAt
+  ) return true;
   return false;
 }
 
