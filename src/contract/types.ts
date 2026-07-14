@@ -255,6 +255,13 @@ export interface SchoolMaster {
    *  Null if no year has reported a non-null enrollment. Used to size the
    *  baseline (no-indicator-selected) circles. */
   total_enrollment: number | null;
+  /** Latest non-null need demographics per school (same latest-per-field
+   *  convention as `total_enrollment`), scaled 0..100 like the profile
+   *  endpoint. Added for Spotlight's profile-field candidates; existing
+   *  consumers may ignore them. */
+  pct_poverty: number | null;
+  pct_students_with_disabilities: number | null;
+  pct_english_language_learners: number | null;
   /** Canonical grade tokens this school serves (PK/K/1..12), normalized
    *  server-side from `schools.grades`. Empty when the source value is
    *  missing or unparseable — the Grade filter treats empty as "doesn't

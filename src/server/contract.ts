@@ -341,6 +341,9 @@ interface SchoolMasterRow {
   longitude: number | null;
   latitude: number | null;
   total_enrollment: number | null;
+  pct_poverty: number | null;
+  pct_students_with_disabilities: number | null;
+  pct_english_language_learners: number | null;
   grades: string | null;
   /** PostGIS array_agg of `geo_layer:area_id` pairs, one per crosswalk hit. */
   geo_pairs: string[] | null;
@@ -368,6 +371,30 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
         ORDER BY sy.school_year DESC
         LIMIT 1
       ) AS total_enrollment,
+      -- Latest non-null need demographics (same per-field convention as
+      -- enrollment). Fractions [0,1] here; scaled ×100 below like the
+      -- profile endpoint so 'percent' formatting stays uniform app-wide.
+      (
+        SELECT sy.pct_poverty
+        FROM schools_year sy
+        WHERE sy.dbn = s.dbn AND sy.pct_poverty IS NOT NULL
+        ORDER BY sy.school_year DESC
+        LIMIT 1
+      ) AS pct_poverty,
+      (
+        SELECT sy.pct_students_with_disabilities
+        FROM schools_year sy
+        WHERE sy.dbn = s.dbn AND sy.pct_students_with_disabilities IS NOT NULL
+        ORDER BY sy.school_year DESC
+        LIMIT 1
+      ) AS pct_students_with_disabilities,
+      (
+        SELECT sy.pct_english_language_learners
+        FROM schools_year sy
+        WHERE sy.dbn = s.dbn AND sy.pct_english_language_learners IS NOT NULL
+        ORDER BY sy.school_year DESC
+        LIMIT 1
+      ) AS pct_english_language_learners,
       ARRAY(
         SELECT c.geo_layer || ':' || c.area_id
         FROM school_geo_crosswalk c
@@ -396,6 +423,11 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
       longitude: Number(r.longitude),
       latitude: Number(r.latitude),
       total_enrollment: r.total_enrollment,
+      pct_poverty: r.pct_poverty == null ? null : r.pct_poverty * 100,
+      pct_students_with_disabilities:
+        r.pct_students_with_disabilities == null ? null : r.pct_students_with_disabilities * 100,
+      pct_english_language_learners:
+        r.pct_english_language_learners == null ? null : r.pct_english_language_learners * 100,
       grades_canonical: normalizeMasterGrades(r.grades),
       geos,
     };

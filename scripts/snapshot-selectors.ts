@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Characterization snapshot harness for the Phase 1-5 shared selectors.
  *
  * Locks the current outputs of `applyFilters` (filtered universe) and
  * `deriveAnalytics` (KPI / timeline / ranked list) plus the indicator-year
  * resolution + missing-year flags inferred per `<Shell/>`. The next refactor
- * pass MUST keep these snapshots byte-identical — that's the contract.
+ * pass MUST keep these snapshots byte-identical â€” that's the contract.
  *
  * Run:
  *   npm run snapshot:selectors
@@ -12,7 +12,7 @@
  * Output: reports/selectors-snapshot.json (deterministic; safe to git-diff).
  *
  * Inputs are synthetic fixtures, not the live DB. The point isn't to assert
- * "what the production DB says today" — it's to lock the *pure-function
+ * "what the production DB says today" â€” it's to lock the *pure-function
  * behaviour* of the selectors so a refactor can't quietly drift.
  */
 
@@ -42,22 +42,22 @@ import type { SchoolType } from '../src/store/useHubStore.js';
 
 const SCHOOLS: SchoolMaster[] = [
   // Brownsville cohort, school_district 23
-  { dbn: 'DBN-01', school_name: 'P.S. One', borough: 'K', latitude: 40.66, longitude: -73.91, total_enrollment: 400, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
-  { dbn: 'DBN-02', school_name: 'P.S. Two', borough: 'K', latitude: 40.67, longitude: -73.92, total_enrollment: 350, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
-  { dbn: 'DBN-07', school_name: 'P.S. Seven', borough: 'K', latitude: 40.66, longitude: -73.92, total_enrollment: 200, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [] },
+  { dbn: 'DBN-01', school_name: 'P.S. One', borough: 'K', latitude: 40.66, longitude: -73.91, total_enrollment: 400, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-02', school_name: 'P.S. Two', borough: 'K', latitude: 40.67, longitude: -73.92, total_enrollment: 350, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-07', school_name: 'P.S. Seven', borough: 'K', latitude: 40.66, longitude: -73.92, total_enrollment: 200, geos: { school_district: '23', council: '41', county: 'K' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
   // East Harlem cohort, school_district 4
-  { dbn: 'DBN-03', school_name: 'P.S. Three', borough: 'M', latitude: 40.79, longitude: -73.94, total_enrollment: 500, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
-  { dbn: 'DBN-04', school_name: 'P.S. Four', borough: 'M', latitude: 40.80, longitude: -73.94, total_enrollment: 300, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
-  { dbn: 'DBN-08', school_name: 'P.S. Eight', borough: 'M', latitude: 40.79, longitude: -73.93, total_enrollment: 250, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [] },
+  { dbn: 'DBN-03', school_name: 'P.S. Three', borough: 'M', latitude: 40.79, longitude: -73.94, total_enrollment: 500, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-04', school_name: 'P.S. Four', borough: 'M', latitude: 40.80, longitude: -73.94, total_enrollment: 300, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-08', school_name: 'P.S. Eight', borough: 'M', latitude: 40.79, longitude: -73.93, total_enrollment: 250, geos: { school_district: '4', council: '8', county: 'M' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
   // Morrisania cohort, school_district 8
-  { dbn: 'DBN-05', school_name: 'P.S. Five', borough: 'X', latitude: 40.83, longitude: -73.90, total_enrollment: 600, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [] },
-  { dbn: 'DBN-09', school_name: 'P.S. Nine', borough: 'X', latitude: 40.83, longitude: -73.91, total_enrollment: 550, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [] },
+  { dbn: 'DBN-05', school_name: 'P.S. Five', borough: 'X', latitude: 40.83, longitude: -73.90, total_enrollment: 600, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-09', school_name: 'P.S. Nine', borough: 'X', latitude: 40.83, longitude: -73.91, total_enrollment: 550, geos: { school_district: '8', council: '17', county: 'X' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
   // Fort Greene cohort, school_district 13
-  { dbn: 'DBN-06', school_name: 'P.S. Six', borough: 'K', latitude: 40.69, longitude: -73.97, total_enrollment: 450, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [] },
-  { dbn: 'DBN-10', school_name: 'P.S. Ten', borough: 'K', latitude: 40.69, longitude: -73.98, total_enrollment: 300, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [] },
+  { dbn: 'DBN-06', school_name: 'P.S. Six', borough: 'K', latitude: 40.69, longitude: -73.97, total_enrollment: 450, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
+  { dbn: 'DBN-10', school_name: 'P.S. Ten', borough: 'K', latitude: 40.69, longitude: -73.98, total_enrollment: 300, geos: { school_district: '13', council: '35', county: 'K' }, grades_canonical: [], pct_poverty: null, pct_students_with_disabilities: null, pct_english_language_learners: null },
 ];
 
-// PWC membership snapshots — by year. Note: DBN-03 is 'both' (anchor + healing
+// PWC membership snapshots â€” by year. Note: DBN-03 is 'both' (anchor + healing
 // arts), so it must pass either the Anchor or Healing Arts School Type filter
 // AND show in both KPI cells. DBN-04 is 'pwc_other'.
 function pwcSnapshot(year: SliderYear | '2025-26'): PwcMember[] {
@@ -77,7 +77,7 @@ function pwcSnapshot(year: SliderYear | '2025-26'): PwcMember[] {
 
 const ALL_COHORTS = ['Brownsville', 'East Harlem', 'Fort Greene', 'Morrisania'];
 
-/* Indicators — minimal IndicatorPublic shape, enough for the selectors. */
+/* Indicators â€” minimal IndicatorPublic shape, enough for the selectors. */
 const math: IndicatorPublic = {
   id: 'math_proficiency',
   family: 'school',
@@ -108,7 +108,7 @@ const artsEd: IndicatorPublic = {
   format: 'integer',
   scale: { type: 'diverging', good_direction: 'high' },
   geometry: 'point',
-  // Discontinuous — only two years. Triggers the missing-year case for 2022-23.
+  // Discontinuous â€” only two years. Triggers the missing-year case for 2022-23.
   years: ['2020-21', '2024-25'],
   source_description: 'fixture',
 };
@@ -120,13 +120,13 @@ const childPoverty: IndicatorPublic = {
   format: 'percent',
   scale: { type: 'sequential', good_direction: 'low' },
   geometry: 'polygon',
-  // Calendar years from ACS — slider mapping makes 2021 the only "data" stop
+  // Calendar years from ACS â€” slider mapping makes 2021 the only "data" stop
   // inside the slider for snapshot purposes.
   years: ['2021', '2022', '2023'],
   source_description: 'fixture',
 };
 
-/* Fixed value tables — deterministic per (indicator, year, dbn). */
+/* Fixed value tables â€” deterministic per (indicator, year, dbn). */
 function seriesFor(indicatorId: string): AnalyticsSeriesRow[] {
   if (indicatorId === 'math_proficiency') {
     // higher = better. DBN-04 deliberately null in 2024-25 to exercise null skip.
@@ -159,7 +159,7 @@ function seriesFor(indicatorId: string): AnalyticsSeriesRow[] {
     return rowsFromTable(TABLE);
   }
   if (indicatorId === 'child_poverty') {
-    // Community series — calendar years. Shell normalizes via fromCommunityYear
+    // Community series â€” calendar years. Shell normalizes via fromCommunityYear
     // before passing into deriveAnalytics; mirror that here so the snapshot
     // reflects what the panel actually consumes.
     const TABLE_CAL: Record<string, Record<string, number | null>> = {
@@ -259,7 +259,7 @@ interface AnalyticsSnap {
     allInView: number | null;
     citywide: number | null;
   }>;
-  /** Top 5 ranked rows — DBN + category + latestValue. */
+  /** Top 5 ranked rows â€” DBN + category + latestValue. */
   topList: Array<{ rank: number; dbn: string; category: string; latestValue: number | null }>;
   /** Full ranked-list order (DBN only) so the user can spot order changes. */
   fullOrder: string[];
@@ -284,7 +284,7 @@ function round(x: number | null, decimals = 4): number | null {
 function snapUniverse(state: FilterState): UniverseSnap {
   const u = applyFilters({
     state: {
-      // Cast the geoFilters fixture to GeoFilterMap shape — our fixtures don't
+      // Cast the geoFilters fixture to GeoFilterMap shape â€” our fixtures don't
       // actually exercise the Geo layer here (the two filter states focus on
       // School Type + Cohort).
       geoFilters: state.geoFilters,
@@ -318,7 +318,7 @@ function snapAnalytics(indicator: IndicatorPublic, year: SliderYear, state: Filt
     allCohorts: ALL_COHORTS,
   });
   // Per-year membership map. We hold membership steady across the slider
-  // years for fixture stability — `deriveAnalytics` still does the per-year
+  // years for fixture stability â€” `deriveAnalytics` still does the per-year
   // lookup it would do in production.
   const pwcByYear: Record<string, PwcMember[]> = {};
   for (const y of SLIDER_YEARS) pwcByYear[y] = pwcSnapshot(y);
@@ -377,7 +377,7 @@ for (const ind of [...SCHOOL_INDICATORS, ...COMMUNITY_INDICATORS]) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Percentile snapshots (School Detail Panel §1.a)                            */
+/* Percentile snapshots (School Detail Panel Â§1.a)                            */
 /* -------------------------------------------------------------------------- */
 
 interface PercentileCase {

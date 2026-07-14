@@ -75,10 +75,11 @@ export default function Logo(): React.JSX.Element {
       </a>
       <CreditsButton />
       <ScorecardButton />
+      <SpotlightButton />
       <AdminButton />
-      {/* Back-to-dashboard pill — only on the Scorecard route. Sits to the
-       *  right of the three icon buttons so users always have a prominent
-       *  return path. */}
+      {/* Back-to-dashboard pill — only on the standalone routes (Scorecard,
+       *  Spotlight). Sits to the right of the icon buttons so users always
+       *  have a prominent return path. */}
       <BackToDashboardButton />
     </div>
   );
@@ -311,7 +312,8 @@ function ScorecardIcon(): React.JSX.Element {
  */
 function BackToDashboardButton(): React.JSX.Element | null {
   const pathname = usePathname();
-  if (pathname !== '/scorecard') return null;
+  const show = pathname === '/scorecard' || (pathname?.startsWith('/spotlight') ?? false);
+  if (!show) return null;
   return (
     <Link
       href="/"
@@ -349,6 +351,48 @@ function BackToDashboardButton(): React.JSX.Element | null {
       </svg>
       Back to dashboard
     </Link>
+  );
+}
+
+/** View switcher → Spotlight (shareable per-school card builder). Mirrors
+ *  ScorecardButton: active styling anywhere under /spotlight, href flips to
+ *  "/" so a second click returns to the dashboard. */
+function SpotlightButton(): React.JSX.Element {
+  const pathname = usePathname();
+  const isActive = pathname?.startsWith('/spotlight') ?? false;
+  const href = isActive ? '/' : '/spotlight';
+  const label = isActive ? 'Back to dashboard' : 'Open Spotlight';
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      style={{
+        ...iconBtnStyle(isActive),
+        textDecoration: 'none',
+      }}
+    >
+      <SpotlightIcon />
+    </Link>
+  );
+}
+
+/** 14×14 five-point star — visual shorthand for "spotlight a school". Echoes
+ *  the sunburst star at the center of the PWC mark. */
+function SpotlightIcon(): React.JSX.Element {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 16 16"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinejoin="round"
+    >
+      <path d="M 8 1.8 L 9.7 6 L 14.2 6.3 L 10.7 9.1 L 11.9 13.5 L 8 11 L 4.1 13.5 L 5.3 9.1 L 1.8 6.3 L 6.3 6 Z" />
+    </svg>
   );
 }
 
