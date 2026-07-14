@@ -12,21 +12,7 @@
 
 import { db } from '../lib/db.js';
 import { recordFinding } from '../lib/findings.js';
-
-const CROSSWALK_LAYERS = [
-  // Phase 0
-  'school_district',
-  'nta_2020',
-  // Phase 3 — §6.1 Geo filter (Counties, Senate, Assembly, Council, School Dist, Community Dist)
-  'county',
-  'senate',
-  'assembly',
-  'council',
-  'community_district',
-  // Added per user request — US Congressional Districts (not in §6.1 but
-  // useful to PWC advocacy work).
-  'congressional',
-] as const;
+import { CROSSWALK_LAYERS } from '../../src/lib/crosswalkLayers';
 
 async function buildOne(layer: string): Promise<void> {
   const sql = db();

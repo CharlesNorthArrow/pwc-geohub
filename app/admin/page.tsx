@@ -1,5 +1,7 @@
 import { getActiveSchema } from '../../src/server/adminDb';
+import { getActiveMasterSchema } from '../../src/server/schoolMasterAdminDb';
 import ProgrammaticSection from './ProgrammaticSection';
+import SchoolMasterSection from './SchoolMasterSection';
 import StubCard from './StubCard';
 import CommunitySection from './CommunitySection';
 
@@ -24,6 +26,7 @@ const SCHOOL_STUB_CARDS = [
 
 export default async function AdminPage(): Promise<React.JSX.Element> {
   const schema = await getActiveSchema();
+  const masterSchema = await getActiveMasterSchema();
   return (
     <div>
       <h1 style={{ fontSize: 24, margin: '0 0 6px 0' }}>Data Admin</h1>
@@ -36,6 +39,13 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
         subtitle="PWC-owned data uploaded as CSV (once per year)."
       >
         <ProgrammaticSection initialSchema={schema} />
+      </Section>
+
+      <Section
+        title="School data master"
+        subtitle="School identity, geocoding, enrollment & demographics — the base dataset everything joins to (updated once per year)."
+      >
+        <SchoolMasterSection initialSchema={masterSchema} />
       </Section>
 
       <Section

@@ -3,6 +3,9 @@
  *
  * Every redaction sentinel and quirky string lives here so components never
  * need to know about them.
+ *
+ * Canonical home is src/lib so both the ETL scripts and the Next.js admin
+ * routes share one implementation.
  */
 
 /** String values that should be coerced to NULL in numeric columns. */

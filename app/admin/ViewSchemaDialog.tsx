@@ -19,21 +19,29 @@ interface SchemaResponse {
   updatedAt: string | null;
 }
 
-export default function ViewSchemaDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
+export default function ViewSchemaDialog({
+  onClose,
+  basePath = '/api/admin/pwc',
+  datasetLabel = 'pwc_schools',
+}: {
+  onClose: () => void;
+  basePath?: string;
+  datasetLabel?: string;
+}): React.JSX.Element {
   const [data, setData] = useState<SchemaResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/pwc/schema')
+    fetch(`${basePath}/schema`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         setData((await r.json()) as SchemaResponse);
       })
       .catch((e) => setErr((e as Error).message));
-  }, []);
+  }, [basePath]);
 
   return (
-    <Modal title="pwc_schools schema" onClose={onClose} width={720}>
+    <Modal title={`${datasetLabel} schema`} onClose={onClose} width={720}>
       {err ? (
         <div style={{ color: '#c0392b' }}>Failed to load: {err}</div>
       ) : !data ? (

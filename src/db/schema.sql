@@ -229,6 +229,40 @@ CREATE TABLE IF NOT EXISTS pwc_program_current (
 );
 
 -- =============================================================================
+-- Admin Panel — versioned, append-only history of schools_master uploads
+-- ("School data master" category). Mirrors the pwc_program_* trio with ONE
+-- deliberate difference in the apply path: the live tables (`schools`,
+-- `schools_year`) are UPSERTED, never delete-and-replaced — schools_year,
+-- pwc_school_program, school_indicator_values, and school_geo_crosswalk all
+-- REFERENCE schools(dbn) ON DELETE CASCADE, so a swap would wipe them.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS school_master_versions (
+  version_id  SERIAL PRIMARY KEY,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT NOT NULL,           -- 'admin' until real users exist
+  source      TEXT NOT NULL,           -- 'upload:<filename>' | 'rollback:v<id>' | 'seed'
+  notes       TEXT,
+  row_count   INTEGER NOT NULL,
+  csv_url     TEXT                     -- Vercel Blob immutable snapshot
+);
+
+CREATE TABLE IF NOT EXISTS school_master_version_rows (
+  version_id  INTEGER NOT NULL REFERENCES school_master_versions(version_id) ON DELETE CASCADE,
+  dbn         TEXT NOT NULL,
+  school_year TEXT NOT NULL,
+  payload     JSONB NOT NULL,          -- full row's data columns, schema-shaped
+  PRIMARY KEY (version_id, dbn, school_year)
+);
+CREATE INDEX IF NOT EXISTS smvr_version_idx ON school_master_version_rows (version_id);
+
+-- Singleton pointer at the currently-active version (same shape as PWC's).
+CREATE TABLE IF NOT EXISTS school_master_current (
+  pin        INTEGER PRIMARY KEY DEFAULT 1 CHECK (pin = 1),
+  version_id INTEGER NOT NULL REFERENCES school_master_versions(version_id),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =============================================================================
 -- Community Indicators — per-provider versioning + availability status.
 -- Provider ∈ {'acs', 'cdc_places'}. The live read view stays
 -- `community_indicator_values`; admin "apply" swaps a provider's slice in

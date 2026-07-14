@@ -75,8 +75,50 @@ export default function DiffPreview({
         </Banner>
       ) : null}
 
+      {(preview.warnings.duplicateRowCount ?? 0) > 0 ? (
+        <Banner tone="warn" title={`${preview.warnings.duplicateRowCount} duplicate (DBN, school_year) rows in the upload`}>
+          When the same key appears more than once, the LAST row in the file wins. If that's not
+          intended, dedupe the source and re-upload.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.fractionSuspectCount ?? 0) > 0 ? (
+        <Banner tone="warn" title={`${preview.warnings.fractionSuspectCount} rows have percent-looking values in fraction columns`}>
+          <code>pct_*</code> and <code>economic_need_index</code> are expected as fractions between
+          0 and 1 (e.g. 0.85, not 85). Values above 1.5 were found in these rows — the dashboard
+          would display them wrong. Double-check the source before applying.
+          {(preview.warnings.fractionSuspectSample?.length ?? 0) > 0 ? (
+            <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 11 }}>
+              {preview.warnings.fractionSuspectSample!.join(', ')}
+            </div>
+          ) : null}
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.remappedDbnCount ?? 0) > 0 ? (
+        <Banner tone="info" title={`${preview.warnings.remappedDbnCount} rows remapped 08X208 → 84X208`}>
+          The charter-district DBN recode was applied automatically (same school, canonical code).
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.unplottableCount ?? 0) > 0 ? (
+        <Banner tone="info" title={`${preview.warnings.unplottableCount} schools without coordinates`}>
+          These schools have no latitude/longitude in any year, so they won't plot on the map
+          (they still appear in lists and analytics). Historically ~5% of the master lacks
+          coordinates — only worry if this number jumped.
+          {(preview.warnings.unplottableSample?.length ?? 0) > 0 ? (
+            <details style={{ marginTop: 6 }}>
+              <summary style={{ cursor: 'pointer' }}>Show sample ({preview.warnings.unplottableSample!.length})</summary>
+              <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 11 }}>
+                {preview.warnings.unplottableSample!.join(', ')}
+              </div>
+            </details>
+          ) : null}
+        </Banner>
+      ) : null}
+
       {preview.updates.length > 0 ? (
-        <Section title={`${preview.updates.length} updated rows`}>
+        <Section title={`${preview.summary.updated} updated rows`}>
           <div style={{ border: '1px solid #e1e8ef', borderRadius: 6, maxHeight: 280, overflow: 'auto' }}>
             {preview.updates.slice(0, 200).map((u) => {
               const key = `${u.dbn}|${u.school_year}`;
@@ -114,9 +156,9 @@ export default function DiffPreview({
                 </div>
               );
             })}
-            {preview.updates.length > 200 ? (
+            {preview.summary.updated > Math.min(preview.updates.length, 200) ? (
               <div style={{ padding: '8px 10px', fontSize: 11, color: '#5a6e85' }}>
-                Showing first 200 of {preview.updates.length}.
+                Showing first {Math.min(preview.updates.length, 200)} of {preview.summary.updated}.
               </div>
             ) : null}
           </div>

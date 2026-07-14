@@ -10,22 +10,10 @@
  * Panel reconciles incoming files against THIS shape; it never mutates it.
  */
 
-export type PwcFieldType = 'text' | 'integer' | 'boolean';
+import type { AdminField, AdminFieldType } from './schemaTypes';
 
-export interface PwcField {
-  /** Column name as it must appear in the live table / CSV. */
-  id: string;
-  type: PwcFieldType;
-  /** True for the composite primary key (dbn, school_year). */
-  isKey: boolean;
-  /** Plain-English description shown in the "View schema" dialog. */
-  description: string;
-  /** Optional historical aliases — if the new CSV uses an old header
-   *  name (e.g. `school_type` → `governance_school_type`), classification
-   *  treats it as an EXACT match rather than asking the admin to map it.
-   *  Suggestions still surface to "View schema" so the rename is visible. */
-  aliases?: readonly string[];
-}
+export type PwcFieldType = AdminFieldType;
+export type PwcField = AdminField;
 
 export const PWC_FIELDS: readonly PwcField[] = [
   // ---- keys ---------------------------------------------------------------

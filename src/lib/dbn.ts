@@ -6,6 +6,9 @@
  *   district code used by DOE for the same school).
  * - `03M299` (Maxine Greene HS) is a known unmatched closed school — surfaced
  *   in the data-quality report, not remapped.
+ *
+ * Canonical home is src/lib so both the ETL scripts and the Next.js admin
+ * routes share one implementation.
  */
 
 /** Charter-district remap. Add new pairs here if more surface in the future. */

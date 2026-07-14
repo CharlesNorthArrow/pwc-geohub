@@ -16,9 +16,11 @@ interface VersionRow {
 export default function VersionHistory({
   refreshKey,
   onRolledBack,
+  basePath = '/api/admin/pwc',
 }: {
   refreshKey: number;
   onRolledBack: () => Promise<void>;
+  basePath?: string;
 }): React.JSX.Element {
   const [rows, setRows] = useState<VersionRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function VersionHistory({
 
   useEffect(() => {
     let abandoned = false;
-    fetch('/api/admin/pwc/versions')
+    fetch(`${basePath}/versions`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const body = (await r.json()) as { versions: VersionRow[] };
@@ -34,7 +36,7 @@ export default function VersionHistory({
       })
       .catch((e) => !abandoned && setErr((e as Error).message));
     return () => { abandoned = true; };
-  }, [refreshKey]);
+  }, [refreshKey, basePath]);
 
   const rollback = async (versionId: number): Promise<void> => {
     const sure = window.confirm(
@@ -43,7 +45,7 @@ export default function VersionHistory({
     if (!sure) return;
     setRollbackBusy(versionId);
     try {
-      const r = await fetch('/api/admin/pwc/rollback', {
+      const r = await fetch(`${basePath}/rollback`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ targetVersionId: versionId }),

@@ -31,10 +31,31 @@ export interface PreviewResponse {
   updates: Array<{ dbn: string; school_year: string; changedColumns: string[]; before: Record<string, unknown>; after: Record<string, unknown> }>;
   addedSample: Array<{ dbn: string; school_year: string }>;
   retainedSample: Array<{ dbn: string; school_year: string }>;
-  warnings: { unknownDbns: string[]; unknownDbnCount: number; retainedFromCurrent: number };
+  warnings: {
+    unknownDbns: string[];
+    unknownDbnCount: number;
+    retainedFromCurrent: number;
+    // schools_master-only data-quality signals (absent in the pwc flow).
+    remappedDbnCount?: number;
+    duplicateRowCount?: number;
+    unplottableCount?: number;
+    unplottableSample?: string[];
+    fractionSuspectCount?: number;
+    fractionSuspectSample?: string[];
+  };
   canApply: boolean;
   currentVersionId: number | null;
 }
+
+/** Which dataset an upload dialog talks to. Defaults preserve the pwc flow. */
+export interface DatasetConfig {
+  /** API prefix, e.g. '/api/admin/pwc' or '/api/admin/school-master'. */
+  basePath: string;
+  /** Dataset name shown in dialog titles, e.g. 'pwc_schools'. */
+  datasetLabel: string;
+}
+
+export const PWC_DATASET: DatasetConfig = { basePath: '/api/admin/pwc', datasetLabel: 'pwc_schools' };
 
 type Step =
   | { kind: 'choose' }
@@ -48,9 +69,11 @@ type Step =
 export default function UploadFlow({
   onClose,
   onApplied,
+  dataset = PWC_DATASET,
 }: {
   onClose: () => void;
   onApplied: () => Promise<void>;
+  dataset?: DatasetConfig;
 }): React.JSX.Element {
   const [step, setStep] = useState<Step>({ kind: 'choose' });
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +83,7 @@ export default function UploadFlow({
     setStep({ kind: 'uploading' });
     const fd = new FormData();
     fd.append('file', file);
-    const r = await fetch('/api/admin/pwc/upload', { method: 'POST', body: fd });
+    const r = await fetch(`${dataset.basePath}/upload`, { method: 'POST', body: fd });
     if (!r.ok) {
       const body = (await r.json().catch(() => ({}))) as { error?: string };
       setError(body.error ?? `HTTP ${r.status}`);
@@ -84,7 +107,7 @@ export default function UploadFlow({
   const runPreview = async (upload: UploadResponse, decisions: Decisions): Promise<void> => {
     setError(null);
     setStep({ kind: 'reviewing', upload, decisions });
-    const r = await fetch('/api/admin/pwc/preview', {
+    const r = await fetch(`${dataset.basePath}/preview`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ uploadId: upload.uploadId, decisions }),
@@ -104,7 +127,7 @@ export default function UploadFlow({
     setError(null);
     const { upload, decisions } = step;
     setStep({ kind: 'applying' });
-    const r = await fetch('/api/admin/pwc/apply', {
+    const r = await fetch(`${dataset.basePath}/apply`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ uploadId: upload.uploadId, decisions, notes }),
@@ -122,7 +145,7 @@ export default function UploadFlow({
   // --- Rendering ----
   if (step.kind === 'choose' || step.kind === 'uploading') {
     return (
-      <Modal title="Upload pwc_schools CSV" onClose={onClose} width={560}>
+      <Modal title={`Upload ${dataset.datasetLabel} CSV`} onClose={onClose} width={560}>
         <p style={{ marginTop: 0, fontSize: 13, color: '#5a6e85' }}>
           Pick the new CSV. The server compares its columns against the current schema before merging.
           Each row is keyed (DBN, school_year): existing rows get updated where values changed; new

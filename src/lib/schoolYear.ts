@@ -10,6 +10,10 @@
  *   cohort 2013 → school_year 2016-17
  *   ...
  *   cohort 2021 → school_year 2024-25
+ *
+ * Canonical home is src/lib so both the ETL scripts and the Next.js admin
+ * routes share one implementation. (Distinct from src/contract/year.ts,
+ * which is the SLIDER_YEARS window + community-year mapping.)
  */
 
 /** Convert a graduation cohort_year (numeric or string) → school_year string. */

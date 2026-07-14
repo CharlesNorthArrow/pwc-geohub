@@ -12,8 +12,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db, bulkUpsert } from '../lib/db.js';
 import { readCsv } from '../lib/csv.js';
-import { normalizeDbn, wasDbnRemapped, KNOWN_UNMATCHED_DBNS } from '../lib/dbn.js';
-import { toNullableBool, toNullableInt, toNullableText } from '../lib/normalize.js';
+import { normalizeDbn, wasDbnRemapped, KNOWN_UNMATCHED_DBNS } from '../../src/lib/dbn';
+import { toNullableBool, toNullableInt, toNullableText } from '../../src/lib/normalize';
 import { recordFinding } from '../lib/findings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

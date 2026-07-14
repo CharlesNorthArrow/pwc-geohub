@@ -21,7 +21,8 @@
  * collapsed to lowercase tokens). Score is RANK ONLY — never a green light.
  */
 
-import { PWC_DATA_FIELDS, PWC_FIELDS, PWC_KEY_FIELDS, type PwcField } from './pwcSchema';
+import { PWC_FIELDS } from './pwcSchema';
+import { keyFieldsOf, type AdminField } from './schemaTypes';
 
 export interface MatchedColumn {
   csvHeader: string;
@@ -125,15 +126,18 @@ function similarity(csvHeader: string, fieldId: string): number {
  *
  * Deterministic: stable order in / stable order out.
  */
-export function classifyColumns(csvHeaders: string[]): Classification {
+export function classifyColumns(
+  csvHeaders: string[],
+  fields: readonly AdminField[] = PWC_FIELDS,
+): Classification {
   const consumedFields = new Set<string>();
   const consumedHeaders = new Set<string>();
   const matched: MatchedColumn[] = [];
 
   // Build lookups.
-  const fieldByNorm = new Map<string, PwcField>();
-  const aliasByNorm = new Map<string, PwcField>();
-  for (const f of PWC_FIELDS) {
+  const fieldByNorm = new Map<string, AdminField>();
+  const aliasByNorm = new Map<string, AdminField>();
+  for (const f of fields) {
     fieldByNorm.set(normalizeName(f.id), f);
     for (const a of f.aliases ?? []) {
       aliasByNorm.set(normalizeName(a), f);
@@ -162,7 +166,7 @@ export function classifyColumns(csvHeaders: string[]): Classification {
   const unmatched: UnmatchedColumn[] = [];
   for (const h of csvHeaders) {
     if (consumedHeaders.has(h)) continue;
-    const scored = PWC_FIELDS
+    const scored = fields
       .filter((f) => !consumedFields.has(f.id))
       .map((f) => ({ fieldId: f.id, score: similarity(h, f.id) }))
       .sort((a, b) => b.score - a.score)
@@ -171,7 +175,7 @@ export function classifyColumns(csvHeaders: string[]): Classification {
   }
 
   const missing: MissingColumn[] = [];
-  for (const f of PWC_FIELDS) {
+  for (const f of fields) {
     if (!consumedFields.has(f.id)) {
       missing.push({ fieldId: f.id, isKey: f.isKey });
     }
@@ -190,7 +194,9 @@ export function classifyColumns(csvHeaders: string[]): Classification {
 export function validateDecisions(
   classification: Classification,
   decisions: ReconciliationDecisions,
+  fields: readonly AdminField[] = PWC_FIELDS,
 ): ValidationResult {
+  const keyFields = keyFieldsOf(fields);
   const errors: string[] = [];
 
   // Mappings supply a missing field — collect targets so we don't double-flag
@@ -235,7 +241,7 @@ export function validateDecisions(
   const mappedFields = new Map<string, string>(); // fieldId → csvHeader
   for (const d of decisions.unmatched) {
     if (d.kind !== 'map') continue;
-    if (!PWC_FIELDS.some((f) => f.id === d.fieldId)) {
+    if (!fields.some((f) => f.id === d.fieldId)) {
       errors.push(`Mapping target "${d.fieldId}" is not in the schema.`);
       continue;
     }
@@ -245,7 +251,7 @@ export function validateDecisions(
     }
     mappedFields.set(d.fieldId, d.csvHeader);
     // Can't map onto a key — the source file should have the key column itself.
-    if (PWC_KEY_FIELDS.includes(d.fieldId)) {
+    if (keyFields.includes(d.fieldId)) {
       errors.push(`"${d.fieldId}" is a key column; it can't be supplied via column renaming. Fix the source header.`);
     }
   }
@@ -274,6 +280,7 @@ export function applyDecisions(
   rawRows: Array<Record<string, string>>,
   classification: Classification,
   decisions: ReconciliationDecisions,
+  fields: readonly AdminField[] = PWC_FIELDS,
 ): Array<Record<string, string | null>> {
   // Build header → fieldId map.
   const headerToField = new Map<string, string>();
@@ -285,13 +292,12 @@ export function applyDecisions(
   const out: Array<Record<string, string | null>> = [];
   for (const r of rawRows) {
     const norm: Record<string, string | null> = {};
-    for (const f of PWC_FIELDS) norm[f.id] = null;
+    for (const f of fields) norm[f.id] = null;
     for (const [csvHeader, fieldId] of headerToField) {
       const v = r[csvHeader];
       norm[fieldId] = v == null || v === '' ? null : v;
     }
     out.push(norm);
   }
-  void PWC_DATA_FIELDS; // referenced for clarity in the schema design
   return out;
 }
