@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 
 import StripPlot from './StripPlot';
 import {
@@ -225,24 +226,59 @@ export default function SchoolDetailPanel({
             </div>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close school details"
-          title="Close"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'white',
-            fontSize: 20,
-            padding: 2,
-            lineHeight: 1,
-            opacity: 0.85,
-          }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {/* Deep link to this school's shareable Spotlight card. */}
+          <Link
+            href={`/spotlight/${encodeURIComponent(dbn)}`}
+            aria-label={`Open Spotlight card for ${schoolName}`}
+            title="Open Spotlight card"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              border: '1px solid rgba(255,255,255,0.6)',
+              borderRadius: 999,
+              color: 'white',
+              padding: '2px 8px',
+              fontSize: 10,
+              fontWeight: 700,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg
+              width={11}
+              height={11}
+              viewBox="0 0 16 16"
+              aria-hidden
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+            >
+              <path d="M 8 1.8 L 9.7 6 L 14.2 6.3 L 10.7 9.1 L 11.9 13.5 L 8 11 L 4.1 13.5 L 5.3 9.1 L 1.8 6.3 L 6.3 6 Z" />
+            </svg>
+            Spotlight
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close school details"
+            title="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'white',
+              fontSize: 20,
+              padding: 2,
+              lineHeight: 1,
+              opacity: 0.85,
+            }}
+          >
+            ×
+          </button>
+        </div>
       </header>
 
       {/* Sections render via an ordered array so the alternating
