@@ -18,6 +18,7 @@ import type {
   SchoolProfile,
 } from '../contract/types';
 import { SLIDER_YEARS } from '../contract/year';
+import { indicatorsById } from '../registry/indicators';
 import type { Format } from '../registry/types';
 import type { LayerState } from '../store/activeLayers';
 import { computePercentile, type PercentileResult } from '../store/percentile';
@@ -878,7 +879,32 @@ function ArtsEdSection({ artsEd }: { artsEd: SchoolArtsEd | null }): React.JSX.E
           <DisciplineChip key={d} label={d} />
         ))}
       </div>
+      <ArtsEdSourceLine />
     </Section>
+  );
+}
+
+/** Task 5 — explicit source citation. Text comes from the registry's
+ *  arts_ed_score entry (one place), never hardcoded here. */
+function ArtsEdSourceLine(): React.JSX.Element | null {
+  const entry = indicatorsById.get('arts_ed_score');
+  if (!entry?.data_source) return null;
+  return (
+    <div style={{ fontSize: 10, color: '#8296a8', marginTop: 8 }}>
+      Source:{' '}
+      {entry.data_source_url ? (
+        <a
+          href={entry.data_source_url}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: '#467c9d' }}
+        >
+          {entry.data_source}
+        </a>
+      ) : (
+        entry.data_source
+      )}
+    </div>
   );
 }
 
