@@ -103,7 +103,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'temp_housing_rate',
     family: 'school',
-    theme: 'Student Need',
+    theme: 'Student Needs',
     label: '% Students in Temporary Housing',
     short_label: 'Temp Housing',
     data_source: 'NYC DOE Students in Temporary Housing Reports',
@@ -220,7 +220,9 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'safety_climate',
     family: 'school',
-    theme: 'Student Experience',
+    // Task 10 (2026-07): moved from Student Experience into the renamed
+    // School Culture group alongside the parent + teacher survey questions.
+    theme: 'School Culture',
     label: 'Safety & School Climate (% Positive)',
     short_label: 'Safety & Climate',
     description:
@@ -253,7 +255,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'family_q36_satisfied',
     family: 'school',
-    theme: 'Staff & School Culture',
+    theme: 'School Culture',
     label: 'Parent: Satisfaction w/ School (q36)',
     short_label: 'Parent: Satisfaction w/ School',
     full_question:
@@ -283,7 +285,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q120_supports',
     family: 'school',
-    theme: 'Staff & School Culture',
+    theme: 'School Culture',
     label: 'Teacher: Access to Behavioral Supports (q120)',
     short_label: 'Teacher: Behavioral Supports',
     full_question:
@@ -360,7 +362,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
   {
     id: 'teacher_q119_disruptive_sel',
     family: 'school',
-    theme: 'Staff & School Culture',
+    theme: 'School Culture',
     label: 'Teacher: Recognizes Disruptive Behavior as SEL Opportunity (q119)',
     short_label: 'Teacher: SEL Awareness',
     full_question:
@@ -697,8 +699,8 @@ export const INDICATORS: readonly IndicatorRegistryEntry[] = [
 export const SCHOOL_THEME_ORDER: readonly string[] = [
   'Student Outcomes',
   'Student Experience',
-  'Student Need',
-  'Staff & School Culture',
+  'Student Needs',
+  'School Culture',
 ];
 
 export const indicatorsById: ReadonlyMap<string, IndicatorRegistryEntry> = new Map(
