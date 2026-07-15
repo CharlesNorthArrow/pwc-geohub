@@ -14,11 +14,15 @@ interface Props {
   schoolIndicator: IndicatorPublic | null;
   /** Active community indicator (or null) — drives the community-row dots. */
   communityIndicator: IndicatorPublic | null;
+  /** Years with active PWC program data (from pwc history) — drives the
+   *  always-on yellow-star row. Null while the history fetch is in flight. */
+  pwcYears: Set<SliderYear> | null;
 }
 
 /* Brand colors used for the per-family availability indicators. */
 const SCHOOL_DOT = '#027BC0';
 const COMMUNITY_DOT = '#F0901F';
+const PWC_STAR = '#f5c400';
 const EMPTY_RING = '#c5cdd6';
 
 /**
@@ -34,6 +38,7 @@ const EMPTY_RING = '#c5cdd6';
 export default function TimeSlider({
   schoolIndicator,
   communityIndicator,
+  pwcYears,
 }: Props): React.JSX.Element {
   const year = useHubStore((s) => s.year);
   const setYear = useHubStore((s) => s.setYear);
@@ -99,9 +104,9 @@ export default function TimeSlider({
             accentColor: '#027BC0',
           }}
         />
-        {/* Per-family availability dots — rendered only when their indicator
-         *  is active; absent families collapse the row entirely. */}
-        {schoolAvailable || communityAvailable ? (
+        {/* Per-family availability dots (rendered only when their indicator
+         *  is active) + the always-on PWC-program star row. */}
+        {schoolAvailable || communityAvailable || pwcYears ? (
           <div
             style={{
               display: 'flex',
@@ -132,6 +137,7 @@ export default function TimeSlider({
                     available={communityAvailable.has(y)}
                   />
                 ) : null}
+                {pwcYears ? <PwcStar available={pwcYears.has(y)} /> : null}
               </div>
             ))}
           </div>
@@ -158,6 +164,21 @@ export default function TimeSlider({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Tiny five-point star — filled gold when PWC program data exists for the
+ *  year, hollow otherwise. Sits under the family dots. */
+function PwcStar({ available }: { available: boolean }): React.JSX.Element {
+  return (
+    <svg width={7} height={7} viewBox="0 0 16 16" aria-hidden style={{ display: 'block' }}>
+      <path
+        d="M 8 1 L 10 6 L 15.2 6.3 L 11.1 9.5 L 12.5 14.6 L 8 11.7 L 3.5 14.6 L 4.9 9.5 L 0.8 6.3 L 6 6 Z"
+        fill={available ? PWC_STAR : 'transparent'}
+        stroke={available ? PWC_STAR : EMPTY_RING}
+        strokeWidth={available ? 0 : 1.6}
+      />
+    </svg>
   );
 }
 

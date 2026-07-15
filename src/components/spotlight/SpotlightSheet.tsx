@@ -95,57 +95,76 @@ export default function SpotlightSheet({
       }}
     >
       {/* ------------------------------- hero ------------------------------- */}
-      <header style={{ borderBottom: `${3 * s}px solid ${accent}`, paddingBottom: 12 * s }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 * s, flexWrap: 'wrap' }}>
-          <span
-            style={{
-              background: tag.color,
-              color: 'white',
-              borderRadius: 999,
-              padding: `${3 * s}px ${10 * s}px`,
-              fontSize: 11 * s,
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {tag.text}
-          </span>
-          <span
-            style={{
-              color: accent,
-              fontSize: 11 * s,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {MODE_LABEL[model.mode]}
-          </span>
-        </div>
-        <h1 style={{ fontSize: 30 * s, fontWeight: 800, margin: `${10 * s}px 0 ${6 * s}px`, lineHeight: 1.08 }}>
-          {hero.schoolName}
-        </h1>
-        <div style={{ fontSize: 12.5 * s, color: MUTED }}>{meta.join(' · ')}</div>
-        {hero.programFacts.length > 0 ? (
-          <div style={{ display: 'flex', gap: 6 * s, flexWrap: 'wrap', marginTop: 8 * s }}>
-            {hero.programFacts.map((f) => (
-              <span
-                key={f}
-                style={{
-                  border: `1px solid ${PWC_BLUE}`,
-                  color: PWC_BLUE,
-                  borderRadius: 999,
-                  padding: `${2 * s}px ${9 * s}px`,
-                  fontSize: 11 * s,
-                  fontWeight: 600,
-                }}
-              >
-                {f}
-              </span>
-            ))}
+      <header
+        style={{
+          borderBottom: `${3 * s}px solid ${accent}`,
+          paddingBottom: 12 * s,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 12 * s,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 * s, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                background: tag.color,
+                color: 'white',
+                borderRadius: 999,
+                padding: `${3 * s}px ${10 * s}px`,
+                fontSize: 11 * s,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {tag.text}
+            </span>
+            <span
+              style={{
+                color: accent,
+                fontSize: 11 * s,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {MODE_LABEL[model.mode]}
+            </span>
           </div>
-        ) : null}
+          <h1 style={{ fontSize: 30 * s, fontWeight: 800, margin: `${10 * s}px 0 ${6 * s}px`, lineHeight: 1.08 }}>
+            {hero.schoolName}
+          </h1>
+          <div style={{ fontSize: 12.5 * s, color: MUTED }}>{meta.join(' · ')}</div>
+          {hero.programFacts.length > 0 ? (
+            <div style={{ display: 'flex', gap: 6 * s, flexWrap: 'wrap', marginTop: 8 * s }}>
+              {hero.programFacts.map((f) => (
+                <span
+                  key={f}
+                  style={{
+                    border: `1px solid ${PWC_BLUE}`,
+                    color: PWC_BLUE,
+                    borderRadius: 999,
+                    padding: `${2 * s}px ${9 * s}px`,
+                    fontSize: 11 * s,
+                    fontWeight: 600,
+                  }}
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>
+            so html2canvas and the print pipeline capture it without Next's
+            image optimizer in the way. */}
+        <img
+          src="/brand/PWC-Logo.png"
+          alt="Partnership with Children"
+          style={{ height: 40 * s, width: 'auto', flexShrink: 0, marginTop: 2 * s }}
+        />
       </header>
 
       {/* --------------------------- school section -------------------------- */}

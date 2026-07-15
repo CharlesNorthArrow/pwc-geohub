@@ -19,6 +19,7 @@ import {
 import { useHubStore, type SchoolType } from '../store/useHubStore';
 import type { FilteredUniverse } from '../store/derived';
 import { CANONICAL_GRADES } from '../lib/grades';
+import { isSliderYear, type SliderYear } from '../contract/year';
 
 interface Props {
   geographies: GeographiesResponse | null;
@@ -66,6 +67,18 @@ export default function HeaderBar({
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
   const latestPerLayer = useHubStore((s) => s.latestPerLayer);
   const setLatestPerLayer = useHubStore((s) => s.setLatestPerLayer);
+
+  // Years with at least one active PWC program row — the slider's yellow-star
+  // availability row. PWC data runs a year past the public indicators, so
+  // this is how 2025-26 advertises itself.
+  const pwcYears = useMemo<Set<SliderYear> | null>(() => {
+    if (!pwcHistory) return null;
+    const out = new Set<SliderYear>();
+    for (const [y, members] of Object.entries(pwcHistory.byYear)) {
+      if (members.length > 0 && isSliderYear(y)) out.add(y);
+    }
+    return out;
+  }, [pwcHistory]);
 
   const [geoOpen, setGeoOpen] = useState(false);
 
@@ -466,7 +479,11 @@ export default function HeaderBar({
           {latestPerLayer ? '✓ Latest' : 'Latest'}
         </button>
         <div style={{ opacity: latestPerLayer ? 0.4 : 1, transition: 'opacity 120ms' }}>
-          <TimeSlider schoolIndicator={schoolIndicator} communityIndicator={communityIndicator} />
+          <TimeSlider
+            schoolIndicator={schoolIndicator}
+            communityIndicator={communityIndicator}
+            pwcYears={pwcYears}
+          />
         </div>
       </div>
 

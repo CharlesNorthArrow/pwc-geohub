@@ -13,8 +13,11 @@
  * community layer — that's the honest behaviour and the acceptance test.
  */
 
-/** The 5-year window the Phase 4 slider exposes (spec §6.5). */
-export const SLIDER_YEARS = ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'] as const;
+/** The year window the Phase 4 slider exposes (spec §6.5). 2025-26 was added
+ *  per PWC request (resolves spec Q5): PWC program data extends one year past
+ *  the public indicators, so at 2025-26 the PWC layer/panel has data while
+ *  indicator layers show their 🗓️ no-data state. */
+export const SLIDER_YEARS = ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25', '2025-26'] as const;
 export type SliderYear = (typeof SLIDER_YEARS)[number];
 
 /** Default slider position — the spec's "latest available year" convention. */
