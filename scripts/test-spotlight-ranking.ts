@@ -253,9 +253,9 @@ console.log('\n== candidate assembly (categorical/context exclusion) ==');
   };
 
   const master: SchoolMaster[] = [
-    { dbn: 'S1', school_name: 'One', borough: 'Brooklyn', geos: {}, longitude: 0, latitude: 0, total_enrollment: 200, pct_poverty: 94, pct_students_with_disabilities: 30, pct_english_language_learners: 12, grades_canonical: [] },
-    { dbn: 'S2', school_name: 'Two', borough: 'Bronx', geos: {}, longitude: 0, latitude: 0, total_enrollment: 300, pct_poverty: 60, pct_students_with_disabilities: 20, pct_english_language_learners: 10, grades_canonical: [] },
-    { dbn: 'S3', school_name: 'Three', borough: 'Queens', geos: {}, longitude: 0, latitude: 0, total_enrollment: 400, pct_poverty: 40, pct_students_with_disabilities: 15, pct_english_language_learners: 8, grades_canonical: [] },
+    { dbn: 'S1', school_name: 'One', borough: 'Brooklyn', geos: {}, longitude: 0, latitude: 0, total_enrollment: 200, pct_poverty: 94, pct_students_with_disabilities: 30, pct_english_language_learners: 12, community_school: null, grades_canonical: [] },
+    { dbn: 'S2', school_name: 'Two', borough: 'Bronx', geos: {}, longitude: 0, latitude: 0, total_enrollment: 300, pct_poverty: 60, pct_students_with_disabilities: 20, pct_english_language_learners: 10, community_school: null, grades_canonical: [] },
+    { dbn: 'S3', school_name: 'Three', borough: 'Queens', geos: {}, longitude: 0, latitude: 0, total_enrollment: 400, pct_poverty: 40, pct_students_with_disabilities: 15, pct_english_language_learners: 8, community_school: null, grades_canonical: [] },
   ];
 
   const ctx: CandidateContext = {

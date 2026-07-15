@@ -91,7 +91,7 @@ export function applyFilters({
   // --- Step 2: School Type cascade -----------------------------------------
   const afterSchoolType = new Set<string>();
   for (const dbn of afterGeo) {
-    if (passesSchoolType(dbn, state.schoolType, pwcByDbn)) afterSchoolType.add(dbn);
+    if (passesSchoolType(dbn, state.schoolType, pwcByDbn, schoolByDbn)) afterSchoolType.add(dbn);
   }
 
   // --- Step 3: Cohort cascade ----------------------------------------------
@@ -196,8 +196,14 @@ function passesSchoolType(
   dbn: string,
   t: SchoolType,
   pwcByDbn: Map<string, PwcMember>,
+  schoolByDbn: Map<string, SchoolMaster>,
 ): boolean {
   if (t === 'all') return true;
+  if (t === 'nyc_community') {
+    // NYC Community Schools initiative membership comes from the schools
+    // master (not PWC data): the community_school field flags it with a "1".
+    return isNycCommunitySchool(schoolByDbn.get(dbn));
+  }
   const m = pwcByDbn.get(dbn);
   if (!m) return false;
   switch (t) {
@@ -208,6 +214,11 @@ function passesSchoolType(
     case 'healing_arts':
       return belongsToPwcGroup(m.category, 'healing_arts');
   }
+}
+
+/** The one place the community_school sentinel is interpreted. */
+export function isNycCommunitySchool(s: SchoolMaster | undefined): boolean {
+  return (s?.community_school ?? '').includes('1');
 }
 
 function passesCohort(
@@ -284,6 +295,7 @@ function layerShortName(id: GeoFilterLayerId): string {
 function labelSchoolType(t: SchoolType): string {
   switch (t) {
     case 'pwc': return 'PWC';
+    case 'nyc_community': return 'NYC Community Schools';
     case 'anchor': return 'Anchor';
     case 'healing_arts': return 'Healing Arts';
     case 'all': return 'All';

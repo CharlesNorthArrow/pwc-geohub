@@ -497,8 +497,12 @@ export default function MapView({
     if (!map) return;
     const apply = (): void => {
       const dbns = filteredSchoolDbns;
+      // Empty universe normally means "filters not settled yet — show all";
+      // for nyc_community the universe IS the filter (point features carry no
+      // community-school flag), so an empty set must hide every school
+      // rather than show every school.
       const inUniverse: unknown = dbns.size === 0
-        ? true
+        ? schoolType !== 'nyc_community'
         : ['in', ['get', 'dbn'], ['literal', [...dbns]]];
       const cascade = ['all', filterFor(schoolType), inUniverse];
       const nonPwcFilter = ['all', cascade, ['!=', ['get', 'is_pwc'], true]];
@@ -867,6 +871,11 @@ function filterFor(t: SchoolType): unknown {
       return ['==', ['get', 'is_anchor'], true];
     case 'healing_arts':
       return ['==', ['get', 'is_arts'], true];
+    case 'nyc_community':
+      // Point features carry no community-school flag — membership is
+      // enforced entirely by the filtered-universe DBN set (see the
+      // `inUniverse` cascade above).
+      return true;
     case 'all':
     default:
       return true;

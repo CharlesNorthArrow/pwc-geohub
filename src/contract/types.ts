@@ -262,6 +262,10 @@ export interface SchoolMaster {
   pct_poverty: number | null;
   pct_students_with_disabilities: number | null;
   pct_english_language_learners: number | null;
+  /** NYC Community School designation from the master (free text; a value
+   *  containing "1" flags membership — interpret via `isNycCommunitySchool`,
+   *  never inline). Null until the master refresh carrying it lands. */
+  community_school: string | null;
   /** Canonical grade tokens this school serves (PK/K/1..12), normalized
    *  server-side from `schools.grades`. Empty when the source value is
    *  missing or unparseable — the Grade filter treats empty as "doesn't

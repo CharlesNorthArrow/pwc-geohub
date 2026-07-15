@@ -32,11 +32,13 @@ interface Props {
   communityIndicator: IndicatorPublic | null;
 }
 
+// Three-option redesign (2026-07): Anchor / Healing Arts dropped from the
+// dropdown (their SchoolType values survive internally); NYC Community
+// Schools added, driven by schools_master.community_school.
 const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> = [
+  { value: 'pwc', label: 'All PWC' },
   { value: 'all', label: 'All NYC' },
-  { value: 'pwc', label: 'Only PWC' },
-  { value: 'anchor', label: 'Only PWC Anchor' },
-  { value: 'healing_arts', label: 'Only PWC Healing Arts' },
+  { value: 'nyc_community', label: 'NYC Community Schools' },
 ];
 
 /**

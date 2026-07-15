@@ -344,6 +344,7 @@ interface SchoolMasterRow {
   pct_poverty: number | null;
   pct_students_with_disabilities: number | null;
   pct_english_language_learners: number | null;
+  community_school: string | null;
   grades: string | null;
   /** PostGIS array_agg of `geo_layer:area_id` pairs, one per crosswalk hit. */
   geo_pairs: string[] | null;
@@ -363,6 +364,7 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
   const layerIds = GEO_FILTER_LAYERS.map((l) => l.id);
   const rows = await sql<SchoolMasterRow>`
     SELECT s.dbn, s.school_name, s.borough, s.longitude, s.latitude, s.grades,
+      s.community_school,
       -- Latest non-null enrollment across all known school_year rows.
       (
         SELECT sy.total_enrollment
@@ -428,6 +430,7 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
         r.pct_students_with_disabilities == null ? null : r.pct_students_with_disabilities * 100,
       pct_english_language_learners:
         r.pct_english_language_learners == null ? null : r.pct_english_language_learners * 100,
+      community_school: r.community_school,
       grades_canonical: normalizeMasterGrades(r.grades),
       geos,
     };

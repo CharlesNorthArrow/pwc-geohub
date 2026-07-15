@@ -14,12 +14,16 @@ import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 
 /**
  * Spec §6.2 — School Type filter.
- *  - 'all'           → every plottable school, no PWC filter
- *  - 'pwc'           → any active PWC school (anchor | healing_arts | both | pwc_other)
- *  - 'anchor'        → core_school=true (INCLUDES both-category schools)
- *  - 'healing_arts'  → arts_program=true (INCLUDES both-category schools)
+ *  - 'all'           → every plottable school, no PWC filter ("All NYC")
+ *  - 'pwc'           → any active PWC school ("All PWC": anchor | healing_arts | both | pwc_other)
+ *  - 'nyc_community' → schools_master.community_school flags the school as an
+ *                      NYC Community School (value contains "1")
+ *  - 'anchor' / 'healing_arts' → legacy internal values (core_school /
+ *    arts_program groups). No longer offered in the dropdown (the 2026-07
+ *    three-option redesign) but kept for the selectors snapshot + any saved
+ *    state; the cascade still honors them.
  */
-export type SchoolType = 'all' | 'pwc' | 'anchor' | 'healing_arts';
+export type SchoolType = 'all' | 'pwc' | 'nyc_community' | 'anchor' | 'healing_arts';
 
 /** Spec §6.1 — multi-select per layer. UNION within a layer + UNION across
  *  layers (a school qualifies if it's in any selected pair). Missing key =
