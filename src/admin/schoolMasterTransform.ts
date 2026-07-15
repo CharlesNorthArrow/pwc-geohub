@@ -58,6 +58,8 @@ export interface SchoolIdentityRecord {
   location_category: string | null;
   location_type: string | null;
   grades: string | null;
+  administrative_district_name: string | null;
+  beds_number: string | null;
   latitude: number | null;
   longitude: number | null;
   /** `SRID=4326;POINT(lon lat)` or null when unplottable. */
@@ -131,6 +133,8 @@ export function deriveSchoolIdentities(rows: readonly MasterVersionRow[]): Schoo
       location_category: asText(identity.payload.location_category),
       location_type: asText(identity.payload.location_type),
       grades: asText(identity.payload.grades),
+      administrative_district_name: asText(identity.payload.administrative_district_name),
+      beds_number: asText(identity.payload.beds_number),
       latitude: lat,
       longitude: lon,
       geom_ewkt: lat == null || lon == null ? null : `SRID=4326;POINT(${lon} ${lat})`,

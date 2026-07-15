@@ -55,11 +55,13 @@ async function main(): Promise<void> {
     table: 'schools',
     columns: [
       'dbn', 'school_name', 'borough', 'address', 'managed_by', 'location_category',
-      'location_type', 'grades', 'latitude', 'longitude', 'geom', 'identity_source_year',
+      'location_type', 'grades', 'administrative_district_name', 'beds_number',
+      'latitude', 'longitude', 'geom', 'identity_source_year',
     ],
     rows: identities.map((s) => [
       s.dbn, s.school_name, s.borough, s.address, s.managed_by, s.location_category,
-      s.location_type, s.grades, s.latitude, s.longitude, s.geom_ewkt, s.identity_source_year,
+      s.location_type, s.grades, s.administrative_district_name, s.beds_number,
+      s.latitude, s.longitude, s.geom_ewkt, s.identity_source_year,
     ]),
     conflictKeys: ['dbn'],
     valueExpressions: {

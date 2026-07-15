@@ -147,16 +147,18 @@ export async function applyMasterVersion(args: {
       let n = 1;
       for (const s of chunk) {
         tuples.push(
-          `($${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, ST_GeomFromEWKT($${n++}::text), $${n++})`,
+          `($${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, $${n++}, ST_GeomFromEWKT($${n++}::text), $${n++})`,
         );
         params.push(
           s.dbn, s.school_name, s.borough, s.address, s.managed_by, s.location_category,
-          s.location_type, s.grades, s.latitude, s.longitude, s.geom_ewkt, s.identity_source_year,
+          s.location_type, s.grades, s.administrative_district_name, s.beds_number,
+          s.latitude, s.longitude, s.geom_ewkt, s.identity_source_year,
         );
       }
       await p.query(
         `INSERT INTO schools (dbn, school_name, borough, address, managed_by, location_category,
-                              location_type, grades, latitude, longitude, geom, identity_source_year)
+                              location_type, grades, administrative_district_name, beds_number,
+                              latitude, longitude, geom, identity_source_year)
          VALUES ${tuples.join(', ')}
          ON CONFLICT (dbn) DO UPDATE SET
            school_name = EXCLUDED.school_name,
@@ -166,6 +168,8 @@ export async function applyMasterVersion(args: {
            location_category = EXCLUDED.location_category,
            location_type = EXCLUDED.location_type,
            grades = EXCLUDED.grades,
+           administrative_district_name = EXCLUDED.administrative_district_name,
+           beds_number = EXCLUDED.beds_number,
            latitude = EXCLUDED.latitude,
            longitude = EXCLUDED.longitude,
            geom = EXCLUDED.geom,

@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS schools (
   location_category TEXT,
   location_type     TEXT,
   grades            TEXT,
+  -- LCGMS identity fields — empty until the schools_master refresh that
+  -- carries them lands via the School Data Master admin upload.
+  administrative_district_name TEXT,
+  beds_number       TEXT,
   latitude          DOUBLE PRECISION,
   longitude         DOUBLE PRECISION,
   geom              GEOMETRY(Point, 4326),
@@ -26,6 +30,10 @@ CREATE TABLE IF NOT EXISTS schools (
   updated_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS schools_geom_gix ON schools USING GIST (geom);
+-- Upgrade path for databases created before the LCGMS fields existed
+-- (CREATE TABLE IF NOT EXISTS won't touch an existing table).
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS administrative_district_name TEXT;
+ALTER TABLE schools ADD COLUMN IF NOT EXISTS beds_number TEXT;
 
 -- =============================================================================
 -- schools_year: enrollment + demographics per (DBN, school_year)

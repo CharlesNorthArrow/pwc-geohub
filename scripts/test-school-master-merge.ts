@@ -57,7 +57,7 @@ console.log('\n== classifyColumns against MASTER_FIELDS ==');
 {
   const headers = MASTER_FIELDS.map((f) => f.id);
   const cls = classifyColumns(headers, MASTER_FIELDS);
-  check('all 33 columns match exactly', cls.matched.length === 33 && cls.missing.length === 0 && cls.unmatched.length === 0);
+  check('all 35 columns match exactly', cls.matched.length === 35 && cls.missing.length === 0 && cls.unmatched.length === 0);
 }
 
 console.log('\n== mergeRows with MASTER_FIELDS :: update & append, never delete ==');
