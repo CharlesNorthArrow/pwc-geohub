@@ -325,7 +325,7 @@ export default function HeaderBar({
       />
 
       <FilterDropdown
-        triggerLabel="Program"
+        triggerLabel="PWC Programs"
         selectedLabel={programLabel}
         options={programOptions}
         searchable

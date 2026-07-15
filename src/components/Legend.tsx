@@ -138,7 +138,11 @@ function IndicatorTitleRow({
           fontWeight: 600,
           color: '#002040',
           lineHeight: 1.25,
+          // Hover definition — e.g. the Safety & School Climate rating
+          // methodology. Quietly absent when the registry has none.
+          cursor: indicator.description ? 'help' : undefined,
         }}
+        title={indicator.description}
       >
         {indicator.short_label ?? indicator.label}
       </span>

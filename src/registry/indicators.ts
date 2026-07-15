@@ -56,7 +56,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     scale: {
       type: 'diverging',
       good_direction: 'high',
-      ramp: 'diverging_pugn_muted',
+      ramp: 'diverging_rdbu_muted',
       discrete_values: [0, 1, 2, 3, 4],
     },
     geometry: 'point',
@@ -92,7 +92,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     scale: {
       type: 'diverging',
       good_direction: 'low',
-      ramp: 'diverging_pugn_muted',
+      ramp: 'diverging_rdbu_muted',
       bin_method: 'quantile',
     },
     geometry: 'point',
@@ -223,6 +223,12 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     theme: 'Student Experience',
     label: 'Safety & School Climate (% Positive)',
     short_label: 'Safety & Climate',
+    description:
+      'The Safety and School Climate rating looks at how well the school establishes a culture ' +
+      'where students feel safe, challenged to grow, and supported to meet high expectations; ' +
+      'how well school leadership inspires the school community; and how well teachers participate ' +
+      'in the continuous improvement of the school community. The rating is a combination of ' +
+      'student attendance and NYC School Survey measures.',
     data_source: 'NYC DOE School Quality Reports — Citywide Results',
     data_source_url:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources/school-quality-reports-citywide-results',
@@ -238,7 +244,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       categorical_label_field: 'safety_climate_rating_label',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -248,8 +254,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     id: 'family_q36_satisfied',
     family: 'school',
     theme: 'Staff & School Culture',
-    label: 'Family Satisfaction with Education (q36)',
-    short_label: 'Family Satisfaction',
+    label: 'Parent: Satisfaction w/ School (q36)',
+    short_label: 'Parent: Satisfaction w/ School',
     full_question:
       'I am satisfied with the education my child has received this year.',
     data_source: 'NYC School Survey — Family Data File',
@@ -269,7 +275,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     // so the choropleth reads as monotone. Quintile binning spreads color
     // across the distribution. Same rationale applied to the other four
     // survey indicators below.
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -279,7 +285,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Staff & School Culture',
     label: 'Teacher: Access to Behavioral Supports (q120)',
-    short_label: 'Teacher: Supports Access',
+    short_label: 'Teacher: Behavioral Supports',
     full_question:
       'Adults at this school have access to school-based supports to assist in behavioral/emotional escalations.',
     data_source: 'NYC School Survey — Teacher Data File',
@@ -294,7 +300,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -304,7 +310,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Student Experience',
     label: 'Student: Knows Where to Go for Mental-Health Support (q20)',
-    short_label: 'Student: MH Support',
+    short_label: 'Student: Mental Health Support',
     full_question:
       'I know where to go at my school if I need additional support with my mental-health.',
     data_source: 'NYC School Survey — Student Data File',
@@ -319,7 +325,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted', bin_method: 'quantile' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -329,7 +335,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Student Experience',
     label: 'Student: Felt Happy at School (q22)',
-    short_label: 'Student: Felt Happy',
+    short_label: 'Student: Felt Happy at School',
     full_question:
       'During this school year, most days I have felt happy when at school.',
     data_source: 'NYC School Survey — Student Data File',
@@ -344,7 +350,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_pugn_muted', bin_method: 'quantile' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',
@@ -356,7 +362,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
     family: 'school',
     theme: 'Staff & School Culture',
     label: 'Teacher: Recognizes Disruptive Behavior as SEL Opportunity (q119)',
-    short_label: 'Teacher: SEL View',
+    short_label: 'Teacher: SEL Awareness',
     full_question:
       'Adults at this school recognize disruptive behavior as social-emotional learning opportunities.',
     data_source: 'NYC School Survey — Teacher Data File',
@@ -371,7 +377,7 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       year_field: 'school_year',
     },
     format: 'percent',
-    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_greyteal_muted', bin_method: 'quantile' },
+    scale: { type: 'diverging', good_direction: 'high', ramp: 'diverging_rdbu_muted', bin_method: 'quantile' },
     geometry: 'point',
     years: ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25'],
     status: 'active',

@@ -779,7 +779,7 @@ function ProfileSection({ profile }: { profile: SchoolProfile | null }): React.J
           format="percent"
         />
         <MetricCell
-          label="% Disabled"
+          label="% IEP"
           value={profile.pct_students_with_disabilities}
           format="percent"
         />
@@ -924,17 +924,38 @@ function ProgramSection({
     );
   }
 
+  // Display is driven by the program BOOLEANS: a row renders iff the program
+  // was active that year; the *_status / *_type text is optional detail. No
+  // row for inactive programs — a blank could read as "missing data", and an
+  // em-dash used to appear when a program was active with no detail on file.
+  const programRows: Array<{ label: string; detail: string | null }> = [];
+  if (program.social_work_program) {
+    programRows.push({ label: 'Social work', detail: null });
+  }
+  if (program.community_school_program) {
+    programRows.push({ label: 'Community school', detail: textOrNull(program.community_school_program_status) });
+  }
+  if (program.arts_program) {
+    programRows.push({ label: 'Arts program', detail: textOrNull(program.arts_program_type) });
+  }
+  if (program.ost_program) {
+    programRows.push({ label: 'OST program', detail: textOrNull(program.ost_program_type) });
+  }
+
   return (
     <Section header="PWC programs" yearPill={program.year} pillTone="program">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <CategoryBadge category={program.category} cohort={program.cohort} />
 
-        {/* All three program-detail rows always render so the user sees the
-         *  full dimension set; an em-dash means "no detail recorded for this
-         *  school×year in pwc_schools.csv". */}
-        <Row label="Community school" value={emptyToDash(program.community_school_program_status)} />
-        <Row label="Arts program" value={emptyToDash(program.arts_program_type)} />
-        <Row label="OST program" value={emptyToDash(program.ost_program_type)} />
+        {programRows.length > 0 ? (
+          programRows.map((row) => (
+            <Row key={row.label} label={row.label} value={row.detail ?? 'Active'} />
+          ))
+        ) : (
+          <div style={{ fontSize: 11, color: '#a8b3bf' }}>
+            No program lines recorded for {program.year}.
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
           <BooleanChip label="Food pantry" on={program.food_pantry} />
@@ -945,10 +966,10 @@ function ProgramSection({
   );
 }
 
-function emptyToDash(v: string | null): string {
-  if (v == null) return '—';
+function textOrNull(v: string | null): string | null {
+  if (v == null) return null;
   const t = v.trim();
-  return t.length === 0 ? '—' : t;
+  return t.length === 0 ? null : t;
 }
 
 function CategoryBadge({

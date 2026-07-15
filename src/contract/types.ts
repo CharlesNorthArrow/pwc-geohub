@@ -145,10 +145,10 @@ export interface PwcProgramFlags {
 export type ProgramFlag = keyof PwcProgramFlags;
 
 export const PROGRAM_FLAGS: ReadonlyArray<{ id: ProgramFlag; label: string }> = [
-  { id: 'social_work', label: 'Social work' },
-  { id: 'community_school', label: 'Community school' },
-  { id: 'arts_program', label: 'Healing arts' },
-  { id: 'ost', label: 'Out-of-school' },
+  { id: 'social_work', label: 'Social Work' },
+  { id: 'community_school', label: 'Community School' },
+  { id: 'arts_program', label: 'Healing Arts' },
+  { id: 'ost', label: 'Out-of-School Time' },
 ];
 
 export interface PwcMember extends PwcProgramFlags {
@@ -398,6 +398,13 @@ export interface PwcProgram {
   category: PwcCategory | null;
   cohort: string | null;
   active: boolean;
+  /** Program booleans — the Detail Panel's §1.c display driver: a program
+   *  row renders iff its boolean is true; the *_status / *_type text is
+   *  optional detail, never a display gate. */
+  social_work_program: boolean | null;
+  community_school_program: boolean | null;
+  arts_program: boolean | null;
+  ost_program: boolean | null;
   community_school_program_status: string | null;
   arts_program_type: string | null;
   ost_program_type: string | null;
