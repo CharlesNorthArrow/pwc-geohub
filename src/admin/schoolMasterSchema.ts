@@ -35,8 +35,8 @@ export const MASTER_FIELDS: readonly AdminField[] = [
   { id: 'managed_by',                     type: 'text',   isKey: false, description: 'Managing entity (DOE, Charter, …).' },
   { id: 'location_type',                  type: 'text',   isKey: false, description: 'DOE location type (General Academic, Special Education, …).' },
   { id: 'grades',                         type: 'text',   isKey: false, description: 'Grades served, free text (e.g. "PK,0K,01,…").' },
-  { id: 'administrative_district_name',   type: 'text',   isKey: false, description: 'LCGMS Administrative District Name (e.g. "COMMUNITY SCHOOL DISTRICT 13"). Empty until the LCGMS-based master refresh lands.' },
-  { id: 'beds_number',                    type: 'text',   isKey: false, description: 'LCGMS 12-digit BEDS Number — stable state identifier for future crosswalks. Kept as text to preserve digits. Empty until the LCGMS-based master refresh lands.' },
+  { id: 'community_school',               type: 'text',   isKey: false, description: 'NYC Community School designation. Kept as free text until the source file defines its values. Empty until the upcoming master refresh lands.' },
+  { id: 'beds_number',                    type: 'text',   isKey: false, description: '12-digit BEDS Number — stable state identifier for future crosswalks. Kept as text to preserve digits. Empty until the upcoming master refresh lands.' },
   // ---- enrollment + demographics (per year) --------------------------------
   { id: 'total_enrollment',               type: 'number', isKey: false, description: 'Total enrollment — drives circle size on the map.' },
   { id: 'n_students_with_disabilities',   type: 'number', isKey: false, description: 'Students with disabilities (count).' },

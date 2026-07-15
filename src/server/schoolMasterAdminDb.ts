@@ -151,13 +151,13 @@ export async function applyMasterVersion(args: {
         );
         params.push(
           s.dbn, s.school_name, s.borough, s.address, s.managed_by, s.location_category,
-          s.location_type, s.grades, s.administrative_district_name, s.beds_number,
+          s.location_type, s.grades, s.community_school, s.beds_number,
           s.latitude, s.longitude, s.geom_ewkt, s.identity_source_year,
         );
       }
       await p.query(
         `INSERT INTO schools (dbn, school_name, borough, address, managed_by, location_category,
-                              location_type, grades, administrative_district_name, beds_number,
+                              location_type, grades, community_school, beds_number,
                               latitude, longitude, geom, identity_source_year)
          VALUES ${tuples.join(', ')}
          ON CONFLICT (dbn) DO UPDATE SET
@@ -168,7 +168,7 @@ export async function applyMasterVersion(args: {
            location_category = EXCLUDED.location_category,
            location_type = EXCLUDED.location_type,
            grades = EXCLUDED.grades,
-           administrative_district_name = EXCLUDED.administrative_district_name,
+           community_school = EXCLUDED.community_school,
            beds_number = EXCLUDED.beds_number,
            latitude = EXCLUDED.latitude,
            longitude = EXCLUDED.longitude,
