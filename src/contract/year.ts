@@ -20,8 +20,11 @@
 export const SLIDER_YEARS = ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25', '2025-26'] as const;
 export type SliderYear = (typeof SLIDER_YEARS)[number];
 
-/** Default slider position — the spec's "latest available year" convention. */
-export const DEFAULT_YEAR: SliderYear = '2024-25';
+/** Default slider position — always the latest year in the window (so PWC
+ *  program data, which runs a year past the public indicators, is what the
+ *  app opens on). Indicator layers open in Latest mode anyway, so each still
+ *  shows its own freshest data regardless of this position. */
+export const DEFAULT_YEAR: SliderYear = SLIDER_YEARS[SLIDER_YEARS.length - 1]!;
 
 /**
  * Convert a school_year ("YYYY-YY") to the calendar year used by community

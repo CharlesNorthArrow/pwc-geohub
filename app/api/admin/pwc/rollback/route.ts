@@ -39,12 +39,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (targetRows.length === 0) {
       return NextResponse.json({ error: 'unknown_version' }, { status: 404 });
     }
-    const { versionId } = await applyMergedVersion({
+    const { versionId, skippedDbns } = await applyMergedVersion({
       createdBy: 'admin',
       source: `rollback:v${body.targetVersionId}`,
       notes: body.notes?.trim() || `Rollback to v${body.targetVersionId}`,
       rows: targetRows.map((r) => ({ dbn: r.dbn, school_year: r.school_year, payload: r.payload })),
     });
-    return NextResponse.json({ versionId, rolledBackTo: body.targetVersionId, rowCount: targetRows.length });
+    return NextResponse.json({
+      versionId,
+      rolledBackTo: body.targetVersionId,
+      rowCount: targetRows.length,
+      skippedUnknownDbns: skippedDbns,
+    });
   });
 }

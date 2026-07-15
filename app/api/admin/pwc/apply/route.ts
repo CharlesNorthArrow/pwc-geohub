@@ -9,7 +9,6 @@ import {
 import { mergeRows } from '../../../../../src/admin/merge';
 import {
   applyMergedVersion,
-  findUnknownDbns,
   getCurrentVersionId,
   getVersionRows,
   updateCsvUrl,
@@ -60,17 +59,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const currentRows = currentVersionId == null ? [] : await getVersionRows(currentVersionId);
     const merge = mergeRows(currentRows, normalized);
 
-    const unknownDbns = await findUnknownDbns(merge.newVersionRows.map((r) => r.dbn));
-    if (unknownDbns.length > 0) {
-      return NextResponse.json({
-        error: 'unknown_dbns',
-        unknownDbns,
-        message: 'Some DBNs in the upload are not present in the schools master. Remove or correct those rows before applying.',
-      }, { status: 422 });
-    }
-
+    // Unknown DBNs don't block: applyMergedVersion keeps them in the version
+    // and skips them on the live table (they go live automatically once the
+    // schools master learns the DBN). Reported back as skippedUnknownDbns.
     const notes = body.notes?.trim() || null;
-    const { versionId } = await applyMergedVersion({
+    const { versionId, skippedDbns } = await applyMergedVersion({
       createdBy: 'admin',
       source: `upload:${session.filename}`,
       notes,
@@ -106,6 +99,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         retained: merge.retained.length,
         newVersionRowCount: merge.newVersionRows.length,
       },
+      skippedUnknownDbns: skippedDbns,
       csvUrl,
       blobWarning,
     });

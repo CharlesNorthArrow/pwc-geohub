@@ -68,10 +68,14 @@ export default function DiffPreview({
       ) : null}
 
       {preview.warnings.unknownDbnCount > 0 ? (
-        <Banner tone="error" title={`${preview.warnings.unknownDbnCount} unknown DBN${preview.warnings.unknownDbnCount > 1 ? 's' : ''}`}>
-          These DBNs aren't in the schools master, so they would fail to import:
+        <Banner tone="warn" title={`${preview.warnings.unknownDbnCount} unknown DBN${preview.warnings.unknownDbnCount > 1 ? 's' : ''}`}>
+          These DBNs aren't in the schools master:
           <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 11 }}>{preview.warnings.unknownDbns.join(', ')}</div>
-          <div style={{ marginTop: 8 }}>Apply is disabled until these are removed or corrected in your file.</div>
+          <div style={{ marginTop: 8 }}>
+            You can still apply — their rows are kept in the version but stay OFF the live dashboard
+            until those schools appear in the schools master (they go live automatically on the next
+            update after that). If these are typos, cancel and fix the file instead.
+          </div>
         </Banner>
       ) : null}
 

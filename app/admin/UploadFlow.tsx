@@ -64,7 +64,13 @@ type Step =
   | { kind: 'reviewing'; upload: UploadResponse; decisions: Decisions }
   | { kind: 'preview'; upload: UploadResponse; decisions: Decisions; preview: PreviewResponse }
   | { kind: 'applying' }
-  | { kind: 'done'; versionId: number; summary: PreviewResponse['summary']; blobWarning: string | null };
+  | {
+      kind: 'done';
+      versionId: number;
+      summary: PreviewResponse['summary'];
+      blobWarning: string | null;
+      skippedUnknownDbns: string[];
+    };
 
 export default function UploadFlow({
   onClose,
@@ -138,8 +144,19 @@ export default function UploadFlow({
       setStep({ kind: 'preview', upload, decisions, preview: step.preview });
       return;
     }
-    const body = (await r.json()) as { versionId: number; summary: PreviewResponse['summary']; blobWarning: string | null };
-    setStep({ kind: 'done', versionId: body.versionId, summary: body.summary, blobWarning: body.blobWarning });
+    const body = (await r.json()) as {
+      versionId: number;
+      summary: PreviewResponse['summary'];
+      blobWarning: string | null;
+      skippedUnknownDbns?: string[];
+    };
+    setStep({
+      kind: 'done',
+      versionId: body.versionId,
+      summary: body.summary,
+      blobWarning: body.blobWarning,
+      skippedUnknownDbns: body.skippedUnknownDbns ?? [],
+    });
   };
 
   // --- Rendering ----
@@ -233,6 +250,16 @@ export default function UploadFlow({
         <li>{step.summary.retained} retained (present before, absent from this upload)</li>
         <li>{step.summary.newVersionRowCount} total in new version</li>
       </ul>
+      {step.skippedUnknownDbns.length > 0 ? (
+        <ErrorBox
+          tone="warn"
+          text={
+            `${step.skippedUnknownDbns.length} school(s) not in the schools master were kept in the version ` +
+            `but are NOT live on the dashboard: ${step.skippedUnknownDbns.join(', ')}. ` +
+            `They'll go live automatically on the next update after those schools appear in the master.`
+          }
+        />
+      ) : null}
       {step.blobWarning ? <ErrorBox text={step.blobWarning} tone="warn" /> : null}
     </Modal>
   );

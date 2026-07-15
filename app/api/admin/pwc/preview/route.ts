@@ -50,7 +50,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const currentRows = currentVersionId == null ? [] : await getVersionRows(currentVersionId);
     const merge = mergeRows(currentRows, normalized);
 
-    // FK pre-check: incoming DBNs not in `schools` would crash the apply tx.
+    // Unknown DBNs no longer block the apply — they're kept in the version
+    // but skipped on the live table (FK). Surfaced here as a warning so the
+    // admin can fix typos before committing if that's what they are.
     const incomingDbns = merge.newVersionRows.map((r) => r.dbn);
     const unknownDbns = await findUnknownDbns(incomingDbns);
 
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         unknownDbnCount: unknownDbns.length,
         retainedFromCurrent: merge.retained.length,
       },
-      canApply: unknownDbns.length === 0,
+      canApply: true,
       currentVersionId,
     });
   });

@@ -95,6 +95,13 @@ export async function getActiveSchema(): Promise<{
  * read view, and moves the current pointer — all in one transaction. Either
  * the whole thing lands or none of it does.
  *
+ * Rows whose DBN isn't in `schools` are kept in the VERSION (the uploaded
+ * truth, no FK there) but skipped when rebuilding the live
+ * `pwc_school_program` table (which has the FK). They're returned as
+ * `skippedDbns` so the UI can surface them — and because every apply and
+ * rollback re-derives the live table from version rows, those rows go live
+ * automatically on the next apply after the school master learns the DBN.
+ *
  * `csvUrl` is set later (after the tx) by the upload-blob path; we pass null
  * here and `updateCsvUrl()` patches it after the Blob PUT succeeds.
  */
@@ -103,7 +110,7 @@ export async function applyMergedVersion(args: {
   source: string;
   notes: string | null;
   rows: VersionPayloadRow[];
-}): Promise<{ versionId: number }> {
+}): Promise<{ versionId: number; skippedDbns: string[] }> {
   const p = pool();
   await p.query('BEGIN');
   try {
@@ -133,14 +140,24 @@ export async function applyMergedVersion(args: {
       );
     }
 
-    // pwc_school_program — full replace from the new version's rows. Read-
-    // side queries (PWC layer, analytics) see the old set until COMMIT.
+    // pwc_school_program — full replace from the new version's rows, minus
+    // rows whose DBN the schools master doesn't know (FK would reject them).
+    // Read-side queries (PWC layer, analytics) see the old set until COMMIT.
+    const uniqueDbns = Array.from(new Set(args.rows.map((r) => r.dbn)));
+    const knownRes = await p.query(
+      `SELECT dbn FROM schools WHERE dbn = ANY($1::text[])`,
+      [uniqueDbns],
+    );
+    const known = new Set(knownRes.rows.map((row) => (row as { dbn: string }).dbn));
+    const liveRows = args.rows.filter((r) => known.has(r.dbn));
+    const skippedDbns = uniqueDbns.filter((d) => !known.has(d)).sort();
+
     await p.query(`DELETE FROM pwc_school_program`);
 
     // Per-column INSERT from JSON payload. PWC_DATA_FIELDS is the canonical
     // ordering; if you change schema.sql, change pwcSchema.ts to match.
-    for (let i = 0; i < args.rows.length; i += CHUNK) {
-      const chunk = args.rows.slice(i, i + CHUNK);
+    for (let i = 0; i < liveRows.length; i += CHUNK) {
+      const chunk = liveRows.slice(i, i + CHUNK);
       const tuples: string[] = [];
       const params: unknown[] = [];
       let n = 1;
@@ -167,7 +184,7 @@ export async function applyMergedVersion(args: {
       [versionId],
     );
     await p.query('COMMIT');
-    return { versionId };
+    return { versionId, skippedDbns };
   } catch (err) {
     await p.query('ROLLBACK');
     throw err;
