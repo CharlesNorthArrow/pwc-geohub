@@ -19,6 +19,7 @@
     "etl:admin-init": "tsx scripts/etl/40-init-admin-versioning.ts",
     "etl:community-init": "tsx scripts/etl/41-init-community-versioning.ts",
     "etl:school-master-init": "tsx scripts/etl/42-init-school-master-versioning.ts",
+    "etl:indicator-init": "tsx scripts/etl/43-init-school-indicator-versioning.ts",
     "snapshot:selectors": "tsx scripts/snapshot-selectors.ts",
     "test:admin-merge": "tsx scripts/test-admin-merge.ts",
     "test:school-master-merge": "tsx scripts/test-school-master-merge.ts",

@@ -1,14 +1,14 @@
 /**
  * ETL 11 — load all hosted school indicator CSVs → `school_indicator_values`.
  *
- * Generic over the registry: we never special-case an indicator here. For each
- * `family: 'school'` + `source.type: 'hosted'` registry entry, we read the
- * named CSV, look up `value_field` / `label_field`, map graduation's
- * `cohort_year` → `school_year`, normalize sentinel strings, and upsert into
- * the long contract.
+ * Generic over the dataset configs (src/admin/indicatorDatasets.ts): for each
+ * of the 11 hosted datasets we read the CSV once, coerce it into version-row
+ * shape, and derive the long-format rows for EVERY indicator the dataset
+ * powers (q120 + q119 share teacher_survey.csv with no code change).
  *
- * If two indicators share a dataset (e.g. q120 + q119 in teacher_survey.csv),
- * both still go through this same loop with no code change.
+ * The row transform lives in src/admin/indicatorTransform.ts and is shared
+ * with the Admin Panel upload path, so an admin apply and this loader write
+ * byte-identical values.
  *
  * Foreign key note: rows whose DBN is not in `schools` are skipped and logged
  * to `unmatched_dbn` findings. That is how `03M299` surfaces (closed school —
@@ -19,12 +19,11 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db, bulkUpsert } from '../lib/db.js';
 import { readCsv } from '../lib/csv.js';
-import { normalizeDbn, wasDbnRemapped } from '../../src/lib/dbn';
-import { toNullableNumber, toNullableText, isSentinelNull } from '../../src/lib/normalize';
-import { cohortYearToSchoolYear } from '../../src/lib/schoolYear';
+import { wasDbnRemapped } from '../../src/lib/dbn';
+import { isSentinelNull } from '../../src/lib/normalize';
 import { recordFinding } from '../lib/findings.js';
-import { activeHostedIndicators } from '../../src/registry/indicators.js';
-import type { HostedSource, IndicatorRegistryEntry } from '../../src/registry/types.js';
+import { INDICATOR_DATASETS, hostedSourceOf } from '../../src/admin/indicatorDatasets';
+import { indicatorCsvToVersionRows, deriveIndicatorValues } from '../../src/admin/indicatorTransform';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '..', '..', 'data');
@@ -35,120 +34,69 @@ async function loadValidDbns(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.dbn));
 }
 
-interface IndicatorLoadResult {
-  indicator_id: string;
-  rows_seen: number;
-  rows_inserted: number;
-  rows_sentinel_nulled: number;
-  rows_unmatched_dbn: number;
-  unmatched_dbns: string[];
-  year_coverage: Record<string, number>;
-}
-
-async function loadOneIndicator(
-  ind: IndicatorRegistryEntry,
-  validDbns: Set<string>,
-): Promise<IndicatorLoadResult> {
-  const source = ind.source as HostedSource;
-  const path = resolve(DATA_DIR, source.dataset);
-  console.log(`[etl:indicators] ${ind.id} ← ${source.dataset} (${source.value_field})`);
-  const rows = await readCsv(path);
-
-  const result: IndicatorLoadResult = {
-    indicator_id: ind.id,
-    rows_seen: rows.length,
-    rows_inserted: 0,
-    rows_sentinel_nulled: 0,
-    rows_unmatched_dbn: 0,
-    unmatched_dbns: [],
-    year_coverage: {},
-  };
-  const unmatched = new Set<string>();
-  const toInsert: Array<{
-    dbn: string;
-    school_year: string;
-    value_num: number | null;
-    value_text: string | null;
-    label: string | null;
-    source_year: string | null;
-  }> = [];
-
-  for (const r of rows) {
-    const rawDbn = r['DBN'];
-    if (wasDbnRemapped(rawDbn)) {
-      await recordFinding('remap_applied', `${ind.id}:${rawDbn ?? ''}`, {
-        target: '84X208',
-      });
-    }
-    const dbn = normalizeDbn(rawDbn);
-    if (!dbn) continue;
-    if (!validDbns.has(dbn)) {
-      result.rows_unmatched_dbn++;
-      unmatched.add(dbn);
-      continue;
-    }
-
-    // Resolve school_year. Graduation uses cohort_year and maps to school_year.
-    let school_year: string | null = null;
-    let source_year: string | null = null;
-    if (source.year_field === 'cohort_year') {
-      source_year = r['cohort_year'] ?? null;
-      school_year = cohortYearToSchoolYear(source_year);
-    } else {
-      school_year = r['school_year'] ?? null;
-      source_year = school_year;
-    }
-    if (!school_year) continue;
-
-    const rawVal = r[source.value_field];
-    const wasNull = isSentinelNull(rawVal);
-    if (wasNull) result.rows_sentinel_nulled++;
-    const value_num = toNullableNumber(rawVal);
-    const label = toNullableText(r[source.label_field]);
-
-    // Categorical sibling (e.g. safety_climate_rating) is stored in value_text
-    // so the tooltip layer can show both the % positive and the rating.
-    let value_text: string | null = null;
-    if (source.categorical_field) {
-      value_text = toNullableText(r[source.categorical_field]);
-    }
-
-    toInsert.push({ dbn, school_year, value_num, value_text, label, source_year });
-    result.year_coverage[school_year] = (result.year_coverage[school_year] ?? 0) + 1;
-  }
-
-  result.rows_inserted = await bulkUpsert({
-    table: 'school_indicator_values',
-    columns: ['dbn', 'school_year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
-    rows: toInsert.map((r) => [r.dbn, r.school_year, ind.id, r.value_num, r.value_text, r.label, r.source_year]),
-    conflictKeys: ['dbn', 'school_year', 'indicator_id'],
-  });
-  result.unmatched_dbns = [...unmatched];
-  return result;
-}
-
 async function main(): Promise<void> {
   const validDbns = await loadValidDbns();
-  console.log(`[etl:indicators] ${validDbns.size} schools in DB; loading registry hosted indicators`);
-  const indicators = activeHostedIndicators();
+  console.log(`[etl:indicators] ${validDbns.size} schools in DB; loading hosted datasets`);
 
-  for (const ind of indicators) {
-    const r = await loadOneIndicator(ind, validDbns);
-    await recordFinding('indicator_loaded', ind.id, {
-      rows_seen: r.rows_seen,
-      rows_inserted: r.rows_inserted,
-      rows_sentinel_nulled: r.rows_sentinel_nulled,
-      rows_unmatched_dbn: r.rows_unmatched_dbn,
-    });
-    await recordFinding('year_coverage', ind.id, { years: r.year_coverage });
-    if (r.rows_sentinel_nulled > 0) {
-      await recordFinding('sentinel_nulled', ind.id, {
-        count: r.rows_sentinel_nulled,
-        sentinels: ['R', 'Above 95%', 'Data not available', 'Data suppressed', 's', 'N/A'],
-      });
+  for (const cfg of INDICATOR_DATASETS) {
+    const path = resolve(DATA_DIR, cfg.csvFile);
+    console.log(`[etl:indicators] ${cfg.id} ← ${cfg.csvFile} (${cfg.indicatorIds.join(', ')})`);
+    const rawRows = (await readCsv(path)) as Array<Record<string, string>>;
+
+    // Remap findings — per indicator per remapped source row, matching the
+    // original loader's grain so the DQ report stays comparable.
+    for (const raw of rawRows) {
+      if (!wasDbnRemapped(raw.DBN)) continue;
+      for (const indicatorId of cfg.indicatorIds) {
+        await recordFinding('remap_applied', `${indicatorId}:${raw.DBN ?? ''}`, {
+          target: '84X208',
+        });
+      }
     }
-    for (const dbn of r.unmatched_dbns) {
-      await recordFinding('unmatched_dbn', `${ind.id}:${dbn}`, { dbn, indicator_id: ind.id });
+
+    const { rows } = indicatorCsvToVersionRows(rawRows, cfg);
+    const derived = deriveIndicatorValues(rows, cfg);
+
+    for (const indicatorId of cfg.indicatorIds) {
+      const source = hostedSourceOf(indicatorId);
+      const mine = derived.filter((d) => d.indicator_id === indicatorId);
+      const known = mine.filter((d) => validDbns.has(d.dbn));
+      const unmatched = new Set(mine.filter((d) => !validDbns.has(d.dbn)).map((d) => d.dbn));
+
+      let sentinelNulled = 0;
+      for (const raw of rawRows) {
+        const v = raw[source.value_field];
+        if (v != null && v !== '' && isSentinelNull(v)) sentinelNulled++;
+      }
+
+      const yearCoverage: Record<string, number> = {};
+      for (const d of known) {
+        yearCoverage[d.school_year] = (yearCoverage[d.school_year] ?? 0) + 1;
+      }
+
+      const inserted = await bulkUpsert({
+        table: 'school_indicator_values',
+        columns: ['dbn', 'school_year', 'indicator_id', 'value_num', 'value_text', 'label', 'source_year'],
+        rows: known.map((d) => [d.dbn, d.school_year, d.indicator_id, d.value_num, d.value_text, d.label, d.source_year]),
+        conflictKeys: ['dbn', 'school_year', 'indicator_id'],
+      });
+
+      await recordFinding('indicator_loaded', indicatorId, {
+        rows_seen: rawRows.length,
+        rows_inserted: inserted,
+        rows_sentinel_nulled: sentinelNulled,
+        rows_unmatched_dbn: mine.length - known.length,
+      });
+      await recordFinding('year_coverage', indicatorId, { years: yearCoverage });
+      if (sentinelNulled > 0) {
+        await recordFinding('sentinel_nulled', indicatorId, {
+          count: sentinelNulled,
+          sentinels: ['R', 'Above 95%', 'Data not available', 'Data suppressed', 's', 'N/A'],
+        });
+      }
+      for (const dbn of unmatched) {
+        await recordFinding('unmatched_dbn', `${indicatorId}:${dbn}`, { dbn, indicator_id: indicatorId });
+      }
     }
   }
 
