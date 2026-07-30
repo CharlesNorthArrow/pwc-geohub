@@ -324,3 +324,40 @@ CREATE TABLE IF NOT EXISTS community_provider_status (
   last_check_error       TEXT,
   update_available       BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- =============================================================================
+-- School Indicators — per-dataset versioning for the Admin Panel upload flow.
+-- One version stream per hosted dataset (arts_ed, suspensions, …; the 11 ids
+-- in src/admin/indicatorDatasets.ts), discriminated by `dataset` — mirrors the
+-- community_provider_* trio. The live read view stays `school_indicator_values`;
+-- admin "apply" swaps the dataset's indicator_id slice in one Postgres tx.
+-- Rollback writes a NEW version whose row set copies an older version's.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS school_indicator_dataset_versions (
+  version_id  SERIAL PRIMARY KEY,
+  dataset     TEXT NOT NULL,            -- 'arts_ed' | 'suspensions' | …
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT NOT NULL,
+  source      TEXT NOT NULL,            -- 'upload:<filename>' | 'rollback:v<id>' | 'seed'
+  notes       TEXT,
+  row_count   INTEGER NOT NULL,
+  csv_url     TEXT
+);
+CREATE INDEX IF NOT EXISTS sidv_dataset_idx
+  ON school_indicator_dataset_versions (dataset, version_id DESC);
+
+CREATE TABLE IF NOT EXISTS school_indicator_dataset_version_rows (
+  version_id  INTEGER NOT NULL REFERENCES school_indicator_dataset_versions(version_id) ON DELETE CASCADE,
+  dbn         TEXT NOT NULL,
+  school_year TEXT NOT NULL,
+  payload     JSONB NOT NULL,           -- data columns, schema-shaped (incl. cohort_year for graduation)
+  PRIMARY KEY (version_id, dbn, school_year)
+);
+CREATE INDEX IF NOT EXISTS sidvr_version_idx ON school_indicator_dataset_version_rows (version_id);
+
+-- One row per dataset. Forks are prevented by the PK.
+CREATE TABLE IF NOT EXISTS school_indicator_dataset_current (
+  dataset     TEXT PRIMARY KEY,
+  version_id  INTEGER NOT NULL REFERENCES school_indicator_dataset_versions(version_id),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
