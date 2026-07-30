@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { getActiveIndicators } from '../../../../src/server/contract';
+import { getActiveIndicatorsWithYears } from '../../../../src/server/contract';
 import SpotlightPrint from '../../../../src/components/spotlight/SpotlightPrint';
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export default async function SpotlightPrintPage({
   params: Promise<{ dbn: string }>;
 }): Promise<React.JSX.Element> {
   const { dbn } = await params;
-  const indicators = getActiveIndicators();
+  const indicators = await getActiveIndicatorsWithYears();
   return (
     <Suspense>
       <SpotlightPrint dbn={decodeURIComponent(dbn)} initialIndicators={indicators} />

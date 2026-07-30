@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getActiveIndicators } from '../../src/server/contract';
+import { getActiveIndicatorsWithYears } from '../../src/server/contract';
 import Scorecard from '../../src/components/Scorecard';
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 // Server-rendered indicator list keeps the first byte useful even before the
 // client-side analytics fetches resolve. Same pattern as `app/page.tsx`.
-export default function ScorecardPage(): React.JSX.Element {
-  const indicators = getActiveIndicators();
+export default async function ScorecardPage(): Promise<React.JSX.Element> {
+  const indicators = await getActiveIndicatorsWithYears();
   return <Scorecard initialIndicators={indicators} />;
 }

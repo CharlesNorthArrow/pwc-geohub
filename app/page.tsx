@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getActiveIndicators } from '../src/server/contract';
+import { getActiveIndicatorsWithYears } from '../src/server/contract';
 import Shell from '../src/components/Shell';
 
 // Title intentionally omitted — Next App Router's `title.template` in
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 // Render the indicator list on the server so the panel paints with content
 // on first byte; the client then refreshes it via /api/indicators.
-export default function HomePage(): React.JSX.Element {
-  const indicators = getActiveIndicators();
+export default async function HomePage(): Promise<React.JSX.Element> {
+  const indicators = await getActiveIndicatorsWithYears();
   return <Shell initialIndicators={indicators} />;
 }

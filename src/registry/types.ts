@@ -150,8 +150,11 @@ export interface IndicatorRegistryEntry {
   scale: IndicatorScale;
   geometry: Geometry;
   /**
-   * Year coverage. For hosted indicators this is enumerated from the source
-   * data at ETL time; the registry value is the *declared* expectation.
+   * Year coverage — the *declared* expectation, kept for documentation and
+   * as the fallback when the DB is unreachable. At runtime, school-indicator
+   * years are overlaid with actual `school_indicator_values` coverage via
+   * `getActiveIndicatorsWithYears()` (src/server/contract.ts), so an Admin
+   * Panel upload of a new year needs NO registry edit to reach the slider.
    * For ACS the year is the 5-year vintage endpoint (e.g. '2024' = 2020–2024).
    */
   years: string[];

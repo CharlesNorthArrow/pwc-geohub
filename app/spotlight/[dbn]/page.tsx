@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { getActiveIndicators } from '../../../src/server/contract';
+import { getActiveIndicatorsWithYears } from '../../../src/server/contract';
 import SpotlightCard from '../../../src/components/spotlight/SpotlightCard';
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default async function SpotlightSchoolPage({
   params: Promise<{ dbn: string }>;
 }): Promise<React.JSX.Element> {
   const { dbn } = await params;
-  const indicators = getActiveIndicators();
+  const indicators = await getActiveIndicatorsWithYears();
   return (
     <Suspense>
       <SpotlightCard dbn={decodeURIComponent(dbn)} initialIndicators={indicators} />

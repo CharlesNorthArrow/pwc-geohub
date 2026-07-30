@@ -10,8 +10,9 @@
  * from a query — the registry IS the source of truth for year coverage.
  */
 
-import { sql } from './db';
+import { sql, pool } from './db';
 import { INDICATORS, indicatorsById } from '../registry/indicators';
+import { sortSchoolYears } from '../lib/schoolYear';
 import type { IndicatorRegistryEntry } from '../registry/types';
 import { normalizeMasterGrades } from '../lib/grades';
 import type {
@@ -96,6 +97,42 @@ export function getActiveIndicators(): IndicatorPublic[] {
   return INDICATORS.filter(
     (i) => i.status === 'active' && (i.geometry === 'point' || i.geometry === 'polygon'),
   ).map(toPublic);
+}
+
+/**
+ * getActiveIndicators + actual DB year coverage overlaid onto each SCHOOL
+ * indicator's `years`. The registry list is the *declared* expectation;
+ * admin uploads can add a new year with no code edit, and this overlay is
+ * how it reaches the year slider / Latest mode / availability dots.
+ *
+ * UNION, never subtract: a declared-but-not-loaded year keeps showing the
+ * honest 🗓️ "Data not available" state. Falls back to registry years when
+ * the DB is unreachable (build-time prerender, pre-migration deploys).
+ */
+export async function getActiveIndicatorsWithYears(): Promise<IndicatorPublic[]> {
+  const indicators = getActiveIndicators();
+  try {
+    const r = await pool().query(
+      `SELECT indicator_id, school_year
+         FROM school_indicator_values
+        WHERE value_num IS NOT NULL OR value_text IS NOT NULL
+        GROUP BY indicator_id, school_year`,
+    );
+    const dbYears = new Map<string, string[]>();
+    for (const row of r.rows as Array<{ indicator_id: string; school_year: string }>) {
+      const list = dbYears.get(row.indicator_id) ?? [];
+      list.push(row.school_year);
+      dbYears.set(row.indicator_id, list);
+    }
+    return indicators.map((i) => {
+      if (i.family !== 'school') return i;
+      const fromDb = dbYears.get(i.id);
+      if (!fromDb || fromDb.length === 0) return i;
+      return { ...i, years: sortSchoolYears([...new Set([...i.years, ...fromDb])]) };
+    });
+  } catch {
+    return indicators;
+  }
 }
 
 export function latestYear(id: string): string | null {
