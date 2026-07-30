@@ -64,6 +64,17 @@ export async function getIndicatorVersionRows(versionId: number): Promise<Versio
   }));
 }
 
+/** Which dataset a version belongs to — version ids are global across the
+ *  trio, so rollback must confirm the target is from ITS dataset. */
+export async function getIndicatorVersionDataset(versionId: number): Promise<string | null> {
+  const r = await pool().query(
+    `SELECT dataset FROM school_indicator_dataset_versions WHERE version_id = $1`,
+    [versionId],
+  );
+  if (r.rows.length === 0) return null;
+  return (r.rows[0] as { dataset: string }).dataset;
+}
+
 export async function updateIndicatorCsvUrl(versionId: number, csvUrl: string): Promise<void> {
   await pool().query(
     `UPDATE school_indicator_dataset_versions SET csv_url = $1 WHERE version_id = $2`,
