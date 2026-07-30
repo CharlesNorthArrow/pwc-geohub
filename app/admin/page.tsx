@@ -1,32 +1,20 @@
 import { getActiveSchema } from '../../src/server/adminDb';
 import { getActiveMasterSchema } from '../../src/server/schoolMasterAdminDb';
+import { getIndicatorDatasetStatuses } from '../../src/server/indicatorAdminDb';
+import { INDICATOR_DATASETS } from '../../src/admin/indicatorDatasets';
+import { DATASET_GUIDELINES } from '../../src/registry/dataSources';
+import { indicatorsById } from '../../src/registry/indicators';
 import ProgrammaticSection from './ProgrammaticSection';
 import SchoolMasterSection from './SchoolMasterSection';
-import StubCard from './StubCard';
+import IndicatorDatasetCard from './IndicatorDatasetCard';
 import CommunitySection from './CommunitySection';
 
 export const dynamic = 'force-dynamic';
 
-// 11 school indicator cards + 2 community sync cards = the 13 stubs. Each one
-// will, in a future round, become its own functional surface; this round they
-// only render with last-job copy and disabled actions.
-const SCHOOL_STUB_CARDS = [
-  { id: 'arts_ed', title: 'Arts Education Score', description: 'NYC DOE Arts Education Survey. Updated annually; per-school score.' },
-  { id: 'suspensions', title: 'Suspension Rate', description: 'NYC DOE suspensions / enrollment by school × year.' },
-  { id: 'temp_housing', title: 'Temporary Housing', description: 'NYCDOE temp-housing rate (students in shelter / temporary housing).' },
-  { id: 'math', title: 'Math Proficiency', description: 'NY State 3-8 Math — % proficient (Levels 3+4).' },
-  { id: 'ela', title: 'ELA Proficiency', description: 'NY State 3-8 ELA — % proficient (Levels 3+4).' },
-  { id: 'chronic_absent', title: 'Chronic Absenteeism', description: '% students chronically absent (≥10% of school days).' },
-  { id: 'graduation', title: 'Graduation Rate', description: 'NYC DOE 4-yr cohort graduation rate (HS only).' },
-  { id: 'school_quality', title: 'School Quality / Safety', description: 'NYC DOE School Quality Reports — safety & climate.' },
-  { id: 'family_survey', title: 'Family Survey', description: 'NYC DOE Family Survey responses.' },
-  { id: 'teacher_survey', title: 'Teacher Survey', description: 'NYC DOE Teacher Survey responses.' },
-  { id: 'student_survey', title: 'Student Survey', description: 'NYC DOE Student Survey responses (incl. mental-health items).' },
-];
-
 export default async function AdminPage(): Promise<React.JSX.Element> {
   const schema = await getActiveSchema();
   const masterSchema = await getActiveMasterSchema();
+  const indicatorStatuses = await getIndicatorDatasetStatuses(INDICATOR_DATASETS.map((c) => c.id));
   return (
     <div>
       <h1 style={{ fontSize: 24, margin: '0 0 6px 0' }}>Data Admin</h1>
@@ -53,9 +41,30 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
         subtitle="Public data on NYC schools — updated when DOE / State release new years."
       >
         <CardGrid>
-          {SCHOOL_STUB_CARDS.map((c) => (
-            <StubCard key={c.id} title={c.title} description={c.description} family="school" />
-          ))}
+          {INDICATOR_DATASETS.map((cfg) => {
+            const guidelines = DATASET_GUIDELINES[cfg.id];
+            const status = indicatorStatuses[cfg.id];
+            if (!guidelines || !status) return null;
+            return (
+              <IndicatorDatasetCard
+                key={cfg.id}
+                id={cfg.id}
+                title={cfg.title}
+                description={cfg.description}
+                indicators={cfg.indicatorIds.map((id) => ({
+                  id,
+                  shortLabel: indicatorsById.get(id)?.short_label ?? indicatorsById.get(id)?.label ?? id,
+                }))}
+                guidelines={guidelines}
+                initialStatus={{
+                  versionId: status.versionId,
+                  rowCount: status.rowCount,
+                  updatedAt: status.updatedAt,
+                  latestYearLoaded: status.latestYearLoaded,
+                }}
+              />
+            );
+          })}
         </CardGrid>
       </Section>
 
@@ -96,7 +105,7 @@ function CardGrid({ children }: { children: React.ReactNode }): React.JSX.Elemen
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
         gap: 12,
       }}
     >
