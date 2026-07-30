@@ -35,6 +35,12 @@ export interface UploadSession {
   rawRows: Array<Record<string, string>>;
   classification: Classification;
   createdAt: number;
+  /** Optional per-flow stats stamped at upload time (currently only the
+   *  graduation cohort_year → school_year synthesis counts). */
+  meta?: {
+    cohortDerivedCount?: number;
+    cohortMismatchCount?: number;
+  };
 }
 
 const SESSIONS = new Map<string, UploadSession>();
