@@ -13,12 +13,36 @@
  * community layer — that's the honest behaviour and the acceptance test.
  */
 
-/** The year window the Phase 4 slider exposes (spec §6.5). 2025-26 was added
- *  per PWC request (resolves spec Q5): PWC program data extends one year past
- *  the public indicators, so at 2025-26 the PWC layer/panel has data while
- *  indicator layers show their 🗓️ no-data state. */
-export const SLIDER_YEARS = ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25', '2025-26'] as const;
-export type SliderYear = (typeof SLIDER_YEARS)[number];
+/** A school-year string within the slider window (e.g. "2024-25"). Widened
+ *  from a literal union when the window became clock-derived — use
+ *  `isSliderYear` for runtime membership checks. */
+export type SliderYear = string;
+
+/**
+ * Compute the slider window: '2020-21' (spec §6.5 floor) through the LATER of
+ *  - '2025-26' (added per PWC request, resolves spec Q5 — PWC program data
+ *    runs one year past the public indicators), and
+ *  - the school year whose spring term is the current calendar year.
+ *
+ * Clock-derived so an Admin Panel upload of a brand-new year has a reachable
+ * slider stop without a code edit: on 1 Jan 2027 the '2026-27' stop appears
+ * automatically (showing the honest 🗓️ no-data state until data exists).
+ * Server and client both compute from their own clock; they can only diverge
+ * in the seconds around New Year, which we accept.
+ */
+export function computeSliderYears(now: Date = new Date()): readonly string[] {
+  const FLOOR_START = 2020; // '2020-21'
+  const MIN_LAST_START = 2025; // '2025-26'
+  const lastStart = Math.max(MIN_LAST_START, now.getFullYear() - 1);
+  const out: string[] = [];
+  for (let start = FLOOR_START; start <= lastStart; start++) {
+    out.push(`${start}-${String((start + 1) % 100).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** The year window the slider exposes. */
+export const SLIDER_YEARS: readonly string[] = computeSliderYears();
 
 /** Default slider position — always the latest year in the window (so PWC
  *  program data, which runs a year past the public indicators, is what the
