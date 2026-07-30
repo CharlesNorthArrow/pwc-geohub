@@ -121,6 +121,37 @@ export default function DiffPreview({
         </Banner>
       ) : null}
 
+      {(preview.warnings.newYears?.length ?? 0) > 0 ? (
+        <Banner tone="ok" title={`New year${preview.warnings.newYears!.length > 1 ? 's' : ''} detected: ${preview.warnings.newYears!.join(', ')}`}>
+          After you apply, {preview.warnings.newYears!.length > 1 ? 'these years appear' : 'this year appears'} on
+          the dashboard's year slider and in Latest mode automatically — no other steps needed.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.sentinelNulledCount ?? 0) > 0 ? (
+        <Banner tone="info" title={`${preview.warnings.sentinelNulledCount} redacted values will be stored as blank`}>
+          Cells holding a redaction sentinel (<code>R</code>, <code>Above 95%</code>,{' '}
+          <code>Data suppressed</code>, …) become empty values — the dashboard shows
+          "Data not available" for those schools. This is expected for small-count privacy
+          redactions in the source data.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.cohortDerivedCount ?? 0) > 0 ? (
+        <Banner tone="info" title={`school_year derived from cohort_year for ${preview.warnings.cohortDerivedCount} rows`}>
+          The upload has no <code>school_year</code> column, so it was computed from the cohort:
+          a cohort entering in year Y graduates in school year (Y+3)-(Y+4) — e.g. cohort 2021 → 2024-25.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.cohortMismatchCount ?? 0) > 0 ? (
+        <Banner tone="warn" title={`${preview.warnings.cohortMismatchCount} rows where school_year disagrees with cohort_year`}>
+          The uploaded <code>school_year</code> doesn't match the expected cohort mapping
+          (cohort Y → (Y+3)-(Y+4)). The uploaded value wins, but double-check the source —
+          this usually means one of the two columns is off.
+        </Banner>
+      ) : null}
+
       {preview.updates.length > 0 ? (
         <Section title={`${preview.summary.updated} updated rows`}>
           <div style={{ border: '1px solid #e1e8ef', borderRadius: 6, maxHeight: 280, overflow: 'auto' }}>

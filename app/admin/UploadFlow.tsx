@@ -42,6 +42,11 @@ export interface PreviewResponse {
     unplottableSample?: string[];
     fractionSuspectCount?: number;
     fractionSuspectSample?: string[];
+    // school-indicator-only data-quality signals.
+    sentinelNulledCount?: number;
+    newYears?: string[];
+    cohortDerivedCount?: number;
+    cohortMismatchCount?: number;
   };
   canApply: boolean;
   currentVersionId: number | null;
