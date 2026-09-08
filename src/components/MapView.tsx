@@ -137,28 +137,38 @@ const PWC_INDICATOR_STROKE_EXPR: unknown = [
 ];
 
 /**
- * MapLibre style — light CARTO Voyager basemap. Public, no key required.
+ * MapLibre style — Esri World Light Gray Canvas (base + reference labels).
+ * Public raster tiles, no key required. Esri serves the canvas to zoom 16;
+ * `maxzoom` lets MapLibre overzoom past that instead of going blank.
  */
+const ESRI_LIGHT_GRAY_MAXZOOM = 16;
+const ESRI_ATTRIBUTION = 'Tiles © <a href="https://www.esri.com/">Esri</a> — Esri, HERE, Garmin, FAO, NOAA, USGS, © OpenStreetMap contributors';
 const BASE_STYLE: StyleSpecification = {
   version: 8,
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources: {
-    carto: {
+    esri_light_gray_base: {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
-      attribution:
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      maxzoom: ESRI_LIGHT_GRAY_MAXZOOM,
+      attribution: ESRI_ATTRIBUTION,
+    },
+    esri_light_gray_reference: {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: ESRI_LIGHT_GRAY_MAXZOOM,
     },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#f5f7fa' } },
-    { id: 'carto', type: 'raster', source: 'carto' },
+    { id: 'esri-light-gray-base', type: 'raster', source: 'esri_light_gray_base' },
+    { id: 'esri-light-gray-reference', type: 'raster', source: 'esri_light_gray_reference' },
   ],
 };
 

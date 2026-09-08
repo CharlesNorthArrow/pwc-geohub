@@ -224,7 +224,7 @@ export function buildSpotlightModel(
     benchmarkSource: BENCHMARK_SOURCE,
   };
 
-  const schoolRanking = rankSection(buildSchoolCandidates(ctx), mode);
+  const schoolRanking = rankSection(buildSchoolCandidates(ctx, mode), mode);
   const communityRanking = rankSection(buildCommunityCandidates(ctx), mode);
   const communityNeutral = mode === 'celebrate' && communityRanking.noGenuinePositives;
 

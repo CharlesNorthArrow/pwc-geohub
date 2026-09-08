@@ -5,9 +5,11 @@
  *
  * Candidacy is registry-driven:
  *   - school section: every active school indicator with a direction
- *     (good_direction ≠ 'none'), plus the three profile need-fields
- *     (% poverty / % SWD / % ELL — polarity −1, framed as service need).
- *     Enrollment is never a candidate.
+ *     (good_direction ≠ 'none'), plus the % poverty profile field
+ *     (polarity −1). % ELL and % SWD are deliberately not candidates —
+ *     they read as service need, not school performance. Enrollment is
+ *     never a candidate. Some indicators are additionally excluded from
+ *     Celebrate mode (CELEBRATE_EXCLUDED_SCHOOL_IDS).
  *   - community section: every active community indicator with a direction.
  *     'none' indicators (racial_predominance, children_immigrant_families)
  *     are excluded from scoring; numeric ones surface via
@@ -24,7 +26,7 @@ import type {
   IndicatorPublic,
   SchoolMaster,
 } from '../contract/types';
-import type { BenchmarkSource, CandidateSpec } from './spotlightRanking';
+import type { BenchmarkSource, CandidateSpec, SpotlightMode } from './spotlightRanking';
 import { mean } from '../lib/format';
 
 export interface CandidateContext {
@@ -41,17 +43,20 @@ export interface CandidateContext {
   benchmarkSource: BenchmarkSource;
 }
 
-/** Profile need-fields eligible as school-section candidates (spec). */
+/** Profile fields eligible as school-section candidates. */
 export const PROFILE_FIELDS: ReadonlyArray<{
   id: string;
   label: string;
-  field: 'pct_poverty' | 'pct_students_with_disabilities' | 'pct_english_language_learners';
+  field: 'pct_poverty';
 }> = [
   { id: 'profile_pct_poverty', label: '% Poverty', field: 'pct_poverty' },
-  // SWD/ELL are service needs, not deficits — the label keeps that framing.
-  { id: 'profile_pct_swd', label: '% Students with Disabilities (service need)', field: 'pct_students_with_disabilities' },
-  { id: 'profile_pct_ell', label: '% English Language Learners (service need)', field: 'pct_english_language_learners' },
 ];
+
+/**
+ * School indicators that never appear in Celebrate mode. A low share of
+ * students in temporary housing is not a school achievement to celebrate.
+ */
+export const CELEBRATE_EXCLUDED_SCHOOL_IDS: ReadonlySet<string> = new Set(['temp_housing_rate']);
 
 export function latestIndicatorYear(ind: IndicatorPublic): string | null {
   return ind.years.length > 0 ? ind.years[ind.years.length - 1]! : null;
@@ -107,10 +112,11 @@ function indicatorCandidate(ind: IndicatorPublic, ctx: CandidateContext): Candid
   };
 }
 
-export function buildSchoolCandidates(ctx: CandidateContext): CandidateSpec[] {
+export function buildSchoolCandidates(ctx: CandidateContext, mode: SpotlightMode = 'case'): CandidateSpec[] {
   const out: CandidateSpec[] = [];
   for (const ind of ctx.indicators) {
     if (ind.family !== 'school') continue;
+    if (mode === 'celebrate' && CELEBRATE_EXCLUDED_SCHOOL_IDS.has(ind.id)) continue;
     const c = indicatorCandidate(ind, ctx);
     if (c) out.push(c);
   }

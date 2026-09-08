@@ -179,7 +179,7 @@ export default function SpotlightSheet({
         accent={accent}
         s={s}
         note={model.communityNeutral
-          ? 'No community measure genuinely outperforms the citywide average — shown as neutral context, not spin.'
+          ? 'There are no outliers. All of the indicator values are on par with the city average. The indicator below is shown as neutral context.'
           : undefined}
       >
         <TileRow tiles={model.communityTiles} accent={accent} s={s} variant={variant}

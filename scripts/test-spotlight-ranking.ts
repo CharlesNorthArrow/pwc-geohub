@@ -235,6 +235,7 @@ console.log('\n== candidate assembly (categorical/context exclusion) ==');
   const indicators: IndicatorPublic[] = [
     mkInd({ id: 'suspensions', theme: 'Student Experience', label: 'Suspension Rate' }),
     mkInd({ id: 'math', theme: 'Student Outcomes', label: 'Math', scale: { type: 'diverging', good_direction: 'high' } }),
+    mkInd({ id: 'temp_housing_rate', theme: 'Student Needs', label: 'Temporary Housing' }),
     mkInd({ id: 'child_poverty', family: 'community', theme: 'Economic Conditions', label: 'Child Poverty' }),
     // Context/categorical — must never be scored:
     mkInd({ id: 'racial_predominance', family: 'community', theme: 'Demographics', label: 'Racial Predominance', format: 'categorical', scale: { type: 'categorical', good_direction: 'none' } }),
@@ -247,6 +248,7 @@ console.log('\n== candidate assembly (categorical/context exclusion) ==');
   const seriesById = {
     suspensions: rows('suspensions', [['S1', 9], ['S2', 3], ['S3', 1]]),
     math: rows('math', [['S1', 20], ['S2', 50], ['S3', 70]]),
+    temp_housing_rate: rows('temp_housing_rate', [['S1', 5], ['S2', 12], ['S3', 20]]),
     child_poverty: rows('child_poverty', [['S1', 40], ['S2', 25], ['S3', 10]]),
     children_immigrant_families: rows('children_immigrant_families', [['S1', 33]]),
     racial_predominance: [],
@@ -271,9 +273,16 @@ console.log('\n== candidate assembly (categorical/context exclusion) ==');
 
   const school = buildSchoolCandidates(ctx);
   check('school candidates = directional indicators + profile fields',
-    school.length === 2 + PROFILE_FIELDS.length,
+    school.length === 3 + PROFILE_FIELDS.length,
     school.map((c) => c.id));
   check('enrollment is never a candidate', !school.some((c) => c.id.includes('enrollment')));
+  check('ELL / SWD profile fields are never candidates',
+    !school.some((c) => c.id === 'profile_pct_ell' || c.id === 'profile_pct_swd'));
+  check('temp housing is a Case candidate', school.some((c) => c.id === 'temp_housing_rate'));
+  const celebrateSchool = buildSchoolCandidates(ctx, 'celebrate');
+  check('temp housing is excluded from Celebrate', !celebrateSchool.some((c) => c.id === 'temp_housing_rate'),
+    celebrateSchool.map((c) => c.id));
+  check('Celebrate exclusion drops nothing else', celebrateSchool.length === school.length - 1);
   const pov = school.find((c) => c.id === 'profile_pct_poverty')!;
   check('profile poverty: value from master, polarity −1', pov.value === 94 && pov.polarity === -1);
   check('profile poverty benchmark = citywide mean', approx(pov.benchmark, (94 + 60 + 40) / 3));
