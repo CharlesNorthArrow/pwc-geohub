@@ -100,7 +100,8 @@ export function applyFilters({
     if (passesCohort(dbn, state.cohort, pwcByDbn)) afterCohort.add(dbn);
   }
 
-  // --- Step 4: Program cascade (PWC-only, OR over picked flags) ------------
+  // --- Step 4: Program cascade (OR over picked flags; PWC schools only) ----
+  // Non-PWC schools are never removed by this step — see `passesProgram`.
   const afterProgram = new Set<string>();
   for (const dbn of afterCohort) {
     if (passesProgram(dbn, state.programs, pwcByDbn)) afterProgram.add(dbn);
@@ -231,10 +232,18 @@ function passesCohort(
   return m?.cohort === cohort;
 }
 
-/** Program filter: OR across picked flags. Empty pick = pass. Non-PWC dbns
- *  drop out because they're absent from `pwcByDbn` — selection implicitly
- *  scopes the universe to PWC schools. Honors per-year active logic because
- *  `pwcByDbn` is built from the slider-year membership snapshot. */
+/** Program filter: OR across picked flags. Empty pick = pass.
+ *
+ *  The filter applies ONLY to PWC schools — it narrows which PWC schools stay
+ *  in view and leaves every other NYC school untouched. So a school absent
+ *  from `pwcByDbn` PASSES: picking "Arts program" should not empty the map of
+ *  the ~1,700 non-PWC schools, it should just drop the PWC schools that have
+ *  no arts program. Use the School Type filter to scope the map to PWC only.
+ *
+ *  "PWC school" here means the slider-year snapshot, same as everywhere else in
+ *  the app: `pwcByDbn` holds only schools with an active program row in the
+ *  selected year, so a PWC school with an all-null row that year already
+ *  renders as a plain NYC point (no halo) and is likewise unaffected here. */
 function passesProgram(
   dbn: string,
   picked: ProgramFlag[],
@@ -242,7 +251,7 @@ function passesProgram(
 ): boolean {
   if (picked.length === 0) return true;
   const m = pwcByDbn.get(dbn);
-  if (!m) return false;
+  if (!m) return true; // not a PWC school this year — PWC program filters don't apply
   for (const flag of picked) {
     if (m[flag]) return true;
   }
