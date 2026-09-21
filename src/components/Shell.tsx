@@ -333,6 +333,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
       allCohorts,
     });
   }, [geoFilters, schoolType, cohort, programs, grades, schoolsMaster, pwcMembers, allCohorts]);
+  const exportDbns = useMemo(() => [...universe.schoolDbns], [universe.schoolDbns]);
 
   /* -------------------- Phase 5 analytics series -------------------- */
   // `layers.analytics` already encodes the family-preference fallback when
@@ -792,6 +793,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
               ? (communityIndicator.short_label ?? communityIndicator.label)
               : null
           }
+          exportDbns={exportDbns}
         />
       )}
     </div>

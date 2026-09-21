@@ -2,6 +2,7 @@
 
 import { useHubStore } from '../store/useHubStore';
 import AggregationToggle from './AggregationToggle';
+import ExportSchoolsButton from './ExportSchoolsButton';
 import KpiCards from './KpiCards';
 import RankedList from './RankedList';
 import Timeline from './Timeline';
@@ -30,6 +31,8 @@ interface Props {
   /** Labels for the toggle buttons (skipped when the family isn't active). */
   schoolIndicatorLabel: string | null;
   communityIndicatorLabel: string | null;
+  /** The filtered universe — what "Download data" exports. */
+  exportDbns: readonly string[];
 }
 
 /**
@@ -51,6 +54,7 @@ export default function RightPanel({
   familyToggleValue,
   schoolIndicatorLabel,
   communityIndicatorLabel,
+  exportDbns,
 }: Props): React.JSX.Element {
   const collapsed = useHubStore((s) => s.rightPanelCollapsed);
   const setCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
@@ -127,21 +131,24 @@ export default function RightPanel({
             {indicator ? <span style={{ color: '#a8b3bf' }}> · {year}</span> : null}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed(true)}
-          aria-label="Collapse analytics panel"
-          title="Collapse"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#467c9d',
-            fontSize: 14,
-          }}
-        >
-          ▶
-        </button>
+        <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 8 }}>
+          <ExportSchoolsButton dbns={exportDbns} />
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            aria-label="Collapse analytics panel"
+            title="Collapse"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#467c9d',
+              fontSize: 14,
+            }}
+          >
+            ▶
+          </button>
+        </span>
       </header>
 
       {showFamilyToggle && schoolIndicatorLabel && communityIndicatorLabel ? (
