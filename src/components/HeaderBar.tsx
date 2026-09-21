@@ -224,15 +224,13 @@ export default function HeaderBar({
 
   /* -------------------- School options ---------------- */
   // School filter: searchable, narrowed to the final filtered universe.
-  // With ~1,779 schools this can be heavy — the FilterDropdown's search
-  // narrows visually; we cap the option list to a sane number for perf and
-  // rely on search for finding specific schools.
+  // Every school in the universe is a search candidate; FilterDropdown only
+  // caps how many matching rows it renders (maxVisible).
   const schoolOptions: DropdownOption[] = useMemo(() => {
     const out: DropdownOption[] = [];
     for (const s of schoolsMaster) {
       if (!universe.schoolDbns.has(s.dbn)) continue;
       out.push({ value: s.dbn, label: `${s.school_name ?? '(no name)'} · ${s.dbn}` });
-      if (out.length >= 500) break; // soft cap; search reveals the rest
     }
     return out;
   }, [schoolsMaster, universe.schoolDbns]);
@@ -357,6 +355,7 @@ export default function HeaderBar({
         selectedLabel={selectedSchoolLabel}
         options={schoolOptions}
         searchable
+        maxVisible={200}
         prefilterNote={universe.prefilterSummary.forSchool}
         isAtDefault={selectedSchoolDbn == null}
         onReset={() => setSelectedSchool(null)}

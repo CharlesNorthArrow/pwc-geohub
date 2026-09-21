@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { matchesSearch } from '../lib/searchText';
 
 export interface DropdownOption {
   value: string;
@@ -40,6 +41,10 @@ interface Props {
   /** When `multiSelect` is true, the set of currently-picked values. Drives
    *  checkbox state. Ignored in single-select mode. */
   selectedValues?: ReadonlyArray<string>;
+  /** Render at most this many matching rows (long lists, e.g. ~1,900
+   *  schools); a note says how many more there are. Search always covers
+   *  every option. */
+  maxVisible?: number;
 }
 
 /**
@@ -60,6 +65,7 @@ export default function FilterDropdown({
   activeCount,
   multiSelect = false,
   selectedValues,
+  maxVisible,
 }: Props): React.JSX.Element {
   const pickedSet = useMemo(
     () => (multiSelect ? new Set(selectedValues ?? []) : null),
@@ -106,9 +112,9 @@ export default function FilterDropdown({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  const visible = q
-    ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
-    : options;
+  const matching = q ? options.filter((o) => matchesSearch(o.label, q)) : options;
+  const visible = maxVisible != null ? matching.slice(0, maxVisible) : matching;
+  const hiddenCount = matching.length - visible.length;
 
   // Trigger shows only the filter NAME + a count badge when active. The
   // selected value lives in the tooltip and is marked inside the open panel
@@ -240,6 +246,11 @@ export default function FilterDropdown({
           <div style={{ maxHeight: 260, overflowY: 'auto' }}>
             {visible.length === 0 ? (
               <div style={{ fontSize: 11, color: '#999', padding: '4px 6px' }}>No matches</div>
+            ) : null}
+            {hiddenCount > 0 ? (
+              <div style={{ fontSize: 11, color: '#5a6e85', padding: '4px 6px', fontStyle: 'italic' }}>
+                Showing {visible.length} of {matching.length.toLocaleString()} — type a name, number or DBN to narrow.
+              </div>
             ) : null}
             {visible.map((opt) => {
               const zero = opt.count === 0;

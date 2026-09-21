@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Logo from '../Logo';
 import { fetchPwcHistory, fetchSchoolsMaster } from '../../contract/client';
+import { matchesSearch } from '../../lib/searchText';
 import type { PwcMember, SchoolMaster } from '../../contract/types';
 import { categoryTag } from './SpotlightSheet';
 
@@ -35,7 +36,7 @@ export default function SpotlightPicker(): React.JSX.Element {
   const rows = useMemo(() => {
     if (!schools || !members) return null;
     const byDbn = new Map(schools.map((s) => [s.dbn, s]));
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     return members
       .map((m) => ({
         member: m,
@@ -43,10 +44,7 @@ export default function SpotlightPicker(): React.JSX.Element {
         name: byDbn.get(m.dbn)?.school_name ?? m.dbn,
       }))
       .filter((r) =>
-        q === '' ||
-        r.name.toLowerCase().includes(q) ||
-        r.member.dbn.toLowerCase().includes(q) ||
-        (r.school?.borough ?? '').toLowerCase().includes(q))
+        q === '' || matchesSearch(`${r.name} ${r.member.dbn} ${r.school?.borough ?? ''}`, q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [schools, members, query]);
 
