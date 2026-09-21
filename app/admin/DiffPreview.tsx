@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import type { PreviewResponse } from './UploadFlow';
+import TransformIssueList from './TransformIssueList';
 
 export default function DiffPreview({
   preview,
@@ -11,9 +12,11 @@ export default function DiffPreview({
   onCancel,
   onConfirm,
   error,
+  backLabel = '← Back to mapping',
 }: {
   preview: PreviewResponse;
   filename: string;
+  backLabel?: string;
   onBack: () => void;
   onCancel: () => void;
   onConfirm: (notes: string) => Promise<void> | void;
@@ -29,7 +32,7 @@ export default function DiffPreview({
       width={820}
       footer={
         <>
-          <button type="button" onClick={onBack} style={ghostBtn}>← Back to mapping</button>
+          <button type="button" onClick={onBack} style={ghostBtn}>{backLabel}</button>
           <button type="button" onClick={onCancel} style={ghostBtn}>Cancel</button>
           <button
             type="button"
@@ -53,6 +56,24 @@ export default function DiffPreview({
       }
     >
       <SummaryRow s={preview.summary} />
+
+      {(preview.warnings.transformSourceFiles?.length ?? 0) > 0 ? (
+        <Banner tone="ok" title="Values computed from the raw DOE file">
+          The hub transformed {preview.warnings.transformSourceFiles!.join(', ')} and found every sheet,
+          column and question it needs.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.transformWarnings?.length ?? 0) > 0 ? (
+        <Banner
+          tone="warn"
+          title={`${preview.warnings.transformWarnings!.length} difference${preview.warnings.transformWarnings!.length > 1 ? 's' : ''} from past downloads`}
+        >
+          The file is still usable, but its structure isn't identical to earlier years. Check that the
+          values below look right before applying.
+          <TransformIssueList issues={preview.warnings.transformWarnings!} />
+        </Banner>
+      ) : null}
 
       {preview.warnings.retainedFromCurrent > 0 ? (
         <Banner tone="info" title={`${preview.warnings.retainedFromCurrent} rows retained from current`}>

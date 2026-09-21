@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import UploadFlow, { type DatasetConfig } from './UploadFlow';
+import UploadFlow, { type DatasetConfig, type RawUploadConfig } from './UploadFlow';
 import VersionHistory from './VersionHistory';
 import ViewSchemaDialog from './ViewSchemaDialog';
 import Modal from './Modal';
@@ -25,6 +25,7 @@ export default function IndicatorDatasetCard({
   description,
   indicators,
   guidelines,
+  raw,
   initialStatus,
 }: {
   id: string;
@@ -32,11 +33,13 @@ export default function IndicatorDatasetCard({
   description: string;
   indicators: Array<{ id: string; shortLabel: string }>;
   guidelines: DatasetGuidelines;
+  raw: RawUploadConfig;
   initialStatus: IndicatorCardStatus;
 }): React.JSX.Element {
   const dataset: DatasetConfig = {
     basePath: `/api/admin/school-indicators/${id}`,
     datasetLabel: id,
+    raw,
   };
   const [status, setStatus] = useState<IndicatorCardStatus>(initialStatus);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -138,8 +141,8 @@ export default function IndicatorDatasetCard({
             <li key={s} style={{ marginBottom: 4 }}>{s}</li>
           ))}
           <li style={{ marginBottom: 4 }}>
-            Shape the CSV like the template ("Download template" below), then use "Update data…".
-            Renamed columns are fine — the upload walks you through matching them.
+            Click "Update data…" and upload the file exactly as downloaded — no editing needed. The hub
+            computes the values below and stops with an explanation if DOE changed the file&apos;s layout.
           </li>
         </ol>
         <div

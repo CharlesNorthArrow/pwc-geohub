@@ -4,6 +4,8 @@ import { getIndicatorDatasetStatuses } from '../../src/server/indicatorAdminDb';
 import { INDICATOR_DATASETS } from '../../src/admin/indicatorDatasets';
 import { DATASET_GUIDELINES } from '../../src/registry/dataSources';
 import { indicatorsById } from '../../src/registry/indicators';
+import { getRawTransform } from '../../src/admin/rawTransforms';
+import { SLIDER_YEARS } from '../../src/contract/year';
 import ProgrammaticSection from './ProgrammaticSection';
 import SchoolMasterSection from './SchoolMasterSection';
 import IndicatorDatasetCard from './IndicatorDatasetCard';
@@ -44,7 +46,8 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
           {INDICATOR_DATASETS.map((cfg) => {
             const guidelines = DATASET_GUIDELINES[cfg.id];
             const status = indicatorStatuses[cfg.id];
-            if (!guidelines || !status) return null;
+            const transform = getRawTransform(cfg.id);
+            if (!guidelines || !status || !transform) return null;
             return (
               <IndicatorDatasetCard
                 key={cfg.id}
@@ -56,6 +59,13 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
                   shortLabel: indicatorsById.get(id)?.short_label ?? indicatorsById.get(id)?.label ?? id,
                 }))}
                 guidelines={guidelines}
+                raw={{
+                  multiFile: transform.multiFile,
+                  yearSource: transform.yearSource,
+                  accepts: transform.accepts.join(','),
+                  yearOptions: [...SLIDER_YEARS].reverse(),
+                  sourceLabel: guidelines.sourceLabel,
+                }}
                 initialStatus={{
                   versionId: status.versionId,
                   rowCount: status.rowCount,

@@ -4,12 +4,12 @@
  * `data/reference/PwC Geo Hub - Public Data Wishlist.xlsx`).
  *
  * Rendered on the Admin Panel's School-indicator cards: how to fetch the
- * upstream file, which tab/field/calculation produces each value, and the
- * source outlink. Keyed by dataset id (src/admin/indicatorDatasets.ts).
+ * upstream file, which tab/field/calculation the hub uses for each value, and
+ * the source outlink. Keyed by dataset id (src/admin/indicatorDatasets.ts).
  *
- * Every card's upload expects a CSV shaped like the dataset schema (use the
- * "Download template" button) — these steps describe how to get from the raw
- * DOE/State download to those columns.
+ * The admin uploads the raw download as-is; the hub transforms it
+ * (src/admin/rawTransforms — ports of scripts/scripts/*.py). `fieldCalc`
+ * describes what that transformation computes.
  */
 
 export interface DatasetGuidelines {
@@ -19,7 +19,7 @@ export interface DatasetGuidelines {
   sourceUrl: string;
   /** How to fetch + prepare the data, in order. */
   steps: string[];
-  /** Which tab/field/calculation produces each indicator value. */
+  /** Which tab/field/calculation the hub uses for each indicator value. */
   fieldCalc: string[];
   /** Coverage caveats worth knowing before hunting for missing years. */
   notes?: string;
@@ -31,10 +31,9 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     sourceUrl: 'https://sites.google.com/schools.nyc.gov/nycdoe-oasp/nycps-arts-data',
     steps: [
       'Click on "[YEAR] ArtsCount Survey Data" and download the spreadsheet.',
-      'Compute the score per school (see calculation below), then prepare a CSV matching the template.',
     ],
     fieldCalc: [
-      "Calc: count of arts disciplines (Dance, Music, Theater, Visual Arts) with active instruction — a discipline counts as active if its 'Instruction Not Provided' field is blank. Score ranges 0–4. Source columns: 'Dance - Instruction Not Provided', 'Music - …', 'Theater - …', 'VA - …' (ArtsCount Survey Data, Sheet0).",
+      "The hub computes the count of arts disciplines (Dance, Music, Theater, Visual Arts) with active instruction — a discipline counts as active if its 'Instruction Not Provided' field is blank. Score ranges 0–4. Source columns: 'Dance - Instruction Not Provided', 'Music - …', 'Theater - …', 'VA - …' (ArtsCount Survey Data, Sheet0).",
     ],
     notes: 'Data only exists for 2021 and 2024-25 — nothing in between. Gap years show "Data not available" on the dashboard.',
   },
@@ -43,10 +42,9 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     sourceUrl: 'https://infohub.nyced.org/reports/government-reports/suspension-reports',
     steps: [
       'Download "Student Discipline - Annual Report on Student Discipline [YEAR]".',
-      'Compute the rate per school (see calculation below), then prepare a CSV matching the template.',
     ],
     fieldCalc: [
-      "Calc: total removals/suspensions per 100 enrolled students. Numerator: 'TOTAL REMOVALS/SUSPENSIONS' from the 'Annual Report--R-P-S TOTALS' tab (System_Code = DBN). Denominator: total enrollment from the NYC DOE Demographic Snapshot. Values of 'R' (redacted for small counts) are treated as blank. Formula: (TOTAL REMOVALS/SUSPENSIONS ÷ Total Enrollment) × 100.",
+      "The hub computes total removals/suspensions per 100 enrolled students. Numerator: 'TOTAL REMOVALS/SUSPENSIONS' from the 'Annual Report--R-P-S TOTALS' tab (SchoolDBN / System_Code = DBN). Denominator: total enrollment for the same year from the schools master (NYC DOE Demographic Snapshot) — load that year's schools master first. Values of 'R' (redacted for small counts) are treated as blank. Formula: (TOTAL REMOVALS/SUSPENSIONS ÷ Total Enrollment) × 100.",
     ],
   },
   temp_housing: {
@@ -81,7 +79,7 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     sourceUrl: 'https://infohub.nyced.org/reports/academics/graduation-results',
     steps: [
       'Download the Graduation Results Excel file for "School".',
-      'The file is cohort-keyed — a cohort_year column is fine: the upload derives school_year automatically (cohort Y graduates in school year (Y+3)-(Y+4), e.g. cohort 2021 → 2024-25).',
+      'The file is cohort-keyed — the hub derives school_year automatically (cohort Y graduates in school year (Y+3)-(Y+4), e.g. cohort 2021 → 2024-25).',
     ],
     fieldCalc: ['Field: % grads (4-year cohort rate). High schools only — other schools have no rows.'],
   },
@@ -90,9 +88,9 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     sourceUrl:
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources/school-quality-reports-citywide-results',
     steps: [
-      'Download all five school-type Excel files (EMS, HS, Transfer HS, D75, Early Childhood) and stack them into one table.',
+      'Download all five school-type Excel files (EMS, HS, Transfer HS, D75, Early Childhood) and upload them together, keeping their original filenames.',
     ],
-    fieldCalc: ['Sheet: "Scoring" — Field: "Safety and School Climate - Rating" (plus the % positive sibling).'],
+    fieldCalc: ['Sheet: "Summary" — Fields: "Safety - School Percent Positive" (map value) and "Safety and School Climate - Rating" (EMS/HS/Transfer HS, 2023-24 on).'],
   },
   family_survey: {
     sourceLabel: 'NYC School Survey — Family Data File',
