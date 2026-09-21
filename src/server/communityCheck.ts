@@ -19,6 +19,30 @@ export interface CheckOutcome {
   error?: string;
 }
 
+/**
+ * Probe one provider and record the outcome on its status row — the same
+ * write "Check now" makes. Returns the probe; rethrows after recording a
+ * failure. The sync preview/apply use this too: a sync starts with this
+ * exact probe, so its "checked" timestamp should move with it.
+ */
+export async function probeAndRecord(
+  provider: Provider,
+): Promise<{ latestVintage: string; rowsUpdatedAt?: string }> {
+  try {
+    if (provider === 'acs') {
+      const probe = await probeAcs();
+      await recordCheckSuccess({ provider, latestVintage: probe.latestVintage, cdcLatestUpdatedAt: null });
+      return probe;
+    }
+    const probe = await probeCdcPlaces();
+    await recordCheckSuccess({ provider, latestVintage: probe.latestVintage, cdcLatestUpdatedAt: probe.rowsUpdatedAt });
+    return probe;
+  } catch (err) {
+    await recordCheckFailure({ provider, error: (err as Error).message });
+    throw err;
+  }
+}
+
 export async function runChecks(): Promise<CheckOutcome[]> {
   const out: CheckOutcome[] = [];
   // ACS

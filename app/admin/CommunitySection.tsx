@@ -106,7 +106,12 @@ export default function CommunitySection(): React.JSX.Element {
       {syncing ? (
         <CommunitySyncDialog
           provider={syncing}
-          onClose={() => setSyncing(null)}
+          onClose={() => {
+            setSyncing(null);
+            // The sync probed the source even if nothing was applied —
+            // refresh so the "checked …" pill reflects it.
+            void refreshStatus();
+          }}
           onApplied={async () => {
             setSyncing(null);
             await refreshStatus();

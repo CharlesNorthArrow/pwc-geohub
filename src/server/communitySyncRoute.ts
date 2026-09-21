@@ -2,7 +2,8 @@
  * Shared logic for the per-provider sync routes — the preview + apply path.
  *
  * Both endpoints run the same pipeline:
- *   1. Probe the source to determine the latest vintage + (CDC) updatedAt.
+ *   1. Probe the source to determine the latest vintage + (CDC) updatedAt,
+ *      recording it as a check (the card's "checked …" pill moves).
  *   2. Compare with the loaded state. If already at latest → "no-op".
  *   3. Fetch the new vintage's normalized rows (forceFresh).
  *   4. Read the current version's row set; mergeCommunity.
@@ -10,7 +11,7 @@
  *      apply:   write a new version + atomic swap + clear flag.
  */
 
-import { probeAcs, probeCdcPlaces } from '../admin/communityProbe';
+import { probeAndRecord } from './communityCheck';
 import { fetchAcsVintage, fetchCdcVintage, indicatorsForProvider, type Provider } from '../admin/communitySync';
 import { mergeCommunity, type IncomingRow } from '../admin/communityMerge';
 import {
@@ -39,7 +40,7 @@ export interface SyncPreview {
 }
 
 export async function computePreview(provider: Provider): Promise<SyncPreview> {
-  const probe = provider === 'acs' ? await probeAcs() : await probeCdcPlaces();
+  const probe = await probeAndRecord(provider);
   const status = await getStatus(provider);
   const loadedVintage = status.loaded_vintage;
   const loadedCdcUpd = status.cdc_loaded_updated_at;
@@ -152,7 +153,7 @@ export async function computePreview(provider: Provider): Promise<SyncPreview> {
  * Returns the new version id.
  */
 export async function applyProvider(provider: Provider, notes: string | null): Promise<{ versionId: number | null; alreadyLatest: boolean }> {
-  const probe = provider === 'acs' ? await probeAcs() : await probeCdcPlaces();
+  const probe = await probeAndRecord(provider);
   const status = await getStatus(provider);
   const loadedVintage = status.loaded_vintage;
   const loadedCdcUpd = status.cdc_loaded_updated_at;
