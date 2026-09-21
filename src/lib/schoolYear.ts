@@ -50,3 +50,20 @@ export function latestSchoolYear(years: string[]): string | null {
   const sorted = sortSchoolYears(years);
   return sorted[sorted.length - 1] ?? null;
 }
+
+/** End year → school year, e.g. 2025 → "2024-25". */
+export function schoolYearFromEndYear(end: number): string {
+  return `${end - 1}-${String(end % 100).padStart(2, '0')}`;
+}
+
+/**
+ * DOE raw-file naming: the first 4-digit run in a filename is the school
+ * year's END year ("2025-students-in-temporary-housing.xlsx" → "2024-25").
+ * Same rule as extract_year() in scripts/scripts/*.py. Null when absent.
+ */
+export function guessSchoolYearFromFilename(name: string): string | null {
+  const m = /(\d{4})/.exec(name);
+  if (!m) return null;
+  const y = Number(m[1]);
+  return y >= 2000 && y <= 2100 ? schoolYearFromEndYear(y) : null;
+}
