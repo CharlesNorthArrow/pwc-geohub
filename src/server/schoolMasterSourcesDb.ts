@@ -64,8 +64,20 @@ export async function listSources(db: Queryable): Promise<Array<Omit<SourceRecor
   }
 }
 
-/** Upsert extracts by slot (one statement per source — extracts are large). */
+/**
+ * Upsert extracts by slot (one statement per source — extracts are large).
+ * Creates the table first if needed (same DDL as src/db/schema.sql), so the
+ * first rebuild applied from the admin panel works without running the seed.
+ */
 export async function saveSources(db: Queryable, records: readonly SourceRecord[], by: string): Promise<void> {
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS school_master_sources (
+       slot TEXT PRIMARY KEY, kind TEXT NOT NULL, filename TEXT NOT NULL,
+       row_count INTEGER NOT NULL, summary TEXT NOT NULL,
+       uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(), uploaded_by TEXT NOT NULL,
+       extract JSONB NOT NULL
+     )`,
+  );
   for (const s of records) {
     await db.query(
       `INSERT INTO school_master_sources (slot, kind, filename, row_count, summary, uploaded_at, uploaded_by, extract)
