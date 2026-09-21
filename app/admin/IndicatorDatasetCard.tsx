@@ -84,10 +84,13 @@ export default function IndicatorDatasetCard({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ fontSize: 10, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          School indicator
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            School indicator
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{title}</div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <span
             style={{
               background: status.latestYearLoaded ? '#eaf3fb' : '#eef2f7',
@@ -108,8 +111,6 @@ export default function IndicatorDatasetCard({
           </div>
         </div>
       </div>
-
-      <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
 
       {guidelines.warning ? (
         <div
