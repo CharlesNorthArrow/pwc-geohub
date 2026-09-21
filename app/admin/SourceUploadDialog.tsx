@@ -5,6 +5,7 @@ import Modal from './Modal';
 import TransformIssueList, { type TransformIssue } from './TransformIssueList';
 import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from '../../src/admin/uploadLimits';
 import type { MasterSourceGuide } from '../../src/registry/dataSources';
+import { postFiles } from './postFiles';
 
 interface FileResult {
   file: string;
@@ -50,10 +51,14 @@ export default function SourceUploadDialog({
     setError(null);
     setIssues(null);
     setResults(null);
-    const fd = new FormData();
-    fd.append('card', guide.kind);
-    for (const f of picked) fd.append('file', f);
-    const r = await fetch('/api/admin/school-master/sources/upload', { method: 'POST', body: fd });
+    let r: Response;
+    try {
+      r = await postFiles('/api/admin/school-master/sources/upload', picked, { card: guide.kind });
+    } catch (err) {
+      setBusy(false);
+      setError(`Upload failed: ${(err as Error).message}`);
+      return;
+    }
     const body = (await r.json().catch(() => ({}))) as {
       error?: string;
       issues?: TransformIssue[];

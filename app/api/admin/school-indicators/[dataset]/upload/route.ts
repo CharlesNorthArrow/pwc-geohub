@@ -10,6 +10,7 @@ import { classifyColumns } from '../../../../../../src/admin/columnReconciliatio
 import { getIndicatorDataset, type IndicatorDatasetConfig } from '../../../../../../src/admin/indicatorDatasets';
 import { synthesizeGraduationSchoolYear } from '../../../../../../src/admin/indicatorTransform';
 import { getRawTransform, type RawFile } from '../../../../../../src/admin/rawTransforms';
+import { readUploadedFiles } from '../../../../../../src/server/uploadedFiles';
 import { csvCell } from '../../../../../../src/admin/csvRender';
 import { getEnrollmentByDbnYear } from '../../../../../../src/server/indicatorAdminDb';
 import { MAX_UPLOAD_BYTES as MAX_BYTES } from '../../../../../../src/admin/uploadLimits';
@@ -19,8 +20,10 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /**
- * Multipart upload: one or more `file` parts, plus an optional `schoolYear`
- * (confirmed by the admin for datasets whose year isn't inside the file).
+ * Upload of one or more files plus an optional `schoolYear` (confirmed by the
+ * admin for datasets whose year isn't inside the file). Files arrive as
+ * multipart parts (small uploads) or as Vercel Blob URLs (large ones — see
+ * src/server/uploadedFiles.ts).
  *
  * Two paths:
  *  - Raw DOE file(s), the normal case: the dataset's raw-file transform
@@ -43,58 +46,57 @@ export async function POST(
       return NextResponse.json({ error: 'unknown_dataset' }, { status: 404 });
     }
 
-    let form: FormData;
+    const uploaded = await readUploadedFiles(req);
+    if ('error' in uploaded) {
+      return NextResponse.json({ error: uploaded.error }, { status: 400 });
+    }
     try {
-      form = await req.formData();
-    } catch {
-      return NextResponse.json({ error: 'bad_multipart' }, { status: 400 });
+      if (uploaded.totalBytes > MAX_BYTES) {
+        return NextResponse.json({ error: 'file_too_large', max_bytes: MAX_BYTES }, { status: 413 });
+      }
+      return await processUpload(cfg, uploaded.files, uploaded.fields.schoolYear || undefined);
+    } finally {
+      await uploaded.cleanup();
     }
-    const uploads = form.getAll('file').filter((f): f is File => f instanceof File);
-    if (uploads.length === 0) {
-      return NextResponse.json({ error: 'missing_file' }, { status: 400 });
-    }
-    const totalBytes = uploads.reduce((s, f) => s + f.size, 0);
-    if (totalBytes > MAX_BYTES) {
-      return NextResponse.json({ error: 'file_too_large', max_bytes: MAX_BYTES }, { status: 413 });
-    }
-    const files: RawFile[] = await Promise.all(
-      uploads.map(async (f) => ({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) })),
+  });
+}
+
+async function processUpload(
+  cfg: IndicatorDatasetConfig,
+  files: RawFile[],
+  schoolYear: string | undefined,
+): Promise<NextResponse> {
+  if (files.length === 1 && files[0]!.name.toLowerCase().endsWith('.csv')) {
+    const processed = tryProcessedCsv(files[0]!, cfg);
+    if (processed) return processed;
+  }
+
+  const transform = getRawTransform(cfg.id);
+  if (!transform) {
+    return NextResponse.json({ error: 'no_transform' }, { status: 400 });
+  }
+  const enrollment = transform.needsEnrollment ? await getEnrollmentByDbnYear() : undefined;
+  const result = transform.run(files, { schoolYear, enrollment });
+  if (result.errors.length > 0) {
+    return NextResponse.json(
+      { error: 'schema_changed', issues: result.errors, warnings: result.warnings },
+      { status: 422 },
     );
-    const schoolYearField = form.get('schoolYear');
-    const schoolYear = typeof schoolYearField === 'string' && schoolYearField ? schoolYearField : undefined;
+  }
 
-    if (files.length === 1 && files[0]!.name.toLowerCase().endsWith('.csv')) {
-      const processed = tryProcessedCsv(files[0]!, cfg);
-      if (processed) return processed;
-    }
+  const headers = cfg.fields.map((f) => f.id);
+  const rawRows = result.rows.map((r) => Object.fromEntries(headers.map((h) => [h, r[h] ?? ''])));
+  const csvText =
+    [headers.join(','), ...rawRows.map((r) => headers.map((h) => csvCell(r[h] || null)).join(','))].join('\n') + '\n';
+  const filename = files.length === 1 ? files[0]!.name : `${files.length} files (${files.map((f) => f.name).join(', ')})`;
 
-    const transform = getRawTransform(cfg.id);
-    if (!transform) {
-      return NextResponse.json({ error: 'no_transform' }, { status: 400 });
-    }
-    const enrollment = transform.needsEnrollment ? await getEnrollmentByDbnYear() : undefined;
-    const result = transform.run(files, { schoolYear, enrollment });
-    if (result.errors.length > 0) {
-      return NextResponse.json(
-        { error: 'schema_changed', issues: result.errors, warnings: result.warnings },
-        { status: 422 },
-      );
-    }
-
-    const headers = cfg.fields.map((f) => f.id);
-    const rawRows = result.rows.map((r) => Object.fromEntries(headers.map((h) => [h, r[h] ?? ''])));
-    const csvText =
-      [headers.join(','), ...rawRows.map((r) => headers.map((h) => csvCell(r[h] || null)).join(','))].join('\n') + '\n';
-    const filename = files.length === 1 ? files[0]!.name : `${files.length} files (${files.map((f) => f.name).join(', ')})`;
-
-    return store({
-      filename,
-      csvText,
-      headers,
-      rawRows,
-      cfg,
-      meta: { transform: { sourceFiles: result.stats.files, warnings: result.warnings } },
-    });
+  return store({
+    filename,
+    csvText,
+    headers,
+    rawRows,
+    cfg,
+    meta: { transform: { sourceFiles: result.stats.files, warnings: result.warnings } },
   });
 }
 

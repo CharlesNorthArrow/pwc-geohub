@@ -76,7 +76,7 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     steps: ['Download the "School" file under "End-of-Year Attendance and Chronic Absenteeism Data".'],
     fieldCalc: ['Field: % Chronically Absent.'],
     warning:
-      'Large file: DOE’s download is ~88 MB and the hub accepts up to 95 MB (a hosting-platform limit). The upload and check take ~30 seconds. If a future file is refused as too large, contact North Arrow.',
+      'Large file: DOE’s download is ~88 MB and the hub accepts up to 95 MB per upload. Uploading and checking it takes about a minute. If a future file is refused as too large, contact North Arrow.',
   },
   graduation: {
     sourceLabel: 'NYC DOE Graduation Results',

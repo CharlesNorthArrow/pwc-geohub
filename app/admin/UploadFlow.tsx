@@ -7,6 +7,7 @@ import DiffPreview from './DiffPreview';
 import TransformIssueList, { type TransformIssue } from './TransformIssueList';
 import { guessSchoolYearFromFilename } from '../../src/lib/schoolYear';
 import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from '../../src/admin/uploadLimits';
+import { postFiles } from './postFiles';
 
 interface Classification {
   matched: Array<{ csvHeader: string; fieldId: string; viaAlias?: boolean }>;
@@ -133,10 +134,20 @@ export default function UploadFlow({
     setError(null);
     setIssues(null);
     setStep({ kind: 'uploading' });
-    const fd = new FormData();
-    for (const f of files) fd.append('file', f);
-    if (schoolYear) fd.append('schoolYear', schoolYear);
-    const r = await fetch(`${dataset.basePath}/upload`, { method: 'POST', body: fd });
+    let r: Response;
+    try {
+      if (dataset.raw) {
+        r = await postFiles(`${dataset.basePath}/upload`, files, schoolYear ? { schoolYear } : {});
+      } else {
+        const fd = new FormData();
+        for (const f of files) fd.append('file', f);
+        r = await fetch(`${dataset.basePath}/upload`, { method: 'POST', body: fd });
+      }
+    } catch (err) {
+      setError(`Upload failed: ${(err as Error).message}`);
+      setStep({ kind: 'choose' });
+      return;
+    }
     if (!r.ok) {
       const body = (await r.json().catch(() => ({}))) as { error?: string; issues?: TransformIssue[] };
       if (body.error === 'schema_changed' && body.issues) setIssues(body.issues);
