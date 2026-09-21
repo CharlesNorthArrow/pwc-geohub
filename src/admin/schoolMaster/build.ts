@@ -191,3 +191,25 @@ export function buildMaster(sources: readonly SourceRecord[]): MasterBuildResult
     },
   };
 }
+
+/** Plain-language coverage lines for the preview banner and the admin panel. */
+export function coverageNotes(c: MasterCoverage): string[] {
+  const years = c.snapshotYears;
+  const notes = [
+    `Demographic Snapshot covers ${years[0]} → ${years[years.length - 1]}.`,
+    c.directoryYearsUsed.length > 0
+      ? `Directory data added ${Object.values(c.directoryAdded).reduce((a, b) => a + b, 0)} school-years missing from the snapshot (${c.directoryYearsUsed
+          .map((y) => `${y}: ${c.directoryAdded[y]}`)
+          .join(', ')}).`
+      : 'No directory data in use.',
+  ];
+  for (const fall of c.directoryYearsWaiting) {
+    const sy = `${fall}-${String((Number(fall) + 1) % 100).padStart(2, '0')}`;
+    notes.push(`Fall ${fall} directory data is stored but not used yet — it applies once the snapshot includes ${sy}.`);
+  }
+  notes.push(
+    `LCGMS export${c.lcgmsExportDate ? ` from ${c.lcgmsExportDate}` : ''}: BEDS numbers for ${c.withBeds.toLocaleString('en-US')} of ${c.rowCount.toLocaleString('en-US')} rows.`,
+    `Community Schools list ${c.communityListYear ?? '(year unknown)'}: ${c.communitySchoolDbns} NYC schools flagged.`,
+  );
+  return notes;
+}

@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import { requireRole, UnauthorizedError } from './auth';
 import type { Classification } from '../admin/columnReconciliation';
 import type { TransformIssue } from '../admin/rawTransforms/types';
+import type { SourceRecord } from '../admin/schoolMaster/types';
 
 export type AdminHandler = () => Promise<NextResponse>;
 
@@ -46,6 +47,10 @@ export interface UploadSession {
       sourceFiles: string[];
       warnings: TransformIssue[];
     };
+    /** School master rebuild: newly uploaded source extracts (saved on
+     *  apply) and plain-language coverage lines for the preview. */
+    stagedSources?: SourceRecord[];
+    coverageNotes?: string[];
   };
 }
 

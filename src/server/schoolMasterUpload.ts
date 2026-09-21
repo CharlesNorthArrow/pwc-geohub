@@ -24,6 +24,7 @@ import { deriveSchoolIdentities } from '../admin/schoolMasterTransform';
 import { normalizeDbn, wasDbnRemapped } from '../lib/dbn';
 import { getCurrentMasterVersionId, getMasterVersionRows } from './schoolMasterAdminDb';
 import type { UploadSession } from './adminRoutes';
+import type { TransformIssue } from '../admin/rawTransforms/types';
 
 export interface MasterWarnings {
   /** Kept for PreviewResponse shape-compat with the pwc flow (always empty). */
@@ -36,6 +37,10 @@ export interface MasterWarnings {
   unplottableSample: string[];
   fractionSuspectCount: number;
   fractionSuspectSample: string[];
+  /** Rebuilds from raw source files: tolerated drift, files used, coverage. */
+  transformWarnings?: TransformIssue[];
+  transformSourceFiles?: string[];
+  coverageNotes?: string[];
 }
 
 export interface MasterMergeOutcome {
@@ -105,6 +110,13 @@ export async function buildMasterMerge(
         unplottableSample: unplottable.slice(0, 25),
         fractionSuspectCount: fractionSuspect.length,
         fractionSuspectSample: fractionSuspect.slice(0, 25),
+        ...(session.meta?.transform
+          ? {
+              transformWarnings: session.meta.transform.warnings,
+              transformSourceFiles: session.meta.transform.sourceFiles,
+              coverageNotes: session.meta.coverageNotes ?? [],
+            }
+          : {}),
       },
     },
   };

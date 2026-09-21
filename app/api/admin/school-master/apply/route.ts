@@ -24,7 +24,8 @@ interface ApplyBody {
  * Commit a new schools_master version. Re-runs the whole pipeline end-to-end
  * (never trusting the preview), then:
  *   1. applyMasterVersion — single tx: insert version + rows, UPSERT the live
- *      `schools` + `schools_year`, move the current pointer. No deletes.
+ *      `schools` + `schools_year`, move the current pointer. No deletes. A
+ *      rebuild from raw source files also stores their extracts here.
  *   2. Rebuild school_geo_crosswalk (new/moved schools need point-in-polygon
  *      assignments). Non-fatal: failure leaves stale-but-present crosswalks
  *      and is surfaced as `crosswalkWarning`.
@@ -50,11 +51,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { merge } = r.outcome;
 
     const notes = body.notes?.trim() || null;
+    const staged = session.meta?.stagedSources;
     const { versionId } = await applyMasterVersion({
       createdBy: 'admin',
-      source: `upload:${session.filename}`,
+      source: staged ? `rebuild:${staged.map((s) => s.filename).join(', ')}` : `upload:${session.filename}`,
       notes,
       rows: merge.newVersionRows,
+      sources: staged,
     });
 
     let crosswalkWarning: string | null = null;

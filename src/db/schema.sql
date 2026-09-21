@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS school_master_versions (
   version_id  SERIAL PRIMARY KEY,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_by  TEXT NOT NULL,           -- 'admin' until real users exist
-  source      TEXT NOT NULL,           -- 'upload:<filename>' | 'rollback:v<id>' | 'seed'
+  source      TEXT NOT NULL,           -- 'upload:<filename>' | 'rebuild:<files>' | 'rollback:v<id>' | 'seed'
   notes       TEXT,
   row_count   INTEGER NOT NULL,
   csv_url     TEXT                     -- Vercel Blob immutable snapshot
