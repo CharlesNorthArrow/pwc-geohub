@@ -129,6 +129,8 @@ export interface MasterSourceGuide {
   kind: 'snapshot' | 'directory' | 'lcgms' | 'community_schools';
   title: string;
   required: boolean;
+  /** How many files make up this source, e.g. '3 files per fall year'. */
+  fileCount: string;
   sourceLabel: string;
   sourceUrl: string;
   /** What to download, as named on the source page → the file you get. */
@@ -150,6 +152,7 @@ export const MASTER_SOURCE_GUIDES: readonly MasterSourceGuide[] = [
     kind: 'snapshot',
     title: 'Demographic Snapshot',
     required: true,
+    fileCount: '1 file (.xlsx)',
     sourceLabel: 'NYC DOE InfoHub — Information and Data Overview',
     sourceUrl: 'https://infohub.nyced.org/reports/students-and-schools/school-quality/information-and-data-overview',
     files: [{ link: '“Demographic Snapshot”', filename: 'demographic-snapshot-[year]-to-[year]-public.xlsx' }],
@@ -161,6 +164,7 @@ export const MASTER_SOURCE_GUIDES: readonly MasterSourceGuide[] = [
     kind: 'directory',
     title: 'Directory Data',
     required: false,
+    fileCount: '3 files per fall year (ES, MS, HS)',
     sourceLabel: 'NYC DOE InfoHub — Directory Data',
     sourceUrl: 'https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data',
     files: [
@@ -177,6 +181,7 @@ export const MASTER_SOURCE_GUIDES: readonly MasterSourceGuide[] = [
     kind: 'lcgms',
     title: 'LCGMS school data',
     required: true,
+    fileCount: '2 files (.csv + .xls)',
     sourceLabel: 'NYC DOE InfoHub — LCGMS',
     sourceUrl: 'https://infohub.nyced.org/in-our-schools/operations/lcgms',
     files: [
@@ -192,6 +197,7 @@ export const MASTER_SOURCE_GUIDES: readonly MasterSourceGuide[] = [
     kind: 'community_schools',
     title: 'Community Schools list',
     required: true,
+    fileCount: '1 file (.pdf)',
     sourceLabel: 'NYSED — Community Schools Resources',
     sourceUrl: 'https://www.nysed.gov/student-support-services/community-schools-resources',
     files: [

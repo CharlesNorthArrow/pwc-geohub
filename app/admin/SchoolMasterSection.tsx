@@ -54,6 +54,7 @@ export default function SchoolMasterSection({
   const [sources, setSources] = useState<SourcesState | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'sources' | 'csv' | 'schema' | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const loadSources = useCallback(async (): Promise<void> => {
     try {
@@ -131,7 +132,9 @@ export default function SchoolMasterSection({
             ))}
           </ul>
           <div style={{ marginTop: 4 }}>
-            Upload them (all at once is fine) with Update sources…. The current version stays live until you apply.
+            First time: select every source file together in Update sources… — the 4 required files (Snapshot, both
+            LCGMS files, the Community Schools PDF) plus the Directory files for each fall year. The current version
+            stays live until you apply.
           </div>
         </Callout>
       ) : null}
@@ -146,14 +149,44 @@ export default function SchoolMasterSection({
         </Callout>
       ) : null}
 
-      <div style={{ marginTop: 22, fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        Sources
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 12, marginTop: 8 }}>
-        {MASTER_SOURCE_GUIDES.map((g) => (
-          <SourceCard key={g.kind} guide={g} state={sources} />
-        ))}
-      </div>
+      <button
+        type="button"
+        onClick={() => setSourcesOpen((o) => !o)}
+        aria-expanded={sourcesOpen}
+        style={{
+          marginTop: 22,
+          width: '100%',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 10,
+          background: 'none',
+          border: 0,
+          borderTop: '1px solid #e1e8ef',
+          padding: '12px 0 0 0',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {sourcesOpen ? '▾' : '▸'} Sources ({MASTER_SOURCE_GUIDES.length})
+        </span>
+        <span style={{ fontSize: 12, color: '#9aa9ba' }}>{sourcesSummary(sources)}</span>
+      </button>
+      {sourcesOpen ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 12,
+            marginTop: 10,
+            alignItems: 'start',
+          }}
+        >
+          {MASTER_SOURCE_GUIDES.map((g) => (
+            <SourceCard key={g.kind} guide={g} state={sources} />
+          ))}
+        </div>
+      ) : null}
 
       <div style={{ marginTop: 28 }}>
         <div style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
@@ -181,10 +214,55 @@ export default function SchoolMasterSection({
   );
 }
 
+/** One line for the collapsed Sources header. */
+function sourcesSummary(state: SourcesState | null): string {
+  if (!state) return 'Loading…';
+  const required = MASTER_SOURCE_GUIDES.filter((g) => g.required).length;
+  const missing = state.missing.length;
+  const dirFiles = state.sources.filter((s) => s.kind === 'directory').length;
+  const head = missing === 0 ? 'All required sources stored' : `${required - missing} of ${required} required sources stored`;
+  return `${head} · ${dirFiles} directory file${dirFiles === 1 ? '' : 's'}`;
+}
+
+/** Compact status for a card's collapsed face. */
+function cardStatus(guide: MasterSourceGuide, state: SourcesState | null): { text: string; ok: boolean } {
+  if (!state) return { text: 'Loading…', ok: true };
+  const bySlot = (slot: string): StoredSource | undefined => state.sources.find((s) => s.slot === slot);
+  if (guide.kind === 'directory') {
+    const dir = state.sources.filter((s) => s.kind === 'directory');
+    if (dir.length === 0) return { text: 'Not uploaded yet', ok: false };
+    const falls = [...new Set(dir.map((s) => Number(s.slot.split(':')[1])))].sort();
+    const range = falls.length > 1 ? `Fall ${falls[0]}–${falls[falls.length - 1]}` : `Fall ${falls[0]}`;
+    return { text: `${dir.length} files stored · ${range}`, ok: true };
+  }
+  if (guide.kind === 'lcgms') {
+    const n = [bySlot('lcgms_geo'), bySlot('lcgms_beds')].filter(Boolean).length;
+    if (n === 2) return { text: 'Both files stored', ok: true };
+    return { text: n === 0 ? 'Not uploaded yet' : '1 of 2 files stored', ok: false };
+  }
+  const s = bySlot(guide.kind);
+  return s ? { text: s.summary, ok: true } : { text: 'Not uploaded yet', ok: false };
+}
+
+/** Collapsed cards share this height so the row reads as a set. */
+const CARD_HEIGHT = 178;
+
 function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: SourcesState | null }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
   const stored = (slot: string): StoredSource | undefined => state?.sources.find((s) => s.slot === slot);
-  return (
-    <div style={{ border: '1px solid #e1e8ef', borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+  const status = cardStatus(guide, state);
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setOpen((o) => !o)}
+      aria-expanded={open}
+      style={{ background: 'none', border: 0, padding: 0, color: '#027BC0', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      {open ? 'Hide details ▴' : 'Details ▾'}
+    </button>
+  );
+  const header = (
+    <>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{guide.title}</div>
         <span
@@ -194,11 +272,66 @@ function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: Sources
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             color: guide.required ? '#027BC0' : '#5a6e85',
+            whiteSpace: 'nowrap',
           }}
         >
           {guide.required ? 'Required' : 'Recommended'}
         </span>
       </div>
+      <div style={{ fontSize: 11, color: '#5a6e85' }}>{guide.fileCount}</div>
+    </>
+  );
+
+  if (!open) {
+    return (
+      <div
+        style={{
+          border: '1px solid #e1e8ef',
+          borderRadius: 8,
+          padding: 14,
+          height: CARD_HEIGHT,
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        {header}
+        <div
+          style={{
+            fontSize: 12,
+            color: '#33455c',
+            lineHeight: 1.45,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {guide.provides}
+        </div>
+        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <span
+            title={status.text}
+            style={{
+              fontSize: 11,
+              color: status.ok ? '#1f7a3a' : guide.required ? '#c0392b' : '#a37800',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {status.ok ? '✓' : '✗'} {status.text}
+          </span>
+          {toggle}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ border: '1px solid #c7d3e0', borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {header}
       <div style={{ fontSize: 12, color: '#33455c', lineHeight: 1.45 }}>{guide.provides}</div>
 
       <div style={{ fontSize: 11, color: '#5a6e85' }}>
@@ -233,6 +366,7 @@ function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: Sources
           <StoredLine source={stored(guide.kind)} required={guide.required} />
         )}
       </div>
+      {toggle}
     </div>
   );
 }
