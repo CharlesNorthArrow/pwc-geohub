@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import UploadFlow, { type DatasetConfig } from './UploadFlow';
 import VersionHistory from './VersionHistory';
 import ViewSchemaDialog from './ViewSchemaDialog';
-import MasterSourcesDialog from './MasterSourcesDialog';
+import MasterRebuildDialog from './MasterRebuildDialog';
+import SourceUploadDialog from './SourceUploadDialog';
 import { MASTER_SOURCE_GUIDES, type MasterSourceGuide } from '../../src/registry/dataSources';
 
 const DATASET: DatasetConfig = {
@@ -37,11 +38,12 @@ interface SourcesState {
 /**
  * "School data master" admin category. The master is BUILT by the hub from
  * public source files (Demographic Snapshot, Directory data, LCGMS, NYSED
- * Community Schools list). The panel lists every source — where to get it,
- * what the hub takes from it, and which file is stored — and "Update
- * sources…" takes only the file(s) that changed, rebuilds, previews, and
- * applies. Apply UPSERTS `schools` / `schools_year` and rebuilds the geo
- * crosswalks; nothing is ever deleted. A prepared CSV can still be uploaded
+ * Community Schools list). Each source card lists where to get it, what the
+ * hub takes from it and which file is stored, and has its own Upload… —
+ * which stores the file without touching the live master. "Rebuild master…"
+ * (enabled once the required sources are stored) builds from every stored
+ * source, previews the changes and applies them. Apply UPSERTS `schools` /
+ * `schools_year` and rebuilds the geo crosswalks; nothing is ever deleted. A prepared CSV can still be uploaded
  * through the column-matching flow (advanced).
  */
 export default function SchoolMasterSection({
@@ -53,7 +55,8 @@ export default function SchoolMasterSection({
   const [activeVersion, setActiveVersion] = useState<InitialSchema>(initialSchema);
   const [sources, setSources] = useState<SourcesState | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'sources' | 'csv' | 'schema' | null>(null);
+  const [dialog, setDialog] = useState<'rebuild' | 'csv' | 'schema' | null>(null);
+  const [uploadGuide, setUploadGuide] = useState<MasterSourceGuide | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const loadSources = useCallback(async (): Promise<void> => {
@@ -82,6 +85,11 @@ export default function SchoolMasterSection({
     }
   };
 
+  const canRebuild = sources != null && sources.missing.length === 0;
+  const lastBuilt = activeVersion.updatedAt ? new Date(activeVersion.updatedAt).getTime() : 0;
+  const isNew = (s: StoredSource): boolean => s.uploadedAt != null && new Date(s.uploadedAt).getTime() > lastBuilt;
+  const pending = sources?.sources.filter(isNew) ?? [];
+
   const afterApply = async (): Promise<void> => {
     setDialog(null);
     await Promise.all([refreshActive(), loadSources()]);
@@ -98,18 +106,24 @@ export default function SchoolMasterSection({
           <div style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>schools_master</div>
           <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 6, maxWidth: 600, lineHeight: 1.5 }}>
             Every NYC school with its location, enrollment and demographics, per school year — the base every
-            indicator and PWC record joins to. The hub builds it from the four public sources below. To update,
-            download the new file(s) and use <strong>Update sources…</strong>: only the files that changed are
-            needed; the hub rebuilds the master from them plus the stored ones and shows you the changes before
-            anything is saved. Schools are never deleted.
+            indicator and PWC record joins to. The hub builds it from the four public sources below. To update:
+            upload the new file on its source card (only what changed), then <strong>Rebuild master…</strong> —
+            the hub rebuilds from every stored source and shows you the changes before anything is saved.
+            Schools are never deleted.
           </div>
         </div>
         <Badge {...activeVersion} />
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" onClick={() => setDialog('sources')} style={primaryBtn}>
-          Update sources…
+        <button
+          type="button"
+          disabled={!canRebuild}
+          onClick={() => setDialog('rebuild')}
+          title={canRebuild ? 'Build from the stored sources, preview, apply' : 'Load the required sources first'}
+          style={{ ...primaryBtn, opacity: canRebuild ? 1 : 0.45, cursor: canRebuild ? 'pointer' : 'not-allowed' }}
+        >
+          Rebuild master…
         </button>
         <button type="button" onClick={() => { window.location.href = `${DATASET.basePath}/download`; }} style={secondaryBtn}>
           Download current CSV
@@ -125,17 +139,30 @@ export default function SchoolMasterSection({
       {sourcesError ? <Callout tone="error">{sourcesError}</Callout> : null}
       {sources && sources.missing.length > 0 ? (
         <Callout tone="warn">
-          <strong>Sources still needed before the master can be rebuilt:</strong>
+          <strong>Rebuild master… unlocks once the required sources are loaded:</strong>
           <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
             {sources.missing.map((m) => (
               <li key={m}>{m}</li>
             ))}
           </ul>
           <div style={{ marginTop: 4 }}>
-            First time: select every source file together in Update sources… — the 4 required files (Snapshot, both
-            LCGMS files, the Community Schools PDF) plus the Directory files for each fall year. The current version
-            stays live until you apply.
+            Use the Upload… button on each card in{' '}
+            <button type="button" onClick={() => setSourcesOpen(true)} style={{ ...textBtn, color: '#a37800', padding: 0, fontSize: 12 }}>
+              Sources
+            </button>{' '}
+            (Directory Data is recommended too — all its fall years). The live master doesn&apos;t change until you
+            rebuild and apply.
           </div>
+        </Callout>
+      ) : null}
+      {canRebuild && pending.length > 0 ? (
+        <Callout tone="info">
+          <strong>
+            {pending.length} source file{pending.length > 1 ? 's' : ''} loaded since the last rebuild
+          </strong>{' '}
+          ({pending.slice(0, 3).map((p) => p.filename).join(', ')}
+          {pending.length > 3 ? ` and ${pending.length - 3} more` : ''}). Click <strong>Rebuild master…</strong> to preview and apply
+          {pending.length > 1 ? ' them' : ' it'}.
         </Callout>
       ) : null}
       {sources && sources.notes.length > 0 ? (
@@ -183,7 +210,7 @@ export default function SchoolMasterSection({
           }}
         >
           {MASTER_SOURCE_GUIDES.map((g) => (
-            <SourceCard key={g.kind} guide={g} state={sources} />
+            <SourceCard key={g.kind} guide={g} state={sources} isNew={isNew} onUpload={() => setUploadGuide(g)} />
           ))}
         </div>
       ) : null}
@@ -205,7 +232,10 @@ export default function SchoolMasterSection({
         />
       </div>
 
-      {dialog === 'sources' ? <MasterSourcesDialog onClose={() => setDialog(null)} onApplied={afterApply} /> : null}
+      {dialog === 'rebuild' ? <MasterRebuildDialog onClose={() => setDialog(null)} onApplied={afterApply} /> : null}
+      {uploadGuide ? (
+        <SourceUploadDialog guide={uploadGuide} onClose={() => setUploadGuide(null)} onStored={loadSources} />
+      ) : null}
       {dialog === 'csv' ? <UploadFlow dataset={DATASET} onClose={() => setDialog(null)} onApplied={afterApply} /> : null}
       {dialog === 'schema' ? (
         <ViewSchemaDialog basePath={DATASET.basePath} datasetLabel={DATASET.datasetLabel} onClose={() => setDialog(null)} />
@@ -247,10 +277,36 @@ function cardStatus(guide: MasterSourceGuide, state: SourcesState | null): { tex
 /** Collapsed cards share this height so the row reads as a set. */
 const CARD_HEIGHT = 178;
 
-function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: SourcesState | null }): React.JSX.Element {
+/** Stored slots that belong to a card. */
+const cardSlots = (guide: MasterSourceGuide, state: SourcesState | null): StoredSource[] =>
+  (state?.sources ?? []).filter((s) =>
+    guide.kind === 'lcgms' ? s.kind === 'lcgms_geo' || s.kind === 'lcgms_beds' : s.kind === guide.kind,
+  );
+
+function SourceCard({
+  guide,
+  state,
+  isNew,
+  onUpload,
+}: {
+  guide: MasterSourceGuide;
+  state: SourcesState | null;
+  isNew: (s: StoredSource) => boolean;
+  onUpload: () => void;
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const stored = (slot: string): StoredSource | undefined => state?.sources.find((s) => s.slot === slot);
   const status = cardStatus(guide, state);
+  const hasNew = cardSlots(guide, state).some(isNew);
+  const uploadBtn = (
+    <button
+      type="button"
+      onClick={onUpload}
+      style={{ background: '#027BC0', color: '#fff', border: 0, borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      Upload…
+    </button>
+  );
   const toggle = (
     <button
       type="button"
@@ -278,7 +334,17 @@ function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: Sources
           {guide.required ? 'Required' : 'Recommended'}
         </span>
       </div>
-      <div style={{ fontSize: 11, color: '#5a6e85' }}>{guide.fileCount}</div>
+      <div style={{ fontSize: 11, color: '#5a6e85', display: 'flex', gap: 6, alignItems: 'baseline' }}>
+        {guide.fileCount}
+        {hasNew ? (
+          <span
+            title="Loaded after the current master version — rebuild to apply"
+            style={{ background: '#eaf3fb', color: '#027BC0', borderRadius: 999, padding: '1px 7px', fontSize: 10, fontWeight: 600 }}
+          >
+            New — not in the master yet
+          </span>
+        ) : null}
+      </div>
     </>
   );
 
@@ -323,7 +389,10 @@ function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: Sources
           >
             {status.ok ? '✓' : '✗'} {status.text}
           </span>
-          {toggle}
+          <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {toggle}
+            {uploadBtn}
+          </span>
         </div>
       </div>
     );
@@ -366,7 +435,10 @@ function SourceCard({ guide, state }: { guide: MasterSourceGuide; state: Sources
           <StoredLine source={stored(guide.kind)} required={guide.required} />
         )}
       </div>
-      {toggle}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {toggle}
+        {uploadBtn}
+      </div>
     </div>
   );
 }

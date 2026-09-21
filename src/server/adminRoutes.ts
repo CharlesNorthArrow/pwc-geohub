@@ -47,8 +47,8 @@ export interface UploadSession {
       sourceFiles: string[];
       warnings: TransformIssue[];
     };
-    /** School master rebuild: newly uploaded source extracts (saved on
-     *  apply) and plain-language coverage lines for the preview. */
+    /** School master rebuild from stored sources: source extracts to save
+     *  on apply (empty — already stored) and coverage lines for the preview. */
     stagedSources?: SourceRecord[];
     coverageNotes?: string[];
   };

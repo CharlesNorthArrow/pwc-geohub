@@ -51,10 +51,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { merge } = r.outcome;
 
     const notes = body.notes?.trim() || null;
+    // Rebuild sessions (sources/rebuild) carry `stagedSources` — already
+    // stored, so nothing extra is saved; the version is labelled 'rebuild'.
     const staged = session.meta?.stagedSources;
     const { versionId } = await applyMasterVersion({
       createdBy: 'admin',
-      source: staged ? `rebuild:${staged.map((s) => s.filename).join(', ')}` : `upload:${session.filename}`,
+      source: staged ? 'rebuild' : `upload:${session.filename}`,
       notes,
       rows: merge.newVersionRows,
       sources: staged,

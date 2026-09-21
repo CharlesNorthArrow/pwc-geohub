@@ -1,10 +1,10 @@
 /**
  * ETL 44 — seed the school-master source extracts from a folder of raw files.
  *
- * The admin "Update sources" flow rebuilds the master from the stored extract
- * of every source, so the store needs one complete set before the first
- * admin update. Point this at the folder holding the files the current
- * master was built from (the Drive "Public Data Indicators/Input/Main
+ * A shortcut for the admin panel's per-source Upload… buttons: stores every
+ * source in one go (the admin's "Rebuild master…" then builds from them).
+ * Point this at the folder holding the files the current master was built
+ * from (the Drive "Public Data Indicators/Input/Main
  * Dataset" folder): Demographic Snapshot, Directory data, both LCGMS files,
  * the Community Schools PDF. Other files in the folder are skipped.
  *
