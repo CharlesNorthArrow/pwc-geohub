@@ -270,6 +270,22 @@ CREATE TABLE IF NOT EXISTS school_master_current (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Latest parsed extract per school-master SOURCE file (Demographic Snapshot,
+-- Directory data per fall year × level, LCGMS geocoded CSV, LCGMS BEDS
+-- export, NYSED Community Schools list). An admin update uploads only the
+-- file(s) that changed; the master is rebuilt from every row here, with the
+-- new extracts replacing their slot when the version is applied.
+CREATE TABLE IF NOT EXISTS school_master_sources (
+  slot         TEXT PRIMARY KEY,        -- 'snapshot' | 'directory:2025:hs' | 'lcgms_geo' | …
+  kind         TEXT NOT NULL,
+  filename     TEXT NOT NULL,
+  row_count    INTEGER NOT NULL,
+  summary      TEXT NOT NULL,
+  uploaded_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  uploaded_by  TEXT NOT NULL,
+  extract      JSONB NOT NULL
+);
+
 -- =============================================================================
 -- Community Indicators — per-provider versioning + availability status.
 -- Provider ∈ {'acs', 'cdc_places'}. The live read view stays

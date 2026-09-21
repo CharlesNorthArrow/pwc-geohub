@@ -24,6 +24,8 @@ import {
   type MasterVersionRow,
 } from '../admin/schoolMasterTransform';
 import type { Payload } from '../admin/merge';
+import type { SourceRecord } from '../admin/schoolMaster/types';
+import { saveSources } from './schoolMasterSourcesDb';
 
 export async function getCurrentMasterVersionId(): Promise<number | null> {
   const r = await pool().query(`SELECT version_id FROM school_master_current WHERE pin = 1`);
@@ -103,12 +105,15 @@ const CHUNK = 200;
  * Atomic apply. Creates a new version, inserts its rows, UPSERTS the live
  * `schools` + `schools_year` tables from the transform derivation, and moves
  * the current pointer — all in one transaction. No DELETEs anywhere in here.
+ * A rebuild from raw source files also stores the newly uploaded source
+ * extracts in the same transaction (`sources`).
  */
 export async function applyMasterVersion(args: {
   createdBy: string;
   source: string;
   notes: string | null;
   rows: MasterVersionRow[];
+  sources?: readonly SourceRecord[];
 }): Promise<{ versionId: number }> {
   const p = pool();
   await p.query('BEGIN');
@@ -205,6 +210,10 @@ export async function applyMasterVersion(args: {
            ${yearCols.map((c) => `${c} = EXCLUDED.${c}`).join(', ')}`,
         params,
       );
+    }
+
+    if (args.sources && args.sources.length > 0) {
+      await saveSources(p, args.sources, args.createdBy);
     }
 
     await p.query(
