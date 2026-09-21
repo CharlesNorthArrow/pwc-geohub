@@ -5,7 +5,7 @@ import Scorecard from '../../src/components/Scorecard';
 export const metadata: Metadata = {
   title: 'Indicator Scorecard',
   description:
-    'PWC Anchor and Healing Arts schools benchmarked against a citywide or borough average across every active indicator.',
+    'PWC Anchor (Community School), Anchor (Social Work) and Healing Arts schools benchmarked against all NYC schools — citywide or by borough — across every active indicator.',
 };
 
 // Server-rendered indicator list keeps the first byte useful even before the

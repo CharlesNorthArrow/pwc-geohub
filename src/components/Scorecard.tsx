@@ -18,7 +18,7 @@ import { SCHOOL_THEME_ORDER } from '../registry/indicators';
 import type { Format, GoodDirection } from '../registry/types';
 import { applyFilters } from '../store/derived';
 import { deltaStatus } from '../store/analytics';
-import { belongsToPwcGroup } from '../store/pwcGroups';
+import { anchorProgram, belongsToPwcGroup } from '../store/pwcGroups';
 import { formatDelta, formatValue, mean } from '../lib/format';
 
 interface InitialProps {
@@ -27,8 +27,10 @@ interface InitialProps {
 
 /**
  * Spec §10 "Scorecard" — full-screen, read-at-a-glance comparison of PWC
- * groups (Anchor / Healing Arts) vs a benchmark (the same scope) across
- * every active indicator at its own latest year.
+ * groups — Anchor (Community School), Anchor (Social Work), Healing Arts —
+ * vs all NYC schools in the same scope, across every active indicator at
+ * its own latest year. The two Anchor groups split on PWC's
+ * community-school program flag (`anchorProgram`).
  *
  * Decoupled from the dashboard: no slider, no Geo/Cohort/School Type
  * filters. The only control is the scope toggle (Citywide or one of the
@@ -131,15 +133,18 @@ export default function Scorecard({ initialIndicators }: InitialProps): React.JS
   const groupDbns = useMemo(() => {
     if (!inScope || !pwcMembers) return null;
     const byDbn = new Map(pwcMembers.map((m) => [m.dbn, m]));
-    const anchor = new Set<string>();
+    const anchorCs = new Set<string>();
+    const anchorSw = new Set<string>();
     const healing = new Set<string>();
     for (const dbn of inScope) {
       const m = byDbn.get(dbn);
       if (!m) continue;
-      if (belongsToPwcGroup(m.category, 'anchor')) anchor.add(dbn);
+      const program = anchorProgram(m);
+      if (program === 'community_school') anchorCs.add(dbn);
+      else if (program === 'social_work') anchorSw.add(dbn);
       if (belongsToPwcGroup(m.category, 'healing_arts')) healing.add(dbn);
     }
-    return { anchor, healing, benchmark: inScope };
+    return { anchorCs, anchorSw, healing, benchmark: inScope };
   }, [inScope, pwcMembers]);
 
   /* -------------------- grouped indicator lists -------------------- */
@@ -412,7 +417,8 @@ function ScopeToggle({
 /* ========================================================================== */
 
 interface GroupDbns {
-  anchor: Set<string>;
+  anchorCs: Set<string>;
+  anchorSw: Set<string>;
   healing: Set<string>;
   benchmark: Set<string>;
 }
@@ -470,24 +476,24 @@ function ScorecardTable({
   );
 }
 
-/** 7-column grid, shared by header + rows so they line up exactly.
- *  Order: Indicator | Anchor avg | Δ Anchor | HA avg | Δ HA | Benchmark | seam.
+/** 9-column grid, shared by header + rows so they line up exactly.
+ *  Order: Indicator | Anchor (CS) avg | Δ | Anchor (SW) avg | Δ | HA avg | Δ |
+ *  All NYC schools | seam.
  *  Each Δ column sits IMMEDIATELY after the group it compares so the eye can
  *  read "value → delta" without crossing the table. Δ columns are tinted to
  *  reinforce the grouping. Column 7 is the future "open in dashboard /
  *  download row" action seam (currently empty per the goal's clean-seam rule). */
-const GRID_TEMPLATE = '1.6fr 0.95fr 0.7fr 0.95fr 0.7fr 1.0fr 28px';
+const GRID_TEMPLATE = '1.5fr 0.9fr 0.62fr 0.9fr 0.62fr 0.9fr 0.62fr 0.95fr 20px';
 
 /** Subtle tint applied to the two Δ columns (header + every cell) so the
  *  "value → delta" pairing reads at a glance. Very light brand-blue so it
  *  doesn't fight the indicator name's prominence. */
 const DELTA_BG = '#f0f6fb';
 
-/** What the benchmark column averages over, in plain English. Citywide =
- *  all in-scope schools (no county filter). For boroughs, label as such so
- *  the header reads honestly. */
+/** What the benchmark column averages over, in plain English: every NYC
+ *  school in scope (citywide, or one borough). */
 function benchmarkLabel(scope: Scope): string {
-  return scope === 'citywide' ? 'Citywide avg' : `${SCOPE_LABELS[scope]} avg`;
+  return scope === 'citywide' ? 'All NYC schools' : `All ${SCOPE_LABELS[scope]} schools`;
 }
 
 function TableHeader({ scope }: { scope: Scope }): React.JSX.Element {
@@ -508,10 +514,12 @@ function TableHeader({ scope }: { scope: Scope }): React.JSX.Element {
       }}
     >
       <span style={{ padding: '8px 0' }}>Indicator</span>
-      <HeadCell>Anchor avg</HeadCell>
-      <HeadCell tint>Δ Anchor</HeadCell>
-      <HeadCell>Healing Arts avg</HeadCell>
-      <HeadCell tint>Δ Healing Arts</HeadCell>
+      <HeadCell title="PWC Anchor schools running the full community-school program">Anchor (Community School)</HeadCell>
+      <HeadCell tint>Δ</HeadCell>
+      <HeadCell title="PWC Anchor schools with social-work support only">Anchor (Social Work)</HeadCell>
+      <HeadCell tint>Δ</HeadCell>
+      <HeadCell>Healing Arts</HeadCell>
+      <HeadCell tint>Δ</HeadCell>
       <HeadCell>{benchmarkLabel(scope)}</HeadCell>
       <span />
     </div>
@@ -521,12 +529,15 @@ function TableHeader({ scope }: { scope: Scope }): React.JSX.Element {
 function HeadCell({
   children,
   tint,
+  title,
 }: {
   children: React.ReactNode;
   tint?: boolean;
+  title?: string;
 }): React.JSX.Element {
   return (
     <span
+      title={title}
       style={{
         textAlign: 'right',
         padding: '8px 8px',
@@ -625,16 +636,18 @@ function ScorecardRow({
   }
 
   // Build per-group value lists from the scope-restricted dbn sets.
-  const anchorVals = collectValues(values, groupDbns.anchor);
+  const csVals = collectValues(values, groupDbns.anchorCs);
+  const swVals = collectValues(values, groupDbns.anchorSw);
   const healingVals = collectValues(values, groupDbns.healing);
   const benchVals = collectValues(values, groupDbns.benchmark);
 
-  const anchorAvg = mean(anchorVals);
+  const csAvg = mean(csVals);
+  const swAvg = mean(swVals);
   const healingAvg = mean(healingVals);
   const benchAvg = mean(benchVals);
 
   // No value-in-scope at all → full no-data row.
-  if (benchAvg == null && anchorAvg == null && healingAvg == null) {
+  if (benchAvg == null && csAvg == null && swAvg == null && healingAvg == null) {
     return (
       <RowShell indicator={indicator} latest={latest}>
         <Spanned label="🗓️ No data in scope" tone="warn" />
@@ -642,14 +655,22 @@ function ScorecardRow({
     );
   }
 
-  // Column order: Anchor avg · Δ Anchor · HA avg · Δ HA · Benchmark · seam.
+  // Column order: Anchor (CS) · Δ · Anchor (SW) · Δ · HA · Δ · All NYC · seam.
   // Δ cells sit right next to the group they compare so the eye reads
   // value → delta as a pair. Δ cells carry a subtle tint (DELTA_BG).
   return (
     <RowShell indicator={indicator} latest={latest}>
-      <ValueCell value={anchorAvg} n={anchorVals.length} format={indicator.format} />
+      <ValueCell value={csAvg} n={csVals.length} format={indicator.format} />
       <DeltaCell
-        groupAvg={anchorAvg}
+        groupAvg={csAvg}
+        benchAvg={benchAvg}
+        format={indicator.format}
+        goodDirection={indicator.scale.good_direction}
+        tint
+      />
+      <ValueCell value={swAvg} n={swVals.length} format={indicator.format} />
+      <DeltaCell
+        groupAvg={swAvg}
         benchAvg={benchAvg}
         format={indicator.format}
         goodDirection={indicator.scale.good_direction}
@@ -822,13 +843,13 @@ function Spanned({
   label: string;
   tone?: 'warn';
 }): React.JSX.Element {
-  // Spans across all 5 numeric columns (cols 2–6). Used for categorical and
+  // Spans across all 7 numeric columns (cols 2–8). Used for categorical and
   // no-data-in-scope rows so the table layout stays predictable.
   const color = tone === 'warn' ? '#9a4a08' : '#a8b3bf';
   return (
     <div
       style={{
-        gridColumn: '2 / span 5',
+        gridColumn: '2 / span 7',
         textAlign: 'right',
         color,
         fontSize: 12,
