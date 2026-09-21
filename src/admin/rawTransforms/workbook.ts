@@ -29,12 +29,12 @@ export const extOf = (name: string): string => {
  * with raw cell values. Grids are anchored at A1 so column indices are
  * absolute.
  */
-export function readBook(file: RawFile): Book | TransformIssue {
+export function readBook(file: RawFile, opts: { csvEncoding?: 'utf8' | 'latin1' } = {}): Book | TransformIssue {
   const ext = extOf(file.name);
   if (ext === '.csv') {
     let rows: string[][];
     try {
-      rows = parse(Buffer.from(file.data).toString('utf8'), {
+      rows = parse(Buffer.from(file.data).toString(opts.csvEncoding ?? 'utf8'), {
         bom: true,
         relax_quotes: true,
         relax_column_count: true,
@@ -148,7 +148,7 @@ export function findColumn(
   file: string,
   errors: TransformIssue[],
   warnings: TransformIssue[],
-  opts: { alternatives?: readonly string[]; optional?: boolean } = {},
+  opts: { alternatives?: readonly string[]; optional?: boolean; noContains?: boolean } = {},
 ): number | null {
   const candidates = [name, ...(opts.alternatives ?? [])];
   for (const c of candidates) {
@@ -168,7 +168,7 @@ export function findColumn(
       return i;
     }
   }
-  for (const c of candidates) {
+  for (const c of opts.noContains ? [] : candidates) {
     const i = headers.findIndex((h) => compact(h).includes(compact(c)));
     if (i >= 0) {
       warnings.push({
