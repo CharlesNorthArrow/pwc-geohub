@@ -84,11 +84,20 @@ const SNAPSHOT_COLUMNS: ReadonlyArray<[string, string]> = [
   ['pct_male', '% Male'],
 ];
 
-function parseSnapshot(book: Book, c: Ctx): SourceRecord | null {
-  const grid = book.grid('School');
+function parseSnapshot(book: Book, sheet: string, c: Ctx): SourceRecord | null {
+  if (sheet !== 'School') {
+    c.warnings.push({
+      code: 'sheet_name_changed',
+      file: c.file,
+      message: `School-level data found on sheet "${sheet}" instead of "School".`,
+      expected: 'School',
+      found: sheet,
+    });
+  }
+  const grid = book.grid(sheet);
   const hdr = findRow(grid, (r) => r.some((v) => compact(v) === 'dbn'));
   if (hdr == null) {
-    c.errors.push({ code: 'header_not_found', file: c.file, message: 'No header row (a "DBN" column) in the "School" sheet.' });
+    c.errors.push({ code: 'header_not_found', file: c.file, message: `No header row (a "DBN" column) in the "${sheet}" sheet.` });
     return null;
   }
   const headers = grid[hdr]!;
@@ -426,17 +435,30 @@ export async function parseMasterSourceFile(file: RawFile): Promise<ParsedFile> 
     return done(null);
   }
 
-  if (book.sheetNames.includes('School')) {
-    const h = findRow(book.grid('School'), (r) => r.some((v) => compact(v) === compact('Economic Need Index')));
-    if (h != null) return done(parseSnapshot(book, c));
-  }
   const first = book.grid(book.sheetNames[0]!);
   const top = first.slice(0, 5).flat().map((v) => compact(v));
   if (top.includes(compact('ATS System Code'))) {
-    if (top.includes('latitude')) return done(parseLcgmsGeo(book, c));
-    if (top.includes(compact('BEDS Number'))) return done(parseLcgmsBeds(book, c));
+    // The geocoded file is the CSV; the School Data export is an .xls.
+    if (book.kind === 'csv' || top.includes('latitude')) return done(parseLcgmsGeo(book, c));
+    return done(parseLcgmsBeds(book, c));
   }
-  if (findDirectorySheet(book) && (/fall/i.test(file.name) || book.sheetNames.some((s) => s === 'Data' || s === 'Sheet1'))) {
+  // Directory data: DOE names every file fall-YYYY-….
+  if (/fall[-_ ]?\d{4}/i.test(file.name) && findDirectorySheet(book)) return done(parseDirectory(book, c));
+
+  // Snapshot: a school-level sheet (normally "School") with DBN, Total
+  // Enrollment and Economic Need Index columns.
+  const snapshotSheet = ['School', ...book.sheetNames.filter((s) => s !== 'School')].find((sheet) => {
+    if (!book.sheetNames.includes(sheet)) return false;
+    const grid = book.grid(sheet);
+    const h = findRow(grid, (r) => r.some((v) => compact(v) === compact('Economic Need Index')));
+    if (h == null) return false;
+    const hdr = grid[h]!.map((v) => compact(v));
+    return hdr.includes('dbn') && hdr.includes(compact('Total Enrollment'));
+  });
+  if (snapshotSheet) return done(parseSnapshot(book, snapshotSheet, c));
+
+  // A directory file that lost its fall-YYYY name → parseDirectory explains.
+  if (findDirectorySheet(book) && book.sheetNames.some((s) => s === 'Data' || s === 'Sheet1')) {
     return done(parseDirectory(book, c));
   }
   c.errors.push({

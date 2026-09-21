@@ -121,3 +121,86 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
     ],
   },
 };
+
+// --- School master sources ---------------------------------------------------
+
+export interface MasterSourceGuide {
+  /** Matches SourceKind in src/admin/schoolMaster/types.ts. */
+  kind: 'snapshot' | 'directory' | 'lcgms' | 'community_schools';
+  title: string;
+  required: boolean;
+  sourceLabel: string;
+  sourceUrl: string;
+  /** What to download, as named on the source page → the file you get. */
+  files: Array<{ link: string; filename: string }>;
+  /** What the hub takes from it. */
+  provides: string;
+  /** When a new version usually appears / how often to refresh. */
+  cadence: string;
+  note?: string;
+}
+
+/**
+ * The public files the school master is built from, in the order the admin
+ * panel lists them. Upload a file as downloaded; the hub recognizes which
+ * source it is.
+ */
+export const MASTER_SOURCE_GUIDES: readonly MasterSourceGuide[] = [
+  {
+    kind: 'snapshot',
+    title: 'Demographic Snapshot',
+    required: true,
+    sourceLabel: 'NYC DOE InfoHub — Information and Data Overview',
+    sourceUrl: 'https://infohub.nyced.org/reports/students-and-schools/school-quality/information-and-data-overview',
+    files: [{ link: '“Demographic Snapshot”', filename: 'demographic-snapshot-[year]-to-[year]-public.xlsx' }],
+    provides:
+      'The school list for every year, school names, enrollment (circle size on the map) and demographics (poverty, ENI, ELL, disability, race, gender). Sheet “School”.',
+    cadence: 'Once a year — each release covers five school years.',
+  },
+  {
+    kind: 'directory',
+    title: 'Directory Data',
+    required: false,
+    sourceLabel: 'NYC DOE InfoHub — Directory Data',
+    sourceUrl: 'https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data',
+    files: [
+      { link: '“Fall [Year] High School Data”', filename: 'fall-[year]---hs-directory-data….xlsx' },
+      { link: '“Fall [Year] Middle School Data”', filename: 'fall-[year]-middle-school-data.xlsx' },
+      { link: '“Fall [Year] Elementary Schools Data”', filename: 'fall-[year]---es-directory-data….xlsx' },
+    ],
+    provides:
+      'Adds real schools the snapshot is missing for a year (name and grades). Pre-K-only centers are left out.',
+    cadence: 'Three files per fall. A fall year is used once the snapshot covers that school year (Fall 2025 → 2025-26).',
+    note: 'Keep the “fall-[year]” part of the filename — the year is read from it.',
+  },
+  {
+    kind: 'lcgms',
+    title: 'LCGMS school data',
+    required: true,
+    sourceLabel: 'NYC DOE InfoHub — LCGMS',
+    sourceUrl: 'https://infohub.nyced.org/in-our-schools/operations/lcgms',
+    files: [
+      { link: 'LCGMS school data with geocoded fields', filename: 'LCGMS_SchoolData_additional_geocoded_fields_added_.csv' },
+      { link: 'LCGMS School Data export', filename: 'LCGMS_SchoolData_[YYYYMMDD]_[time].xls' },
+    ],
+    provides:
+      'Map location (latitude / longitude), borough, address, school type, managing entity and grades — from the geocoded CSV; exact 12-digit BEDS numbers — from the .xls export.',
+    cadence: 'When schools open, close or move — refresh both files together.',
+    note: 'Both files are needed: the geocoded CSV stores BEDS numbers rounded (e.g. 6.61E+11), and the exact BEDS number is how schools are matched to the Community Schools list.',
+  },
+  {
+    kind: 'community_schools',
+    title: 'Community Schools list',
+    required: true,
+    sourceLabel: 'NYSED — Community Schools Resources',
+    sourceUrl: 'https://www.nysed.gov/student-support-services/community-schools-resources',
+    files: [
+      {
+        link: '“Self-reported Community Schools in New York State for the [year] School Year”',
+        filename: 'community-schools-list-[year]-[year].pdf',
+      },
+    ],
+    provides: 'The Community School flag: a school is flagged when its BEDS number appears on the list (SED code).',
+    cadence: 'Once a year, when NYSED publishes the new list.',
+  },
+];

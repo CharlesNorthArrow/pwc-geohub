@@ -33,7 +33,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
 
       <Section
         title="School data master"
-        subtitle="School identity, geocoding, enrollment & demographics — the base dataset everything joins to (updated once per year)."
+        subtitle="School identity, location, enrollment & demographics — built by the hub from four public sources (updated once per year)."
       >
         <SchoolMasterSection initialSchema={masterSchema} />
       </Section>

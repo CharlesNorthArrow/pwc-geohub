@@ -55,6 +55,8 @@ export interface PreviewResponse {
     // raw-file transform (school indicators).
     transformWarnings?: TransformIssue[];
     transformSourceFiles?: string[];
+    // school master rebuild: what the combined sources cover.
+    coverageNotes?: string[];
   };
   canApply: boolean;
   currentVersionId: number | null;

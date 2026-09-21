@@ -58,9 +58,19 @@ export default function DiffPreview({
       <SummaryRow s={preview.summary} />
 
       {(preview.warnings.transformSourceFiles?.length ?? 0) > 0 ? (
-        <Banner tone="ok" title="Values computed from the raw DOE file">
-          The hub transformed {preview.warnings.transformSourceFiles!.join(', ')} and found every sheet,
-          column and question it needs.
+        <Banner tone="ok" title="Values computed from the raw source files">
+          The hub read {preview.warnings.transformSourceFiles!.join(', ')} and found everything it needs in
+          {preview.warnings.transformSourceFiles!.length > 1 ? ' them' : ' it'}.
+        </Banner>
+      ) : null}
+
+      {(preview.warnings.coverageNotes?.length ?? 0) > 0 ? (
+        <Banner tone="info" title="What the rebuilt master covers">
+          <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+            {preview.warnings.coverageNotes!.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
         </Banner>
       ) : null}
 
