@@ -5,6 +5,7 @@ import UploadFlow, { type DatasetConfig, type RawUploadConfig } from './UploadFl
 import VersionHistory from './VersionHistory';
 import ViewSchemaDialog from './ViewSchemaDialog';
 import Modal from './Modal';
+import DetailsToggle from './DetailsToggle';
 import type { DatasetGuidelines } from '../../src/registry/dataSources';
 
 export interface IndicatorCardStatus {
@@ -108,10 +109,7 @@ export default function IndicatorDatasetCard({
         </div>
       </div>
 
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
-        <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 3, lineHeight: 1.45 }}>{description}</div>
-      </div>
+      <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
 
       {guidelines.warning ? (
         <div
@@ -128,96 +126,99 @@ export default function IndicatorDatasetCard({
         </div>
       ) : null}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-        {indicators.map((ind) => (
-          <span
-            key={ind.id}
-            style={{
-              background: '#f6f8fb',
-              color: '#5a6e85',
-              border: '1px solid #e1e8ef',
-              borderRadius: 999,
-              padding: '2px 8px',
-              fontSize: 10,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {ind.shortLabel}
-          </span>
-        ))}
-      </div>
-
-      <details style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <summary style={{ cursor: 'pointer', color: '#027BC0', fontWeight: 600 }}>
-          How to update this data
-        </summary>
-        <ol style={{ margin: '8px 0 0 0', paddingLeft: 18, color: '#33455c' }}>
-          {guidelines.steps.map((s) => (
-            <li key={s} style={{ marginBottom: 4 }}>{s}</li>
-          ))}
-          <li style={{ marginBottom: 4 }}>
-            Click "Update data…" and upload the file exactly as downloaded — no editing needed. The hub
-            computes the values below and stops with an explanation if DOE changed the file&apos;s layout.
-          </li>
-        </ol>
-        <div
-          style={{
-            background: '#f6f8fb',
-            borderRadius: 6,
-            padding: '8px 10px',
-            marginTop: 8,
-            color: '#5a6e85',
-            fontSize: 11,
-          }}
-        >
-          {guidelines.fieldCalc.map((c) => (
-            <div key={c} style={{ marginBottom: 4 }}>{c}</div>
-          ))}
-          {guidelines.notes ? (
-            <div style={{ marginTop: 6, fontStyle: 'italic' }}>{guidelines.notes}</div>
-          ) : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 'auto' }}>
+        <div>
+          <button type="button" onClick={() => setUploadOpen(true)} style={primaryBtn}>
+            Update data…
+          </button>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <a
-            href={guidelines.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: '#027BC0', fontWeight: 600, textDecoration: 'none' }}
-          >
-            Open source: {guidelines.sourceLabel} ↗
-          </a>
-        </div>
-      </details>
-
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 'auto' }}>
-        <button type="button" onClick={() => setUploadOpen(true)} style={primaryBtn}>
-          Update data…
-        </button>
-        <button type="button" onClick={() => setHistoryOpen(true)} style={secondaryBtn}>
-          History…
-        </button>
-      </div>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', fontSize: 11 }}>
-        <button type="button" onClick={() => setSchemaOpen(true)} style={textBtn}>
-          View schema
-        </button>
-        <span style={{ color: '#c7d3e0' }}>·</span>
-        <button
-          type="button"
-          onClick={() => { window.location.href = `${dataset.basePath}/download`; }}
-          style={textBtn}
-          disabled={!hasData}
-        >
-          Download data
-        </button>
-        <span style={{ color: '#c7d3e0' }}>·</span>
-        <button
-          type="button"
-          onClick={() => { window.location.href = `${dataset.basePath}/template`; }}
-          style={textBtn}
-        >
-          Download template
-        </button>
+        <DetailsToggle>
+          <div style={{ fontSize: 12, color: '#5a6e85', lineHeight: 1.45 }}>{description}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {indicators.map((ind) => (
+              <span
+                key={ind.id}
+                style={{
+                  background: '#f6f8fb',
+                  color: '#5a6e85',
+                  border: '1px solid #e1e8ef',
+                  borderRadius: 999,
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ind.shortLabel}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: '#33455c' }}>How to update this data</div>
+            <ol style={{ margin: '8px 0 0 0', paddingLeft: 18, color: '#33455c' }}>
+              {guidelines.steps.map((s) => (
+                <li key={s} style={{ marginBottom: 4 }}>{s}</li>
+              ))}
+              <li style={{ marginBottom: 4 }}>
+                Click "Update data…" and upload the file exactly as downloaded — no editing needed. The hub
+                computes the values below and stops with an explanation if DOE changed the file&apos;s layout.
+              </li>
+            </ol>
+            <div
+              style={{
+                background: '#f6f8fb',
+                borderRadius: 6,
+                padding: '8px 10px',
+                marginTop: 8,
+                color: '#5a6e85',
+                fontSize: 11,
+              }}
+            >
+              {guidelines.fieldCalc.map((c) => (
+                <div key={c} style={{ marginBottom: 4 }}>{c}</div>
+              ))}
+              {guidelines.notes ? (
+                <div style={{ marginTop: 6, fontStyle: 'italic' }}>{guidelines.notes}</div>
+              ) : null}
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <a
+                href={guidelines.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#027BC0', fontWeight: 600, textDecoration: 'none' }}
+              >
+                Open source: {guidelines.sourceLabel} ↗
+              </a>
+            </div>
+          </div>
+          <div>
+            <button type="button" onClick={() => setHistoryOpen(true)} style={secondaryBtn}>
+              History…
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', fontSize: 11 }}>
+            <button type="button" onClick={() => setSchemaOpen(true)} style={textBtn}>
+              View schema
+            </button>
+            <span style={{ color: '#c7d3e0' }}>·</span>
+            <button
+              type="button"
+              onClick={() => { window.location.href = `${dataset.basePath}/download`; }}
+              style={textBtn}
+              disabled={!hasData}
+            >
+              Download data
+            </button>
+            <span style={{ color: '#c7d3e0' }}>·</span>
+            <button
+              type="button"
+              onClick={() => { window.location.href = `${dataset.basePath}/template`; }}
+              style={textBtn}
+            >
+              Download template
+            </button>
+          </div>
+        </DetailsToggle>
       </div>
 
       {uploadOpen ? (

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import UploadFlow from './UploadFlow';
 import VersionHistory from './VersionHistory';
 import ViewSchemaDialog from './ViewSchemaDialog';
+import DetailsToggle from './DetailsToggle';
 
 interface InitialSchema {
   versionId: number | null;
@@ -51,11 +52,8 @@ export default function ProgrammaticSection({
             PWC Programmatic data
           </div>
           <div style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>pwc_schools</div>
-          <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 6, maxWidth: 540, lineHeight: 1.45 }}>
-            PWC's school × school_year program panel — anchor / healing-arts flags, cohort, social-work
-            counts, programs. Keyed (DBN, school_year). Uploaded as CSV; merged into the live table
-            with update + append (rows that already exist are updated, rows present in the current
-            data but absent from your upload are kept).
+          <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 4 }}>
+            PWC&apos;s program data per school and year, uploaded as a CSV.
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -63,29 +61,40 @@ export default function ProgrammaticSection({
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-        <PrimaryButton onClick={() => setUploadOpen(true)}>Update data…</PrimaryButton>
-        <SecondaryButton onClick={() => setSchemaOpen(true)}>View schema</SecondaryButton>
-        <SecondaryButton
-          onClick={() => {
-            window.location.href = '/api/admin/pwc/download';
-          }}
-        >
-          Download current CSV
-        </SecondaryButton>
-      </div>
-
-      <div style={{ marginTop: 28 }}>
-        <div style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-          Version history
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+        <div>
+          <PrimaryButton onClick={() => setUploadOpen(true)}>Update data…</PrimaryButton>
         </div>
-        <VersionHistory
-          refreshKey={versionsKey}
-          onRolledBack={async () => {
-            await refreshActive();
-            setVersionsKey((k) => k + 1);
-          }}
-        />
+        <DetailsToggle>
+          <div style={{ fontSize: 12, color: '#5a6e85', maxWidth: 620, lineHeight: 1.45 }}>
+            PWC&apos;s school × school_year program panel — anchor / healing-arts flags, cohort, social-work
+            counts, programs. Keyed (DBN, school_year). Uploaded as CSV; merged into the live table with
+            update + append (rows that already exist are updated, rows present in the current data but
+            absent from your upload are kept).
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <SecondaryButton onClick={() => setSchemaOpen(true)}>View schema</SecondaryButton>
+            <SecondaryButton
+              onClick={() => {
+                window.location.href = '/api/admin/pwc/download';
+              }}
+            >
+              Download current CSV
+            </SecondaryButton>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '6px 0 8px' }}>
+              Version history
+            </div>
+            <VersionHistory
+              refreshKey={versionsKey}
+              onRolledBack={async () => {
+                await refreshActive();
+                setVersionsKey((k) => k + 1);
+              }}
+            />
+          </div>
+        </DetailsToggle>
       </div>
 
       {uploadOpen ? (

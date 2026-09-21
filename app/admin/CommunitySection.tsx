@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import ProviderBadge from './ProviderBadge';
 import CommunitySyncDialog from './CommunitySyncDialog';
 import CommunityVersionHistory from './CommunityVersionHistory';
+import DetailsToggle from './DetailsToggle';
 
 interface Status {
   provider: 'acs' | 'cdc_places';
@@ -153,7 +154,6 @@ function CommunityCard({
         </span>
       </div>
       <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
-      <p style={{ fontSize: 12, color: '#5a6e85', margin: 0, lineHeight: 1.4 }}>{description}</p>
       <div>{status ? <ProviderBadge status={status} /> : <SkeletonPill />}</div>
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
         <button
@@ -173,12 +173,15 @@ function CommunityCard({
           Sync…
         </button>
       </div>
-      <details style={{ marginTop: 8 }}>
-        <summary style={{ cursor: 'pointer', fontSize: 11, color: '#5a6e85' }}>Version history</summary>
-        <div style={{ marginTop: 8 }}>
+      <DetailsToggle>
+        <p style={{ fontSize: 12, color: '#5a6e85', margin: 0, lineHeight: 1.4 }}>{description}</p>
+        <div>
+          <div style={{ fontSize: 11, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            Version history
+          </div>
           <CommunityVersionHistory provider={provider} refreshKey={versionsRefreshKey} />
         </div>
-      </details>
+      </DetailsToggle>
     </div>
   );
 }

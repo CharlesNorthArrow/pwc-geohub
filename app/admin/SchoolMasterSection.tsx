@@ -6,6 +6,7 @@ import VersionHistory from './VersionHistory';
 import ViewSchemaDialog from './ViewSchemaDialog';
 import MasterRebuildDialog from './MasterRebuildDialog';
 import SourceUploadDialog from './SourceUploadDialog';
+import DetailsToggle from './DetailsToggle';
 import { MASTER_SOURCE_GUIDES, type MasterSourceGuide } from '../../src/registry/dataSources';
 
 const DATASET: DatasetConfig = {
@@ -57,7 +58,8 @@ export default function SchoolMasterSection({
   const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'rebuild' | 'csv' | 'schema' | null>(null);
   const [uploadGuide, setUploadGuide] = useState<MasterSourceGuide | null>(null);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(true);
 
   const loadSources = useCallback(async (): Promise<void> => {
     try {
@@ -96,6 +98,11 @@ export default function SchoolMasterSection({
     setVersionsKey((k) => k + 1);
   };
 
+  const openSources = (): void => {
+    setDetailsOpen(true);
+    setSourcesOpen(true);
+  };
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e1e8ef', borderRadius: 8, padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
@@ -104,132 +111,154 @@ export default function SchoolMasterSection({
             School data master
           </div>
           <div style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>schools_master</div>
-          <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 6, maxWidth: 600, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 4 }}>
+            Every NYC school&apos;s location, enrollment and demographics — built from four public sources.
+          </div>
+        </div>
+        <Badge {...activeVersion} />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            disabled={!canRebuild}
+            onClick={() => setDialog('rebuild')}
+            title={canRebuild ? 'Build from the stored sources, preview, apply' : 'Load the required sources first'}
+            style={{ ...primaryBtn, opacity: canRebuild ? 1 : 0.45, cursor: canRebuild ? 'pointer' : 'not-allowed' }}
+          >
+            Rebuild master…
+          </button>
+          {sources && sources.missing.length > 0 ? (
+            <span style={{ fontSize: 12, color: '#a37800' }}>
+              ⚠ {sources.missing.length} required source{sources.missing.length > 1 ? 's' : ''} missing —{' '}
+              <button type="button" onClick={openSources} style={{ ...textBtn, color: '#a37800', padding: 0, fontSize: 12 }}>
+                upload {sources.missing.length > 1 ? 'them' : 'it'}
+              </button>
+            </span>
+          ) : canRebuild && pending.length > 0 ? (
+            <span style={{ fontSize: 12, color: '#027BC0' }}>
+              ● {pending.length} source file{pending.length > 1 ? 's' : ''} loaded since the last rebuild — rebuild to
+              apply {pending.length > 1 ? 'them' : 'it'}.
+            </span>
+          ) : null}
+        </div>
+        {sourcesError ? <Callout tone="error">{sourcesError}</Callout> : null}
+
+        <DetailsToggle label="sources, history & details" open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <div style={{ fontSize: 12, color: '#5a6e85', maxWidth: 640, lineHeight: 1.5 }}>
             Every NYC school with its location, enrollment and demographics, per school year — the base every
             indicator and PWC record joins to. The hub builds it from the four public sources below. To update:
             upload the new file on its source card (only what changed), then <strong>Rebuild master…</strong> —
             the hub rebuilds from every stored source and shows you the changes before anything is saved.
             Schools are never deleted.
           </div>
-        </div>
-        <Badge {...activeVersion} />
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button
-          type="button"
-          disabled={!canRebuild}
-          onClick={() => setDialog('rebuild')}
-          title={canRebuild ? 'Build from the stored sources, preview, apply' : 'Load the required sources first'}
-          style={{ ...primaryBtn, opacity: canRebuild ? 1 : 0.45, cursor: canRebuild ? 'pointer' : 'not-allowed' }}
-        >
-          Rebuild master…
-        </button>
-        <button type="button" onClick={() => { window.location.href = `${DATASET.basePath}/download`; }} style={secondaryBtn}>
-          Download current CSV
-        </button>
-        <button type="button" onClick={() => setDialog('schema')} style={secondaryBtn}>
-          View schema
-        </button>
-        <button type="button" onClick={() => setDialog('csv')} style={textBtn}>
-          Advanced: upload a prepared CSV instead
-        </button>
-      </div>
-
-      {sourcesError ? <Callout tone="error">{sourcesError}</Callout> : null}
-      {sources && sources.missing.length > 0 ? (
-        <Callout tone="warn">
-          <strong>Rebuild master… unlocks once the required sources are loaded:</strong>
-          <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
-            {sources.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-          <div style={{ marginTop: 4 }}>
-            Use the Upload… button on each card in{' '}
-            <button type="button" onClick={() => setSourcesOpen(true)} style={{ ...textBtn, color: '#a37800', padding: 0, fontSize: 12 }}>
-              Sources
-            </button>{' '}
-            (Directory Data is recommended too — all its fall years). The live master doesn&apos;t change until you
-            rebuild and apply.
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button type="button" onClick={() => { window.location.href = `${DATASET.basePath}/download`; }} style={secondaryBtn}>
+              Download current CSV
+            </button>
+            <button type="button" onClick={() => setDialog('schema')} style={secondaryBtn}>
+              View schema
+            </button>
+            <button type="button" onClick={() => setDialog('csv')} style={textBtn}>
+              Advanced: upload a prepared CSV instead
+            </button>
           </div>
-        </Callout>
-      ) : null}
-      {canRebuild && pending.length > 0 ? (
-        <Callout tone="info">
-          <strong>
-            {pending.length} source file{pending.length > 1 ? 's' : ''} loaded since the last rebuild
-          </strong>{' '}
-          ({pending.slice(0, 3).map((p) => p.filename).join(', ')}
-          {pending.length > 3 ? ` and ${pending.length - 3} more` : ''}). Click <strong>Rebuild master…</strong> to preview and apply
-          {pending.length > 1 ? ' them' : ' it'}.
-        </Callout>
-      ) : null}
-      {sources && sources.notes.length > 0 ? (
-        <Callout tone="info">
-          <strong>What the stored sources cover</strong>
-          <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
-            {sources.notes.map((n) => (
-              <li key={n}>{n}</li>
-            ))}
-          </ul>
-        </Callout>
-      ) : null}
 
-      <button
-        type="button"
-        onClick={() => setSourcesOpen((o) => !o)}
-        aria-expanded={sourcesOpen}
-        style={{
-          marginTop: 22,
-          width: '100%',
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 10,
-          background: 'none',
-          border: 0,
-          borderTop: '1px solid #e1e8ef',
-          padding: '12px 0 0 0',
-          cursor: 'pointer',
-          textAlign: 'left',
-        }}
-      >
-        <span style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {sourcesOpen ? '▾' : '▸'} Sources ({MASTER_SOURCE_GUIDES.length})
-        </span>
-        <span style={{ fontSize: 12, color: '#9aa9ba' }}>{sourcesSummary(sources)}</span>
-      </button>
-      {sourcesOpen ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: 12,
-            marginTop: 10,
-            alignItems: 'start',
-          }}
-        >
-          {MASTER_SOURCE_GUIDES.map((g) => (
-            <SourceCard key={g.kind} guide={g} state={sources} isNew={isNew} onUpload={() => setUploadGuide(g)} />
-          ))}
-        </div>
-      ) : null}
+          {sources && sources.missing.length > 0 ? (
+            <Callout tone="warn">
+              <strong>Rebuild master… unlocks once the required sources are loaded:</strong>
+              <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                {sources.missing.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+              <div style={{ marginTop: 4 }}>
+                Use the Upload… button on each card in{' '}
+                <button type="button" onClick={() => setSourcesOpen(true)} style={{ ...textBtn, color: '#a37800', padding: 0, fontSize: 12 }}>
+                  Sources
+                </button>{' '}
+                (Directory Data is recommended too — all its fall years). The live master doesn&apos;t change until you
+                rebuild and apply.
+              </div>
+            </Callout>
+          ) : null}
+          {canRebuild && pending.length > 0 ? (
+            <Callout tone="info">
+              <strong>
+                {pending.length} source file{pending.length > 1 ? 's' : ''} loaded since the last rebuild
+              </strong>{' '}
+              ({pending.slice(0, 3).map((p) => p.filename).join(', ')}
+              {pending.length > 3 ? ` and ${pending.length - 3} more` : ''}). Click <strong>Rebuild master…</strong> to preview and apply
+              {pending.length > 1 ? ' them' : ' it'}.
+            </Callout>
+          ) : null}
+          {sources && sources.notes.length > 0 ? (
+            <Callout tone="info">
+              <strong>What the stored sources cover</strong>
+              <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                {sources.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            </Callout>
+          ) : null}
 
-      <div style={{ marginTop: 28 }}>
-        <div style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-          Version history
-        </div>
-        <div style={{ fontSize: 11, color: '#9aa9ba', marginBottom: 6 }}>
-          Rolling back restores the master&apos;s rows; the stored source files stay at their latest upload.
-        </div>
-        <VersionHistory
-          refreshKey={versionsKey}
-          basePath={DATASET.basePath}
-          onRolledBack={async () => {
-            await refreshActive();
-            setVersionsKey((k) => k + 1);
-          }}
-        />
+          <button
+            type="button"
+            onClick={() => setSourcesOpen((o) => !o)}
+            aria-expanded={sourcesOpen}
+            style={{
+              marginTop: 6,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 10,
+              background: 'none',
+              border: 0,
+              borderTop: '1px solid #e1e8ef',
+              padding: '12px 0 0 0',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {sourcesOpen ? '▾' : '▸'} Sources ({MASTER_SOURCE_GUIDES.length})
+            </span>
+            <span style={{ fontSize: 12, color: '#9aa9ba' }}>{sourcesSummary(sources)}</span>
+          </button>
+          {sourcesOpen ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 12,
+                alignItems: 'start',
+              }}
+            >
+              {MASTER_SOURCE_GUIDES.map((g) => (
+                <SourceCard key={g.kind} guide={g} state={sources} isNew={isNew} onUpload={() => setUploadGuide(g)} />
+              ))}
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: '#5a6e85', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Version history
+            </div>
+            <div style={{ fontSize: 11, color: '#9aa9ba', marginBottom: 6 }}>
+              Rolling back restores the master&apos;s rows; the stored source files stay at their latest upload.
+            </div>
+            <VersionHistory
+              refreshKey={versionsKey}
+              basePath={DATASET.basePath}
+              onRolledBack={async () => {
+                await refreshActive();
+                setVersionsKey((k) => k + 1);
+              }}
+            />
+          </div>
+        </DetailsToggle>
       </div>
 
       {dialog === 'rebuild' ? <MasterRebuildDialog onClose={() => setDialog(null)} onApplied={afterApply} /> : null}
@@ -537,7 +566,7 @@ function Badge({ versionId, updatedAt, rowCount }: InitialSchema): React.JSX.Ele
 function Callout({ tone, children }: { tone: 'error' | 'warn' | 'info'; children: React.ReactNode }): React.JSX.Element {
   const [bg, fg] = tone === 'error' ? ['#fdecea', '#c0392b'] : tone === 'warn' ? ['#fff7e0', '#a37800'] : ['#eaf3fb', '#1c4f73'];
   return (
-    <div style={{ marginTop: 14, background: bg, color: fg, borderRadius: 6, padding: '10px 12px', fontSize: 12, lineHeight: 1.5 }}>
+    <div style={{ background: bg, color: fg, borderRadius: 6, padding: '10px 12px', fontSize: 12, lineHeight: 1.5 }}>
       {children}
     </div>
   );

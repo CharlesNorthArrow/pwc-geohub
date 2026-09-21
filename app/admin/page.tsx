@@ -134,6 +134,8 @@ function CardGrid({ children }: { children: React.ReactNode }): React.JSX.Elemen
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
         gap: 12,
+        // Expanding one card's details must not stretch its row-mates.
+        alignItems: 'start',
       }}
     >
       {children}
