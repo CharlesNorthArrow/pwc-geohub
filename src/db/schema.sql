@@ -270,6 +270,16 @@ CREATE TABLE IF NOT EXISTS school_master_current (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- In-progress admin uploads (parsed rows + column classification) between
+-- the upload → preview → apply requests. Kept in the DB, not process memory,
+-- because consecutive requests can hit different function instances.
+-- Rows expire after 30 minutes (swept on each new upload).
+CREATE TABLE IF NOT EXISTS admin_upload_sessions (
+  upload_id  TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  session    JSONB NOT NULL
+);
+
 -- Latest parsed extract per school-master SOURCE file (Demographic Snapshot,
 -- Directory data per fall year × level, LCGMS geocoded CSV, LCGMS BEDS
 -- export, NYSED Community Schools list). An admin update uploads only the

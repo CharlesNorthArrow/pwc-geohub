@@ -57,7 +57,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const classification = classifyColumns(headers, MASTER_FIELDS);
     const uploadId = newUploadId();
-    putUploadSession({
+    await putUploadSession({
       uploadId,
       filename: file.name,
       csvText,

@@ -34,7 +34,7 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: 'bad_json' }, { status: 400 });
     }
-    const session = getUploadSession(body.uploadId);
+    const session = await getUploadSession(body.uploadId);
     if (!session) {
       return NextResponse.json({ error: 'upload_expired' }, { status: 410 });
     }

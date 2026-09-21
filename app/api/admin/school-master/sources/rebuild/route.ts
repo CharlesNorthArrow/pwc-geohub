@@ -24,7 +24,7 @@ export async function POST(): Promise<NextResponse> {
     const csvText =
       [headers.join(','), ...rawRows.map((row) => headers.map((h) => csvCell(row[h] || null)).join(','))].join('\n') + '\n';
     const uploadId = newUploadId();
-    putUploadSession({
+    await putUploadSession({
       uploadId,
       filename: 'stored sources',
       csvText,

@@ -67,7 +67,7 @@ async function processUpload(
   schoolYear: string | undefined,
 ): Promise<NextResponse> {
   if (files.length === 1 && files[0]!.name.toLowerCase().endsWith('.csv')) {
-    const processed = tryProcessedCsv(files[0]!, cfg);
+    const processed = await tryProcessedCsv(files[0]!, cfg);
     if (processed) return processed;
   }
 
@@ -101,7 +101,7 @@ async function processUpload(
 }
 
 /** The pre-existing path for a CSV already shaped like the template. */
-function tryProcessedCsv(file: RawFile, cfg: IndicatorDatasetConfig): NextResponse | null {
+async function tryProcessedCsv(file: RawFile, cfg: IndicatorDatasetConfig): Promise<NextResponse | null> {
   const csvText = Buffer.from(file.data).toString('utf8');
   let rawRows: Array<Record<string, string>>;
   let headers: string[];
@@ -131,17 +131,17 @@ function tryProcessedCsv(file: RawFile, cfg: IndicatorDatasetConfig): NextRespon
   return store({ filename: file.name, csvText, headers, rawRows, cfg, meta });
 }
 
-function store(args: {
+async function store(args: {
   filename: string;
   csvText: string;
   headers: string[];
   rawRows: Array<Record<string, string>>;
   cfg: IndicatorDatasetConfig;
   meta?: UploadSession['meta'];
-}): NextResponse {
+}): Promise<NextResponse> {
   const classification = classifyColumns(args.headers, args.cfg.fields);
   const uploadId = newUploadId();
-  putUploadSession({
+  await putUploadSession({
     uploadId,
     filename: args.filename,
     csvText: args.csvText,

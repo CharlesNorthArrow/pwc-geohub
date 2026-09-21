@@ -46,7 +46,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch {
       return NextResponse.json({ error: 'bad_json' }, { status: 400 });
     }
-    const session = getUploadSession(body.uploadId);
+    const session = await getUploadSession(body.uploadId);
     if (!session) {
       return NextResponse.json({ error: 'upload_expired' }, { status: 410 });
     }
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       blobWarning = `Blob snapshot failed: ${(err as Error).message}. The version is committed; CSV can be re-materialized from the download endpoint.`;
     }
 
-    deleteUploadSession(body.uploadId);
+    await deleteUploadSession(body.uploadId);
 
     return NextResponse.json({
       versionId,

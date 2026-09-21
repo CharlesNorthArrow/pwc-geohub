@@ -43,7 +43,7 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: 'bad_json' }, { status: 400 });
     }
-    const session = getUploadSession(body.uploadId);
+    const session = await getUploadSession(body.uploadId);
     if (!session) {
       return NextResponse.json({ error: 'upload_expired' }, { status: 410 });
     }
@@ -80,7 +80,7 @@ export async function POST(
         `downloadable from the version history; only the external snapshot link is missing.`;
     }
 
-    deleteUploadSession(body.uploadId);
+    await deleteUploadSession(body.uploadId);
 
     return NextResponse.json({
       versionId,
