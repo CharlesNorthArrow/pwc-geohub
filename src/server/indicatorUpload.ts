@@ -14,6 +14,8 @@
  *    the current version — these appear on the dashboard after apply.
  *  - Graduation: rows may arrive keyed by cohort_year only; a school_year
  *    column was synthesized at upload time (session.meta carries the counts).
+ *  - Raw-file uploads: the transform's tolerated-drift warnings (sheet or
+ *    column renamed, question moved, scale flipped, …) pass through.
  */
 
 import {
@@ -29,6 +31,7 @@ import { cohortYearToSchoolYear, sortSchoolYears } from '../lib/schoolYear';
 import { findUnknownDbns } from './adminDb';
 import { getCurrentIndicatorVersionId, getIndicatorVersionRows } from './indicatorAdminDb';
 import type { UploadSession } from './adminRoutes';
+import type { TransformIssue } from '../admin/rawTransforms/types';
 
 export interface IndicatorWarnings {
   unknownDbns: string[];
@@ -41,6 +44,10 @@ export interface IndicatorWarnings {
   newYears: string[];
   cohortDerivedCount?: number;
   cohortMismatchCount?: number;
+  /** Tolerated structure drift reported by the raw-file transform. */
+  transformWarnings?: TransformIssue[];
+  /** Raw DOE files the rows were computed from (raw-file uploads only). */
+  transformSourceFiles?: string[];
 }
 
 export interface IndicatorMergeOutcome {
@@ -122,6 +129,12 @@ export async function buildIndicatorMerge(
           ? {
               cohortDerivedCount: session.meta?.cohortDerivedCount ?? 0,
               cohortMismatchCount: session.meta?.cohortMismatchCount ?? 0,
+            }
+          : {}),
+        ...(session.meta?.transform
+          ? {
+              transformWarnings: session.meta.transform.warnings,
+              transformSourceFiles: session.meta.transform.sourceFiles,
             }
           : {}),
       },

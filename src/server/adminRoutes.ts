@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server';
 import { requireRole, UnauthorizedError } from './auth';
 import type { Classification } from '../admin/columnReconciliation';
+import type { TransformIssue } from '../admin/rawTransforms/types';
 
 export type AdminHandler = () => Promise<NextResponse>;
 
@@ -35,11 +36,16 @@ export interface UploadSession {
   rawRows: Array<Record<string, string>>;
   classification: Classification;
   createdAt: number;
-  /** Optional per-flow stats stamped at upload time (currently only the
-   *  graduation cohort_year → school_year synthesis counts). */
+  /** Optional per-flow stats stamped at upload time: the graduation
+   *  cohort_year → school_year synthesis counts, and the raw-file transform's
+   *  tolerated-drift warnings (school indicators). */
   meta?: {
     cohortDerivedCount?: number;
     cohortMismatchCount?: number;
+    transform?: {
+      sourceFiles: string[];
+      warnings: TransformIssue[];
+    };
   };
 }
 
