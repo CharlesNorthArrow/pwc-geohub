@@ -10,6 +10,14 @@ import ProgrammaticSection from './ProgrammaticSection';
 import SchoolMasterSection from './SchoolMasterSection';
 import IndicatorDatasetCard from './IndicatorDatasetCard';
 import CommunitySection from './CommunitySection';
+import AdminSectionNav from './AdminSectionNav';
+
+const SECTIONS = [
+  { id: 'programmatic', label: 'Programmatic data' },
+  { id: 'school-master', label: 'School data master' },
+  { id: 'school-indicators', label: 'School indicators' },
+  { id: 'community-indicators', label: 'Community indicators' },
+] as const;
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +28,14 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
   return (
     <div>
       <h1 style={{ fontSize: 24, margin: '0 0 6px 0' }}>Data Admin</h1>
-      <p style={{ color: '#5a6e85', fontSize: 14, margin: '0 0 28px 0' }}>
+      <p style={{ color: '#5a6e85', fontSize: 14, margin: '0 0 16px 0' }}>
         Update the datasets that power the dashboard. Each update is versioned and reversible.
       </p>
 
+      <AdminSectionNav items={SECTIONS} />
+
       <Section
+        id="programmatic"
         title="Programmatic data"
         subtitle="PWC-owned data uploaded as CSV (once per year)."
       >
@@ -32,6 +43,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
       </Section>
 
       <Section
+        id="school-master"
         title="School data master"
         subtitle="School identity, location, enrollment & demographics — built by the hub from four public sources (updated once per year)."
       >
@@ -39,6 +51,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
       </Section>
 
       <Section
+        id="school-indicators"
         title="School indicators"
         subtitle="Public data on NYC schools — updated when DOE / State release new years."
       >
@@ -79,6 +92,7 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
       </Section>
 
       <Section
+        id="community-indicators"
         title="Community indicators"
         subtitle="Federal data sources — synced on schedule."
       >
@@ -89,16 +103,19 @@ export default async function AdminPage(): Promise<React.JSX.Element> {
 }
 
 function Section({
+  id,
   title,
   subtitle,
   children,
 }: {
+  id: string;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section style={{ marginBottom: 36 }}>
+    // scrollMarginTop keeps the heading clear of the sticky header + tab bar.
+    <section id={id} style={{ marginBottom: 36, scrollMarginTop: 130 }}>
       <h2 style={{ fontSize: 16, margin: '0 0 2px 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {title}
       </h2>
