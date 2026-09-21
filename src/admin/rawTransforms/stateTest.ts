@@ -1,4 +1,4 @@
-/** Port of scripts/scripts/ela.py and math_proficiency.py. */
+/** ELA and Math: NY State 3-8 test results, all grades, all students. */
 
 import { finish, newCollector, openBooks } from './common';
 import { readLongTable } from './longTable';

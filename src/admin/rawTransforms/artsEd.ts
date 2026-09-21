@@ -1,5 +1,5 @@
 /**
- * Port of scripts/scripts/arts_ed.py. Two DOE layouts:
+ * Arts education (ArtsCount survey). Two DOE layouts:
  *  - 2021 raw survey export: sheet "2021", DBN = Q0_DBN, Pre-K grid columns
  *    Q11_R{1..4}_C4 where 1 = instruction NOT provided, 0/blank = provided.
  *  - 2025+ processed export: sheet "Sheet0", two header rows (labels on the

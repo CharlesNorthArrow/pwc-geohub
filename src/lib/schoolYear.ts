@@ -59,7 +59,7 @@ export function schoolYearFromEndYear(end: number): string {
 /**
  * DOE raw-file naming: the first 4-digit run in a filename is the school
  * year's END year ("2025-students-in-temporary-housing.xlsx" → "2024-25").
- * Same rule as extract_year() in scripts/scripts/*.py. Null when absent.
+ * Null when absent.
  */
 export function guessSchoolYearFromFilename(name: string): string | null {
   const m = /(\d{4})/.exec(name);

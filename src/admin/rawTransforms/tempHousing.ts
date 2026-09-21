@@ -1,5 +1,5 @@
 /**
- * Port of scripts/scripts/temp_housing.py. The 2021 CSV carries the rate as
+ * Students in temporary housing. The 2021 CSV carries the rate as
  * "30.7%" strings; 2022+ xlsx ("School-level" sheet) as proportions (0.307).
  * Both → percent 0–100. The scale is re-checked from the data so a format
  * flip is caught instead of silently producing 3070%.

@@ -1,5 +1,5 @@
 /**
- * Port of scripts/scripts/suspensions.py. Rate = TOTAL REMOVALS/SUSPENSIONS ÷
+ * Suspensions. Rate = TOTAL REMOVALS/SUSPENSIONS ÷
  * total enrollment × 100. Enrollment comes from the schools master for the
  * same (DBN, school_year) — supplied by the caller in ctx.enrollment (the
  * live DB on upload, schools_master.csv in the parity harness).
@@ -29,7 +29,7 @@ export const suspensionsTransform: RawTransform = {
     let missingEnrollment = 0;
     for (const book of books) {
       const schoolYear = resolveFileYear(book.file, files.length, ctx, c);
-      // Script rule: the first sheet whose name contains "TOTAL".
+      // The totals tab: the first sheet whose name contains "TOTAL".
       let sheet: string | undefined = book.sheetNames[0];
       if (book.kind === 'excel') {
         sheet = book.sheetNames.find((s) => s.toUpperCase().includes('TOTAL'));

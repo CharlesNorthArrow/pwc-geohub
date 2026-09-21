@@ -1,7 +1,7 @@
 /**
  * Shared plumbing for the raw-file transforms: reading .xlsx/.xlsb/.xls/.csv,
- * tolerant sheet/column lookup (with drift warnings), Python-compatible value
- * parsing and rounding. Pure — no DB, no I/O beyond the bytes handed in.
+ * tolerant sheet/column lookup (with drift warnings), value parsing and the
+ * rounding the historical loads were produced with. Pure — no DB, no I/O beyond the bytes handed in.
  */
 
 import * as XLSX from 'xlsx';
@@ -27,7 +27,7 @@ export const extOf = (name: string): string => {
  * Parse a file into a Book. CSVs go through csv-parse (all cells stay text,
  * so "30.7%" and "01M015" survive untouched); spreadsheets through SheetJS
  * with raw cell values. Grids are anchored at A1 so column indices are
- * absolute, matching openpyxl's `iter_rows` in the Python scripts.
+ * absolute.
  */
 export function readBook(file: RawFile): Book | TransformIssue {
   const ext = extOf(file.name);
@@ -200,7 +200,7 @@ export function findRow(grid: Grid, pred: (row: Cell[]) => boolean, scan = 15): 
   return null;
 }
 
-/** is_valid_dbn from the scripts: 6 chars, third is a letter. */
+/** A school DBN: 6 chars, third is a letter (borough code). */
 export function isValidDbn(dbn: string): boolean {
   return dbn.length === 6 && /[A-Za-z]/.test(dbn[2]!);
 }
@@ -212,7 +212,7 @@ const PY_FLOAT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 export type CellKind = 'number' | 'blank' | 'sentinel' | 'junk';
 
 /**
- * Python-script value parsing: blank → null; a sentinel (case-insensitive,
+ * Value parsing: blank → null; a sentinel (case-insensitive,
  * e.g. "s", "r", "n/a") → null; anything float() accepts → number; else null
  * (reported as 'junk' so drift in a value column can be detected).
  */
@@ -281,7 +281,7 @@ export class ColumnTally {
   }
 }
 
-// --- Python-compatible rounding --------------------------------------------
+// --- Rounding — matches the historical loads (pandas / Python semantics) ----
 
 /** pandas/numpy `.round(d)`: rint(x·10^d)/10^d with half-to-even on the scaled float. */
 export function npRound(x: number, d: number): number {

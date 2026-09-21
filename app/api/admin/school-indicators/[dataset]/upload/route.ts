@@ -12,13 +12,11 @@ import { synthesizeGraduationSchoolYear } from '../../../../../../src/admin/indi
 import { getRawTransform, type RawFile } from '../../../../../../src/admin/rawTransforms';
 import { csvCell } from '../../../../../../src/admin/csvRender';
 import { getEnrollmentByDbnYear } from '../../../../../../src/server/indicatorAdminDb';
+import { MAX_UPLOAD_BYTES as MAX_BYTES } from '../../../../../../src/admin/uploadLimits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
-// Raw DOE workbooks reach ~88 MB (chronic absenteeism); Vercel caps
-// request bodies at 100 MB.
-const MAX_BYTES = 95 * 1024 * 1024;
 
 /**
  * Multipart upload: one or more `file` parts, plus an optional `schoolYear`
@@ -26,7 +24,7 @@ const MAX_BYTES = 95 * 1024 * 1024;
  *
  * Two paths:
  *  - Raw DOE file(s), the normal case: the dataset's raw-file transform
- *    (src/admin/rawTransforms — ports of scripts/scripts/*.py) turns them into
+ *    (src/admin/rawTransforms) turns them into
  *    canonical rows. If the file structure drifted beyond what the transform
  *    handles, respond 422 `schema_changed` with every issue and store
  *    nothing. Tolerated drift rides along in the session as warnings.

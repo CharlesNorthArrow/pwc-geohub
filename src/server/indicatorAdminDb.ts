@@ -242,8 +242,7 @@ export async function applyIndicatorVersion(args: {
 
 /**
  * `${dbn}|${school_year}` → total enrollment from the live schools master.
- * The suspensions raw-file transform divides by it (suspensions.py joined
- * schools_master.csv the same way).
+ * The suspensions raw-file transform divides by it.
  */
 export async function getEnrollmentByDbnYear(): Promise<Map<string, number | null>> {
   const r = await pool().query(`SELECT dbn, school_year, total_enrollment FROM schools_year`);

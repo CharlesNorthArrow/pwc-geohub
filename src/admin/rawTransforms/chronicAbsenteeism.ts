@@ -1,4 +1,4 @@
-/** Port of scripts/scripts/chronic_absenteeism.py. */
+/** Chronic absenteeism: DOE end-of-year attendance file, school-level rows. */
 
 import { finish, newCollector, openBooks } from './common';
 import { readLongTable } from './longTable';

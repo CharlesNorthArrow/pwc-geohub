@@ -1,15 +1,14 @@
 /**
  * Parity harness for the raw-file transforms (src/admin/rawTransforms).
  *
- * Runs every TS transform over the raw DOE files in `<RAW_DIR>/input/<Folder>/`
- * — the same tree the Python scripts in scripts/scripts/ read — and compares
- * the typed values per (DBN, school_year, field) against:
- *   - `<RAW_DIR>/output/<dataset>.csv` (fresh Python run), when present
- *   - `data/<dataset>.csv` (what's loaded in the hub today)
+ * Runs every transform over the raw DOE files in `<RAW_DIR>/input/<Folder>/`
+ * (the Drive "Public Data Indicators/Input" layout) and compares the typed
+ * values per (DBN, school_year, field) against a reference: `<REF_DIR>/<file>`
+ * when given, else `data/<dataset>.csv` (the historical loads).
  *
  * The raw files are not in the repo (they live in Charles's Drive).
  *
- * Run: npm run test:raw-transforms -- <RAW_DIR>
+ * Run: npm run test:raw-transforms -- <RAW_DIR> [dataset] [REF_DIR]
  */
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -35,15 +34,15 @@ const check = (name: string, cond: boolean, detail?: unknown): void => {
   }
 };
 
-console.log('== rounding matches Python ==');
+console.log('== rounding matches the historical loads ==');
 check('pyFixed(12.25, 1) = 12.2 (tie → even)', pyFixed(12.25, 1) === '12.2');
 check('pyFixed(12.75, 1) = 12.8', pyFixed(12.75, 1) === '12.8');
 check('pyRound(2.675, 2) = 2.67 (binary below tie)', pyRound(2.675, 2) === 2.67);
 check('npRound(0.125, 2) = 0.12 (numpy rint)', npRound(0.125, 2) === 0.12);
 check('pyFixed(0.05, 1) = 0.1', pyFixed(0.05, 1) === '0.1');
 
-// Dataset → input folder, plus the Python's per-file year rule where the
-// generic filename guess differs (teacher 2023-24 file has no year in it).
+// Dataset → input folder, plus the year for files whose name doesn't carry
+// one (the teacher 2023-24 file).
 const FOLDERS: Record<string, string> = {
   arts_ed: 'Arts_Ed',
   suspensions: 'Suspensions',
@@ -58,14 +57,12 @@ const FOLDERS: Record<string, string> = {
   student_survey: 'Student_Survey',
 };
 /**
- * Rows where the TS port deliberately differs from the Python output, with
- * the reason. Anything not listed here must match exactly.
+ * Rows the transforms deliberately produce although the historical loads
+ * lack them, with the reason. Anything not listed here must match exactly.
  */
 const KNOWN_EXTRA: Record<string, Record<string, string>> = {
   teacher_survey: {
-    // teacher_survey.py starts 2025 data at row 4, but that file's first
-    // school sits at row 3 (the codes row is row 2) — the script drops it.
-    '01M015|2024-25': 'teacher_survey.py data_start=4 skips the first 2025 school',
+    '01M015|2024-25': 'first school of the 2025 file — the historical load skipped its row',
   },
 };
 
@@ -133,7 +130,8 @@ function compare(
 }
 
 const enrollment = enrollmentMap();
-const only = process.argv[3];
+const only = process.argv[3] || undefined;
+const REF_DIR = process.argv[4];
 
 for (const [dataset, folder] of Object.entries(FOLDERS)) {
   if (only && only !== dataset) continue;
@@ -165,10 +163,8 @@ for (const [dataset, folder] of Object.entries(FOLDERS)) {
     rows.push(...res.rows);
   }
 
-  const pyOut = join(RAW_DIR, 'output', cfg.csvFile);
-  const known = KNOWN_EXTRA[dataset];
-  if (existsSync(pyOut)) compare('vs Python output', rows, readCsv(pyOut), fields, known);
-  compare('vs data/ (loaded today)', rows, readCsv(join('data', cfg.csvFile)), fields, known);
+  const ref = REF_DIR ? join(REF_DIR, cfg.csvFile) : join('data', cfg.csvFile);
+  compare(`vs ${ref}`, rows, readCsv(ref), fields, KNOWN_EXTRA[dataset]);
 }
 
 console.log(failed === 0 ? '\nAll checks passed.' : `\n${failed} check(s) failed.`);

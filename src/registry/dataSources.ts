@@ -8,7 +8,7 @@
  * the source outlink. Keyed by dataset id (src/admin/indicatorDatasets.ts).
  *
  * The admin uploads the raw download as-is; the hub transforms it
- * (src/admin/rawTransforms — ports of scripts/scripts/*.py). `fieldCalc`
+ * (src/admin/rawTransforms). `fieldCalc`
  * describes what that transformation computes.
  */
 
@@ -23,6 +23,8 @@ export interface DatasetGuidelines {
   fieldCalc: string[];
   /** Coverage caveats worth knowing before hunting for missing years. */
   notes?: string;
+  /** Shown on the card itself (not folded away) — e.g. file-size limits. */
+  warning?: string;
 }
 
 export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
@@ -73,6 +75,8 @@ export const DATASET_GUIDELINES: Record<string, DatasetGuidelines> = {
       'https://infohub.nyced.org/reports/students-and-schools/school-quality/information-and-data-overview/end-of-year-attendance-and-chronic-absenteeism-data',
     steps: ['Download the "School" file under "End-of-Year Attendance and Chronic Absenteeism Data".'],
     fieldCalc: ['Field: % Chronically Absent.'],
+    warning:
+      'Large file: DOE’s download is ~88 MB and the hub accepts up to 95 MB (a hosting-platform limit). The upload and check take ~30 seconds. If a future file is refused as too large, contact North Arrow.',
   },
   graduation: {
     sourceLabel: 'NYC DOE Graduation Results',

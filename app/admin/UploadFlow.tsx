@@ -6,6 +6,7 @@ import ColumnReconciliationDialog from './ColumnReconciliationDialog';
 import DiffPreview from './DiffPreview';
 import TransformIssueList, { type TransformIssue } from './TransformIssueList';
 import { guessSchoolYearFromFilename } from '../../src/lib/schoolYear';
+import { MAX_UPLOAD_BYTES, TOO_LARGE_MESSAGE } from '../../src/admin/uploadLimits';
 
 interface Classification {
   matched: Array<{ csvHeader: string; fieldId: string; viaAlias?: boolean }>;
@@ -121,7 +122,7 @@ export default function UploadFlow({
   const pickFiles = (files: File[]): void => {
     setPicked(files);
     setIssues(null);
-    setError(null);
+    setError(files.reduce((s, f) => s + f.size, 0) > MAX_UPLOAD_BYTES ? TOO_LARGE_MESSAGE : null);
     const guess = files.length === 1 ? guessSchoolYearFromFilename(files[0]!.name) : null;
     setYear(guess && raw?.yearOptions.includes(guess) ? guess : '');
   };
@@ -137,7 +138,7 @@ export default function UploadFlow({
     if (!r.ok) {
       const body = (await r.json().catch(() => ({}))) as { error?: string; issues?: TransformIssue[] };
       if (body.error === 'schema_changed' && body.issues) setIssues(body.issues);
-      else if (body.error === 'file_too_large') setError('The upload is larger than 95 MB.');
+      else if (body.error === 'file_too_large') setError(TOO_LARGE_MESSAGE);
       else setError(body.error ?? `HTTP ${r.status}`);
       setStep({ kind: 'choose' });
       return;
@@ -208,7 +209,8 @@ export default function UploadFlow({
   // --- Rendering ----
   if (raw && (step.kind === 'choose' || step.kind === 'uploading')) {
     const busy = step.kind === 'uploading';
-    const blocked = busy || picked.length === 0 || (needsYear && !year);
+    const tooLarge = picked.reduce((s, f) => s + f.size, 0) > MAX_UPLOAD_BYTES;
+    const blocked = busy || picked.length === 0 || tooLarge || (needsYear && !year);
     return (
       <Modal
         title={`Update ${dataset.datasetLabel}`}

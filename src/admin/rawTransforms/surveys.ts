@@ -1,12 +1,12 @@
 /**
- * Ports of scripts/scripts/{family,teacher,student}_survey.py.
+ * NYC School Survey — family, teacher and student files.
  *
  * 2022+ files share the "<Who> Pos & Neg %" layout: a row of question texts,
  * a row of response labels, then one row per school (DBN in column A). A
  * question's positive-response value sits a fixed number of columns after
  * the cell holding its text. Question NUMBERS shift every year, so the
- * question is located by its text; the scripts' known column positions are
- * kept as a cross-check (a mismatch is a warning, like the Python's).
+ * question is located by its text; its column in past files is kept as a
+ * cross-check (a mismatch is a warning).
  *
  * 2021 files are flat CSVs with one column per question × response.
  */
@@ -39,7 +39,7 @@ interface QuestionSpec {
   text: string;
   /** Positive-response column = question-text column + offset. */
   offset: number;
-  /** End year → 0-based positive column in past files (the scripts' COL_MAP). */
+  /** End year → 0-based positive column in past files. */
   knownCols: Record<number, number>;
   /** 2021 CSV: pick the column whose header matches. null = not asked in 2021. */
   csv2021: ((header: string) => boolean) | null;
@@ -232,7 +232,7 @@ export const familySurveyTransform = surveyTransform({
       offset: 1,
       knownCols: {},
       // 2021 CSV labels are swapped: the "Dissatisfied/Very dissatisfied"
-      // column holds the satisfied share (see family_survey.py).
+      // column holds the satisfied share.
       csv2021: (h) => h.includes('education my child has received this year') && h.includes('dissatisfied/very dissatisfied'),
       label: "{v}% of families satisfied with their child's education",
     },

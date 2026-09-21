@@ -1,7 +1,7 @@
 /**
  * The "one tidy sheet, filter to school-level rows" shape shared by the
  * state-test, chronic-absenteeism and graduation files (pandas `read_excel`
- * + boolean filter in the Python).
+ * + boolean filter).
  */
 
 import { cellText, compact, findColumn, findRow, findSheet, type Book, type Cell } from './workbook';

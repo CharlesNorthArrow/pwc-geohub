@@ -1,8 +1,7 @@
 /**
- * Raw-file transforms — the TypeScript ports of the per-indicator Python
- * scripts in scripts/scripts/*.py. Each takes the file(s) exactly as the
- * admin downloaded them from DOE and returns rows in the dataset's canonical
- * CSV shape (src/admin/indicatorDatasets.ts), which then flow through the
+ * Raw-file transforms — one per hosted school-indicator dataset. Each takes
+ * the file(s) exactly as the admin downloaded them from DOE and returns rows
+ * in the dataset's canonical CSV shape (src/admin/indicatorDatasets.ts), which then flow through the
  * normal reconcile → preview → apply pipeline.
  *
  * Issues split into two tiers:

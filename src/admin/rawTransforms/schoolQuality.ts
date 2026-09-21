@@ -1,5 +1,5 @@
 /**
- * Port of scripts/scripts/school_quality.py. One upload = the School Quality
+ * School Quality Reports. One upload = the School Quality
  * Report files for one or more years, one file per school type
  * (`YYYYYY-{ems,hs,hst,d75,ec}-sqr-results.xlsx`). Year and type come from
  * the DOE filename; values from the "Summary" sheet.
@@ -7,7 +7,7 @@
  * Both safety fields only exist from 2023-24 on: "Safety - School Percent
  * Positive" (the map value) for every school type, the categorical "Safety
  * and School Climate - Rating" for EMS/HS/HST only. Older files load with
- * blank safety values, as in the Python.
+ * blank safety values.
  */
 
 import { finish, newCollector, openBooks } from './common';

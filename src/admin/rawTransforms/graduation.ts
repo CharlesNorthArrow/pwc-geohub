@@ -1,4 +1,4 @@
-/** Port of scripts/scripts/graduation.py. */
+/** Graduation: DOE graduation results, 4-year August cohort, all students. */
 
 import { cohortYearToSchoolYear } from '../../lib/schoolYear';
 import { finish, newCollector, openBooks } from './common';

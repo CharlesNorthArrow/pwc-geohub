@@ -113,6 +113,21 @@ export default function IndicatorDatasetCard({
         <div style={{ fontSize: 12, color: '#5a6e85', marginTop: 3, lineHeight: 1.45 }}>{description}</div>
       </div>
 
+      {guidelines.warning ? (
+        <div
+          style={{
+            background: '#fff7e0',
+            color: '#a37800',
+            borderRadius: 6,
+            padding: '6px 9px',
+            fontSize: 11,
+            lineHeight: 1.45,
+          }}
+        >
+          ⚠ {guidelines.warning}
+        </div>
+      ) : null}
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
         {indicators.map((ind) => (
           <span

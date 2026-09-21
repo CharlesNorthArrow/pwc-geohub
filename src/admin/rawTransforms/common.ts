@@ -58,7 +58,8 @@ export function resolveFileYear(
   return null;
 }
 
-/** Sort like the scripts (`sort_values([...])` — plain string order). */
+/** Plain string-order sort. Matters for school_quality, where duplicate
+ *  (DBN, year) keys resolve last-wins. */
 export function sortRows(rows: CanonicalRow[], keys: readonly string[]): CanonicalRow[] {
   return rows.sort((a, b) => {
     for (const k of keys) {
