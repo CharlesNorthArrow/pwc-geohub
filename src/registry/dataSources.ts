@@ -23,7 +23,7 @@ export interface DatasetGuidelines {
   fieldCalc: string[];
   /** Coverage caveats worth knowing before hunting for missing years. */
   notes?: string;
-  /** Shown on the card itself (not folded away) — e.g. file-size limits. */
+  /** Shown first in the card's details, in amber — e.g. file-size limits. */
   warning?: string;
 }
 

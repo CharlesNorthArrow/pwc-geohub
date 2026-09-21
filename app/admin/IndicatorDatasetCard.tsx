@@ -112,21 +112,6 @@ export default function IndicatorDatasetCard({
         </div>
       </div>
 
-      {guidelines.warning ? (
-        <div
-          style={{
-            background: '#fff7e0',
-            color: '#a37800',
-            borderRadius: 6,
-            padding: '6px 9px',
-            fontSize: 11,
-            lineHeight: 1.45,
-          }}
-        >
-          ⚠ {guidelines.warning}
-        </div>
-      ) : null}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 'auto' }}>
         <div>
           <button type="button" onClick={() => setUploadOpen(true)} style={primaryBtn}>
@@ -134,6 +119,9 @@ export default function IndicatorDatasetCard({
           </button>
         </div>
         <DetailsToggle>
+          {guidelines.warning ? (
+            <div style={{ fontSize: 11, color: '#a37800', lineHeight: 1.45 }}>⚠ {guidelines.warning}</div>
+          ) : null}
           <div style={{ fontSize: 12, color: '#5a6e85', lineHeight: 1.45 }}>{description}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             {indicators.map((ind) => (
