@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { activeTiersFor, getTrendSeries } from '../store/trendChart';
 import { useHubStore } from '../store/useHubStore';
 import AggregationToggle from './AggregationToggle';
 import ExportSchoolsButton from './ExportSchoolsButton';
@@ -39,7 +41,7 @@ interface Props {
  * Spec §2 — right panel ~35% width, open by default, collapsible. Contents
  * (§5.1–5.4):
  *   - KPI cards (Anchor / Healing Arts / All)
- *   - 5-year timeline (3 series + active-year marker)
+ *   - 5-year trend (PWC or its two tiers + All in view + Citywide; see src/store/trendChart.ts)
  *   - Ranked PWC school list with sparklines
  *   - District ↔ NTA toggle when a community indicator is the focus
  */
@@ -59,6 +61,16 @@ export default function RightPanel({
   const collapsed = useHubStore((s) => s.rightPanelCollapsed);
   const setCollapsed = useHubStore((s) => s.setRightPanelCollapsed);
   const setAnalyticsFamily = useHubStore((s) => s.setAnalyticsFamily);
+  const schoolType = useHubStore((s) => s.schoolType);
+  const sliderYear = useHubStore((s) => s.year);
+
+  // Trend chart: PWC alone by default, or split into its two partnership
+  // tiers. The tiers in view follow the School Type filter; with one tier
+  // the split has nothing to do.
+  const [splitByTier, setSplitByTier] = useState(false);
+  const activeTiers = activeTiersFor(schoolType);
+  const singleTier = activeTiers.length === 1;
+  const trendSeries = getTrendSeries({ splitByTier, activeTiers });
 
   if (collapsed) {
     return (
@@ -170,20 +182,52 @@ export default function RightPanel({
           <section>
             <div
               style={{
-                fontSize: 10,
-                color: '#467c9d',
-                textTransform: 'uppercase',
-                letterSpacing: 0.4,
-                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
                 marginBottom: 4,
               }}
             >
-              5-year trend
+              <div
+                style={{
+                  fontSize: 10,
+                  color: '#467c9d',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.4,
+                  fontWeight: 600,
+                }}
+              >
+                5-year trend
+              </div>
+              <label
+                title={singleTier ? 'Only one partnership type selected.' : undefined}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  color: singleTier ? '#a8b3bf' : '#467c9d',
+                  cursor: singleTier ? 'default' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={splitByTier && !singleTier}
+                  disabled={singleTier}
+                  onChange={(e) => setSplitByTier(e.target.checked)}
+                  style={{ margin: 0 }}
+                />
+                Split by partnership
+              </label>
             </div>
             <Timeline
               indicator={indicator}
               points={analytics.timeline}
               activeYear={year}
+              series={trendSeries}
+              rosterYear={sliderYear}
             />
           </section>
           <section>

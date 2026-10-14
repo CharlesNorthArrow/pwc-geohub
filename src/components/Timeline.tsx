@@ -1,252 +1,416 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import type { IndicatorPublic } from '../contract/types';
+import { PWC_ANCHOR_COLOR, PWC_HEALING_ARTS_COLOR } from '../lib/pwcColors';
 import type { TimelinePoint } from '../store/analytics';
+import {
+  TREND_MIN_N,
+  TREND_SERIES_LABELS,
+  axisOptionsFor,
+  niceAxis,
+  pointKind,
+  resolveLabelCollisions,
+  rosterCaption,
+  seriesCell,
+  smallSampleNote,
+  trendAriaLabel,
+  type TrendSeriesKey,
+} from '../store/trendChart';
+
+/* ----------------------------- Style constants ----------------------------- */
+
+/** PWC line — dark neutral ink, not blue (blue already means "PWC other
+ *  program" and the top of the indicator ramp). One constant, pending
+ *  Claudia's colour review. */
+export const TREND_PWC_COLOR = '#002040';
+const TREND_COMPARISON_COLOR = '#8a96a3';
+const TREND_COMPARISON_LABEL_COLOR = '#7a8896';
+const TREND_GRID_COLOR = '#e5e9ee';
+const TREND_AXIS_TEXT_COLOR = '#a8b3bf';
+/** Matches the analytics panel background, so hollow points read as hollow. */
+const TREND_BG = '#f7f9fb';
+
+interface SeriesStyle {
+  color: string;
+  width: number;
+  dash?: string;
+  markers: boolean;
+  primary: boolean;
+}
+
+const SERIES_STYLE: Record<TrendSeriesKey, SeriesStyle> = {
+  pwc: { color: TREND_PWC_COLOR, width: 3, markers: true, primary: true },
+  anchor: { color: PWC_ANCHOR_COLOR, width: 2.5, markers: true, primary: true },
+  healing_arts: { color: PWC_HEALING_ARTS_COLOR, width: 2.5, markers: true, primary: true },
+  all_in_view: { color: TREND_COMPARISON_COLOR, width: 1.5, markers: false, primary: false },
+  citywide: { color: TREND_COMPARISON_COLOR, width: 1.5, dash: '5,4', markers: false, primary: false },
+};
+
+const HEIGHT = 150;
+const PAD_L = 34;
+const PAD_T = 10;
+const PAD_B = 22;
+const LABEL_FONT = 10;
+/** Rough average glyph width at LABEL_FONT, for sizing the right gutter. */
+const LABEL_CHAR_W = 5.7;
+const LABEL_GAP = 6;
+const POINT_R = 3;
 
 interface Props {
   indicator: IndicatorPublic;
   points: TimelinePoint[];
-  /** Slider year — drawn as a vertical marker. */
+  /** Year shown in the panel — drawn as a vertical marker. */
   activeYear: string;
+  /** The series to draw, from `getTrendSeries` (draw-priority order). */
+  series: TrendSeriesKey[];
+  /** Slider year — the PWC roster the PWC / tier lines hold for every year. */
+  rosterYear: string;
 }
 
-const SERIES_COLORS = {
-  pwc: '#027BC0',          // PWC brand blue — roll-up of every PWC school
-  anchor: '#903090',
-  healing_arts: '#A0B000', // PWC green — matches map symbology
-  // Benchmark lines — distinct from the PWC group palette so they read as
-  // references. All-in-view is orange (matches the community-accent we
-  // already use); citywide is black + dotted so the static-NYC reference
-  // visually contrasts with every filter-responsive line above it.
-  allInView: '#F0901F',    // orange — All Schools (filtered universe)
-  citywide: '#000000',     // black — Citywide (static NYC average)
-} as const;
-
-/** Series-key helper that stays in sync with TimelinePoint. */
-type SeriesKey = keyof typeof SERIES_COLORS;
-
-/** Spec §5.2 — 3 series + vertical marker at the selected year.
- *  Custom SVG, no chart library. */
+/** Spec §5.2 — the 5-year trend. Custom SVG, no chart library. */
 export default function Timeline({
   indicator,
   points,
   activeYear,
+  series,
+  rosterYear,
 }: Props): React.JSX.Element {
-  const width = 320;
-  const height = 130;
-  const padL = 36;
-  const padR = 8;
-  const padT = 8;
-  const padB = 28;
-  const innerW = width - padL - padR;
-  const innerH = height - padT - padB;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(320);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
-  // Y domain across all five series; ignore nulls.
+  const valueFmt = valueFormatterFor(indicator);
+
+  // Y extent over the drawn series only.
   let dMin = Infinity;
   let dMax = -Infinity;
   for (const p of points) {
-    for (const v of [p.pwc.avg, p.anchor.avg, p.healing_arts.avg, p.allInView.avg, p.citywide.avg]) {
+    for (const key of series) {
+      const v = seriesCell(p, key).avg;
       if (v == null) continue;
       if (v < dMin) dMin = v;
       if (v > dMax) dMax = v;
     }
   }
-  if (!Number.isFinite(dMin) || !Number.isFinite(dMax)) {
+  const hasData = Number.isFinite(dMin) && Number.isFinite(dMax);
+
+  // Measure the real width so label text is true-size; re-attach when the
+  // chart swaps between its empty and drawn states (different elements).
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w > 0) setWidth(Math.round(w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasData]);
+
+  if (!hasData) {
     return (
-      <div style={{ fontSize: 11, color: '#a8b3bf', padding: '8px 0' }}>
+      <div ref={wrapRef} style={{ fontSize: 11, color: '#a8b3bf', padding: '8px 0' }}>
         No timeline data for this indicator.
       </div>
     );
   }
-  const span = Math.max(1e-6, dMax - dMin);
-  const yPad = span * 0.08;
-  const y0 = dMin - yPad;
-  const y1 = dMax + yPad;
+  const axis = niceAxis(dMin, dMax, axisOptionsFor(indicator));
+
+  // End label per series, at its last non-null point.
+  const endLabels: Array<{ key: TrendSeriesKey; idx: number; value: number; text: string }> = [];
+  for (const key of series) {
+    for (let i = points.length - 1; i >= 0; i--) {
+      const v = seriesCell(points[i]!, key).avg;
+      if (v != null) {
+        endLabels.push({ key, idx: i, value: v, text: `${TREND_SERIES_LABELS[key]}  ${valueFmt(v)}` });
+        break;
+      }
+    }
+  }
+
+  const longestLabel = endLabels.reduce((m, l) => Math.max(m, l.text.length), 0);
+  const padR = Math.ceil(longestLabel * LABEL_CHAR_W) + LABEL_GAP + 4;
+  const innerW = Math.max(80, width - PAD_L - padR);
+  const innerH = HEIGHT - PAD_T - PAD_B;
 
   const xAt = (i: number): number =>
-    points.length <= 1 ? padL + innerW / 2 : padL + (i / (points.length - 1)) * innerW;
-  const yAt = (v: number): number => padT + innerH - ((v - y0) / (y1 - y0)) * innerH;
+    points.length <= 1 ? PAD_L + innerW / 2 : PAD_L + (i / (points.length - 1)) * innerW;
+  const yAt = (v: number): number =>
+    PAD_T + innerH - ((v - axis.min) / (axis.max - axis.min)) * innerH;
 
-  const linePath = (key: SeriesKey): string => {
-    let path = '';
+  const ticks: number[] = [];
+  for (let t = axis.min; t <= axis.max + axis.step / 1000; t += axis.step) ticks.push(t);
+  const tickFmt = tickFormatterFor(indicator, axis.step);
+
+  // Lines break wherever a year has no schools reporting — never interpolated.
+  const pathFor = (key: TrendSeriesKey): string => {
+    let d = '';
     let started = false;
     points.forEach((p, i) => {
-      const v = p[key].avg;
-      if (v == null) {
+      const c = seriesCell(p, key);
+      if (pointKind(c.n, c.avg) === 'gap') {
         started = false;
         return;
       }
-      const x = xAt(i);
-      const y = yAt(v);
-      path += started ? ` L${x.toFixed(1)},${y.toFixed(1)}` : `M${x.toFixed(1)},${y.toFixed(1)}`;
+      d += `${started ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(c.avg!).toFixed(1)} `;
       started = true;
     });
-    return path;
+    return d.trim();
   };
 
-  // Dots at every defined point, drawn on top of lines. Single-year indicators
-  // (e.g. CDC PLACES 2023-only) have no line at all — the dots are the chart.
-  const dotsFor = (key: SeriesKey): Array<{ x: number; y: number }> => {
-    const out: Array<{ x: number; y: number }> = [];
-    points.forEach((p, i) => {
-      const v = p[key].avg;
-      if (v == null) return;
-      out.push({ x: xAt(i), y: yAt(v) });
-    });
-    return out;
-  };
+  const placedLabels = resolveLabelCollisions(
+    endLabels.map((l) => ({ ...l, y: yAt(l.value) })),
+    14,
+  );
+
+  // The small-sample note shows only when a hollow point is actually drawn.
+  const anyHollow = series.some(
+    (key) =>
+      SERIES_STYLE[key].markers &&
+      points.some((p) => {
+        const c = seriesCell(p, key);
+        return pointKind(c.n, c.avg) === 'hollow';
+      }),
+  );
 
   const activeIdx = points.findIndex((p) => p.year === activeYear);
-
-  const fmt = formatterFor(indicator);
-  const tickValues = [y0, y0 + (y1 - y0) / 2, y1];
+  // Comparison lines underneath, primaries on top (first key topmost).
+  const drawOrder = [...series].reverse();
+  const ariaLabel = trendAriaLabel(indicator.short_label ?? indicator.label, points, series, valueFmt);
+  const colHalf = points.length <= 1 ? innerW / 2 : innerW / (points.length - 1) / 2;
 
   return (
     <div>
-      <svg
-        width="100%"
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
+      <div
+        ref={wrapRef}
+        role="img"
+        aria-label={ariaLabel}
+        style={{ position: 'relative' }}
+        onMouseLeave={() => setHoverIdx(null)}
       >
-        {/* Y axis grid */}
-        {tickValues.map((tv, i) => (
-          <g key={i}>
-            <line
-              x1={padL}
-              x2={width - padR}
-              y1={yAt(tv)}
-              y2={yAt(tv)}
-              stroke="#eef0f3"
-              strokeWidth={1}
-            />
-            <text x={padL - 4} y={yAt(tv) + 3} fontSize="9" fill="#a8b3bf" textAnchor="end">
-              {fmt(tv)}
-            </text>
-          </g>
-        ))}
+        <svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden>
+          {/* Horizontal gridlines at round-number ticks; no vertical grid */}
+          {ticks.map((tv) => (
+            <g key={tv}>
+              <line
+                x1={PAD_L}
+                x2={PAD_L + innerW}
+                y1={yAt(tv)}
+                y2={yAt(tv)}
+                stroke={TREND_GRID_COLOR}
+                strokeWidth={1}
+              />
+              <text
+                x={PAD_L - 5}
+                y={yAt(tv) + 3}
+                fontSize="9"
+                fill={TREND_AXIS_TEXT_COLOR}
+                textAnchor="end"
+              >
+                {tickFmt(tv)}
+              </text>
+            </g>
+          ))}
 
-        {/* Active-year marker (drawn first, behind lines) */}
-        {activeIdx >= 0 ? (
-          <line
-            x1={xAt(activeIdx)}
-            x2={xAt(activeIdx)}
-            y1={padT}
-            y2={padT + innerH}
-            stroke="#002040"
-            strokeWidth={1}
-            strokeDasharray="3,3"
-            opacity={0.4}
+          {/* Panel-year marker, behind the lines */}
+          {activeIdx >= 0 ? (
+            <line
+              x1={xAt(activeIdx)}
+              x2={xAt(activeIdx)}
+              y1={PAD_T}
+              y2={PAD_T + innerH}
+              stroke="#002040"
+              strokeWidth={1}
+              strokeDasharray="3,3"
+              opacity={0.3}
+            />
+          ) : null}
+
+          {hoverIdx != null ? (
+            <line
+              x1={xAt(hoverIdx)}
+              x2={xAt(hoverIdx)}
+              y1={PAD_T}
+              y2={PAD_T + innerH}
+              stroke="#467c9d"
+              strokeWidth={1}
+              opacity={0.5}
+            />
+          ) : null}
+
+          {drawOrder.map((key) => {
+            const s = SERIES_STYLE[key];
+            return (
+              <path
+                key={`line-${key}`}
+                d={pathFor(key)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={s.width}
+                strokeDasharray={s.dash}
+                strokeLinejoin="round"
+                strokeLinecap={s.dash ? 'butt' : 'round'}
+              />
+            );
+          })}
+
+          {drawOrder
+            .filter((key) => SERIES_STYLE[key].markers)
+            .map((key) =>
+              points.map((p, i) => {
+                const c = seriesCell(p, key);
+                const kind = pointKind(c.n, c.avg);
+                if (kind === 'gap') return null;
+                const color = SERIES_STYLE[key].color;
+                return (
+                  <circle
+                    key={`pt-${key}-${p.year}`}
+                    cx={xAt(i)}
+                    cy={yAt(c.avg!)}
+                    r={POINT_R}
+                    fill={kind === 'hollow' ? TREND_BG : color}
+                    stroke={color}
+                    strokeWidth={kind === 'hollow' ? 1.5 : 0}
+                  />
+                );
+              }),
+            )}
+
+          {/* Direct end labels — replace the legend */}
+          {placedLabels.map((l) => {
+            const s = SERIES_STYLE[l.key];
+            return (
+              <text
+                key={`lbl-${l.key}`}
+                x={xAt(l.idx) + LABEL_GAP}
+                y={l.y + 3.5}
+                fontSize={LABEL_FONT}
+                fontWeight={s.primary ? 600 : 400}
+                fill={s.primary ? s.color : TREND_COMPARISON_LABEL_COLOR}
+                style={{ whiteSpace: 'pre' }}
+              >
+                {l.text}
+              </text>
+            );
+          })}
+
+          {points.map((p, i) => (
+            <text
+              key={p.year}
+              x={xAt(i)}
+              y={HEIGHT - 6}
+              fontSize="9"
+              fill={p.year === activeYear ? '#002040' : TREND_AXIS_TEXT_COLOR}
+              fontWeight={p.year === activeYear ? 700 : 400}
+              textAnchor="middle"
+            >
+              {p.year.replace(/^20/, "'")}
+            </text>
+          ))}
+
+          {/* Hover targets — one transparent column per year */}
+          {points.map((p, i) => (
+            <rect
+              key={`hit-${p.year}`}
+              x={xAt(i) - colHalf}
+              y={PAD_T}
+              width={colHalf * 2}
+              height={innerH}
+              fill="transparent"
+              onMouseEnter={() => setHoverIdx(i)}
+            />
+          ))}
+        </svg>
+
+        {hoverIdx != null && points[hoverIdx] ? (
+          <TrendTooltip
+            point={points[hoverIdx]!}
+            series={series}
+            fmt={valueFmt}
+            x={xAt(hoverIdx)}
+            flip={xAt(hoverIdx) > width / 2}
           />
         ) : null}
-
-        {/* Lines — paint reference lines (citywide, all-in-view) first so
-         *  they sit underneath the PWC group lines, with the PWC roll-up
-         *  rendered LAST and thicker so it's the primary signal. The
-         *  citywide line is DOTTED (black) to signal it's a static reference
-         *  vs the solid lines that react to the filter cascade.
-         *  `strokeDasharray="1,3" + strokeLinecap="round"` renders as visible
-         *  round dots instead of tiny dashes. */}
-        <path
-          d={linePath('citywide')}
-          stroke={SERIES_COLORS.citywide}
-          fill="none"
-          strokeWidth={1.6}
-          strokeDasharray="1,3"
-          strokeLinecap="round"
-        />
-        <path d={linePath('allInView')} stroke={SERIES_COLORS.allInView} fill="none" strokeWidth={1.6} />
-        <path d={linePath('healing_arts')} stroke={SERIES_COLORS.healing_arts} fill="none" strokeWidth={1.6} />
-        <path d={linePath('anchor')} stroke={SERIES_COLORS.anchor} fill="none" strokeWidth={1.6} />
-        <path d={linePath('pwc')} stroke={SERIES_COLORS.pwc} fill="none" strokeWidth={2.4} />
-
-        {/* Dots — drawn after lines so they sit on top. */}
-        {dotsFor('citywide').map((d, i) => (
-          <circle key={`c${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.citywide} />
-        ))}
-        {dotsFor('allInView').map((d, i) => (
-          <circle key={`v${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.allInView} />
-        ))}
-        {dotsFor('healing_arts').map((d, i) => (
-          <circle key={`h${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.healing_arts} />
-        ))}
-        {dotsFor('anchor').map((d, i) => (
-          <circle key={`a${i}`} cx={d.x} cy={d.y} r={2.4} fill={SERIES_COLORS.anchor} />
-        ))}
-        {dotsFor('pwc').map((d, i) => (
-          <circle key={`p${i}`} cx={d.x} cy={d.y} r={3} fill={SERIES_COLORS.pwc} />
-        ))}
-
-        {/* X-axis labels */}
-        {points.map((p, i) => (
-          <text
-            key={p.year}
-            x={xAt(i)}
-            y={height - 12}
-            fontSize="9"
-            fill={p.year === activeYear ? '#002040' : '#a8b3bf'}
-            fontWeight={p.year === activeYear ? 700 : 400}
-            textAnchor="middle"
-          >
-            {p.year.replace(/^20/, "'")}
-          </text>
-        ))}
-      </svg>
-      {/* Legend strip — five static labels. "All Schools in view" tracks
-       *  the filter cascade; "Citywide" is a static NYC reference that
-       *  never moves with filters. */}
-      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#467c9d', marginTop: 4, flexWrap: 'wrap' }}>
-        <LegendDot color={SERIES_COLORS.pwc} label="PWC schools" />
-        <LegendDot color={SERIES_COLORS.anchor} label="Anchor" />
-        <LegendDot color={SERIES_COLORS.healing_arts} label="Healing Arts" />
-        <LegendDot color={SERIES_COLORS.allInView} label="All Schools in view" />
-        <LegendDot color={SERIES_COLORS.citywide} label="Citywide" dashed />
       </div>
+
+      {anyHollow ? <Caption>{smallSampleNote(TREND_MIN_N)}</Caption> : null}
+      <Caption>{rosterCaption(rosterYear)}</Caption>
     </div>
   );
 }
 
-function LegendDot({
-  color,
-  label,
-  dashed = false,
+function TrendTooltip({
+  point,
+  series,
+  fmt,
+  x,
+  flip,
 }: {
-  color: string;
-  label: string;
-  /** Renders the swatch as a dotted top-border to mirror the chart's
-   *  dotted-line strokeDasharray. Citywide is the only series using this. */
-  dashed?: boolean;
+  point: TimelinePoint;
+  series: TrendSeriesKey[];
+  fmt: (v: number) => string;
+  x: number;
+  /** Open to the left of the hovered year when it sits in the right half. */
+  flip: boolean;
 }): React.JSX.Element {
   return (
-    <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-      {dashed ? (
-        <span
-          style={{
-            width: 12,
-            height: 0,
-            borderTop: `2px dotted ${color}`,
-            display: 'inline-block',
-          }}
-        />
-      ) : (
-        <span style={{ width: 10, height: 2, background: color, display: 'inline-block' }} />
-      )}
-      {label}
-    </span>
+    <div
+      role="tooltip"
+      style={{
+        position: 'absolute',
+        top: 4,
+        left: x + 8,
+        transform: flip ? 'translateX(calc(-100% - 16px))' : undefined,
+        background: 'white',
+        border: '1px solid #c5cdd6',
+        borderRadius: 4,
+        boxShadow: '0 2px 8px rgba(0,32,64,0.15)',
+        padding: '5px 7px',
+        fontSize: 10,
+        lineHeight: 1.45,
+        color: '#002040',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        zIndex: 2,
+      }}
+    >
+      <div style={{ fontWeight: 700 }}>{point.year}</div>
+      {series.map((key) => {
+        const c = seriesCell(point, key);
+        const value = c.avg == null ? 'no data' : fmt(c.avg);
+        const n = key === 'citywide' || c.avg == null ? '' : ` (n=${c.n})`;
+        return (
+          <div key={key}>
+            {TREND_SERIES_LABELS[key]}: {value}
+            {n}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function formatterFor(indicator: IndicatorPublic): (v: number) => string {
+function Caption({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <div style={{ fontSize: 10, color: '#7a8896', marginTop: 3 }}>{children}</div>;
+}
+
+/** Values: one decimal, as in the KPI cards and ranked list. */
+function valueFormatterFor(indicator: IndicatorPublic): (v: number) => string {
   switch (indicator.format) {
     case 'percent':
     case 'rate_per_100':
-      return (v) => `${v.toFixed(0)}%`;
-    case 'integer':
-    case 'count':
-      return (v) => v.toFixed(0);
+      return (v) => `${v.toFixed(1)}%`;
     case 'index':
-      return (v) => v.toFixed(1);
+      return (v) => v.toFixed(2);
     default:
-      return (v) => v.toFixed(0);
+      return (v) => v.toFixed(1);
   }
+}
+
+/** Axis ticks: round numbers, decimals only when the step needs them. */
+function tickFormatterFor(indicator: IndicatorPublic, step: number): (v: number) => string {
+  const decimals = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step)));
+  const pct = indicator.format === 'percent' || indicator.format === 'rate_per_100';
+  return (v) => `${v.toFixed(decimals)}${pct ? '%' : ''}`;
 }
