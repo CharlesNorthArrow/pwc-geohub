@@ -43,7 +43,9 @@ const COMMUNITY_ACCENT = '#F0901F'; // distinct from PWC HA
  * both-category schools count ONLY in Anchor, so the Anchor + Healing Arts
  * + Other buckets are disjoint and sum to the total. When an indicator is
  * active, surfaces a "X of N do not have data for {indicator}" line per
- * family so the totals stay honest.
+ * family so the totals stay honest. The Anchor and Healing Arts only rows are
+ * toggles: a click sets School Type to that group, a second click returns to
+ * all PWC.
  */
 export default function PwcCounter({
   universeDbns,
@@ -55,6 +57,14 @@ export default function PwcCounter({
 }: Props): React.JSX.Element | null {
   const pwcHalosVisible = useHubStore((s) => s.pwcHalosVisible);
   const setPwcHalosVisible = useHubStore((s) => s.setPwcHalosVisible);
+  const schoolType = useHubStore((s) => s.schoolType);
+  const setSchoolType = useHubStore((s) => s.setSchoolType);
+
+  // Clicking a group row filters to it (same School Type values the header
+  // dropdown writes); clicking the active row again goes back to all PWC.
+  const toggleGroup = (group: 'anchor' | 'healing_arts'): void =>
+    setSchoolType(schoolType === group ? 'pwc' : group);
+  const groupFilterOn = schoolType === 'anchor' || schoolType === 'healing_arts';
 
   const counts = useMemo(() => {
     const pwcByDbn = new Map(pwcMembers.map((m) => [m.dbn, m]));
@@ -108,7 +118,8 @@ export default function PwcCounter({
     return missing;
   }, [communityLayer, communitySeries, counts.pwcDbns]);
 
-  if (counts.total === 0) return null;
+  // Stay visible while a group filter is on, so the user can click back out.
+  if (counts.total === 0 && !groupFilterOn) return null;
 
   return (
     <div
@@ -154,8 +165,22 @@ export default function PwcCounter({
       >
         {counts.total}
       </div>
-      <Row color={PWC_MAGENTA} label="Anchor" count={counts.anchor} />
-      <Row color={PWC_GREEN} label="Healing Arts only" count={counts.healing} />
+      <Row
+        color={PWC_MAGENTA}
+        label="Anchor"
+        count={counts.anchor}
+        active={schoolType === 'anchor'}
+        dimmed={groupFilterOn && schoolType !== 'anchor'}
+        onClick={() => toggleGroup('anchor')}
+      />
+      <Row
+        color={PWC_GREEN}
+        label="Healing Arts only"
+        count={counts.healing}
+        active={schoolType === 'healing_arts'}
+        dimmed={groupFilterOn && schoolType !== 'healing_arts'}
+        onClick={() => toggleGroup('healing_arts')}
+      />
       {counts.other > 0 ? (
         <Row color={PWC_BLUE} label="Other program" count={counts.other} />
       ) : null}
@@ -216,20 +241,20 @@ function Row({
   color,
   label,
   count,
+  active = false,
+  dimmed = false,
+  onClick,
 }: {
   color: string;
   label: string;
   count: number;
+  active?: boolean;
+  dimmed?: boolean;
+  /** When set, the row is a toggle button that filters the map to this group. */
+  onClick?: () => void;
 }): React.JSX.Element {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '2px 0',
-      }}
-    >
+  const content = (
+    <>
       <span
         aria-hidden
         style={{
@@ -240,9 +265,39 @@ function Row({
           background: color,
         }}
       />
-      <span style={{ flex: 1, color: '#002040' }}>{label}</span>
+      <span style={{ flex: 1, color: '#002040', fontWeight: active ? 700 : 400 }}>{label}</span>
       <span style={{ fontWeight: 700, color: '#002040' }}>{count}</span>
-    </div>
+    </>
+  );
+  const layout: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '2px 0',
+  };
+  if (!onClick) return <div style={layout}>{content}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={active ? 'Show all PWC schools' : `Show only ${label}`}
+      style={{
+        ...layout,
+        width: 'calc(100% + 8px)',
+        margin: '0 -4px',
+        padding: '2px 4px',
+        background: active ? '#eef4f8' : 'transparent',
+        border: 'none',
+        borderRadius: 3,
+        cursor: 'pointer',
+        font: 'inherit',
+        textAlign: 'left',
+        opacity: dimmed ? 0.55 : 1,
+      }}
+    >
+      {content}
+    </button>
   );
 }
 
