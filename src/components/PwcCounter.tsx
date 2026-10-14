@@ -155,7 +155,7 @@ export default function PwcCounter({
         {counts.total}
       </div>
       <Row color={PWC_MAGENTA} label="Anchor" count={counts.anchor} />
-      <Row color={PWC_GREEN} label="Healing Arts" count={counts.healing} />
+      <Row color={PWC_GREEN} label="Healing Arts only" count={counts.healing} />
       {counts.other > 0 ? (
         <Row color={PWC_BLUE} label="Other program" count={counts.other} />
       ) : null}

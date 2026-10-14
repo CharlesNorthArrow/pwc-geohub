@@ -223,7 +223,7 @@ function BaselineSchoolLegend(): React.JSX.Element {
           fill={PWC_GREEN}
           strokeColor="#ffffff"
           strokeWidth={1}
-          label="PWC Healing Arts school"
+          label="PWC Healing Arts only school"
         />
         <ShapeRow
           shape="circle"
@@ -434,7 +434,7 @@ function PwcHaloLegend(): React.JSX.Element {
           fill="#dde4ea"
           strokeColor={PWC_GREEN}
           strokeWidth={1.5}
-          label="Healing Arts"
+          label="Healing Arts only"
         />
         <ShapeRow
           shape="circle"
