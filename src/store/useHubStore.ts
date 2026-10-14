@@ -15,13 +15,14 @@ import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 /**
  * Spec §6.2 — School Type filter.
  *  - 'all'           → every plottable school, no PWC filter ("All NYC")
- *  - 'pwc'           → any active PWC school ("All PWC": anchor | healing_arts | both | pwc_other)
+ *  - 'pwc'           → any active PWC school ("PWC schools" with both group
+ *                      boxes ticked: anchor | healing_arts | both | pwc_other)
+ *  - 'anchor'        → "PWC schools" with only Anchor ticked (anchor | both)
+ *  - 'healing_arts'  → "PWC schools" with only Healing Arts only ticked
+ *                      (pure healing_arts — anchor-wins, see pwcGroups.ts)
  *  - 'nyc_community' → schools_master.community_school flags the school as an
  *                      NYC Community School (value contains "1")
- *  - 'anchor' / 'healing_arts' → legacy internal values (core_school /
- *    arts_program groups). No longer offered in the dropdown (the 2026-07
- *    three-option redesign) but kept for the selectors snapshot + any saved
- *    state; the cascade still honors them.
+ *  The "PWC schools in view" counter rows set 'anchor' / 'healing_arts' too.
  */
 export type SchoolType = 'all' | 'pwc' | 'nyc_community' | 'anchor' | 'healing_arts';
 

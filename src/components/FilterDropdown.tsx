@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { matchesSearch } from '../lib/searchText';
 
@@ -9,6 +9,9 @@ export interface DropdownOption {
   label: string;
   /** Optional count badge — greyed-out when 0 (per the agreed UX). */
   count?: number;
+  /** Optional indented checkboxes under this option (School Type's PWC
+   *  groups). Ticking one calls `onPickSub` and keeps the panel open. */
+  subOptions?: ReadonlyArray<{ value: string; label: string; checked: boolean; disabled?: boolean }>;
 }
 
 interface Props {
@@ -45,6 +48,12 @@ interface Props {
    *  schools); a note says how many more there are. Search always covers
    *  every option. */
   maxVisible?: number;
+  /** Single-select: the picked option's value. When set it marks the picked
+   *  row instead of matching `selectedLabel` (whose text can differ, e.g.
+   *  "PWC: Anchor" under the "PWC schools" option). */
+  selectedValue?: string;
+  /** Called with a sub-option's value when its checkbox is clicked. */
+  onPickSub?: (value: string) => void;
 }
 
 /**
@@ -66,6 +75,8 @@ export default function FilterDropdown({
   multiSelect = false,
   selectedValues,
   maxVisible,
+  selectedValue,
+  onPickSub,
 }: Props): React.JSX.Element {
   const pickedSet = useMemo(
     () => (multiSelect ? new Set(selectedValues ?? []) : null),
@@ -256,10 +267,12 @@ export default function FilterDropdown({
               const zero = opt.count === 0;
               const picked = pickedSet
                 ? pickedSet.has(opt.value)
-                : selectedLabel === opt.label;
+                : selectedValue != null
+                  ? selectedValue === opt.value
+                  : selectedLabel === opt.label;
               return (
+                <Fragment key={opt.value}>
                 <button
-                  key={opt.value}
                   type="button"
                   onClick={() => {
                     onPick(opt.value);
@@ -308,6 +321,31 @@ export default function FilterDropdown({
                     </span>
                   ) : null}
                 </button>
+                {opt.subOptions?.map((sub) => (
+                  <label
+                    key={sub.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '3px 6px 3px 22px',
+                      fontSize: 12,
+                      color: sub.disabled ? '#7a8896' : '#002040',
+                      cursor: sub.disabled ? 'default' : 'pointer',
+                      lineHeight: 1.3,
+                    }}
+                    title={sub.disabled ? 'At least one group stays selected' : undefined}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sub.checked}
+                      disabled={sub.disabled}
+                      onChange={() => onPickSub?.(sub.value)}
+                    />
+                    <span>{sub.label}</span>
+                  </label>
+                ))}
+                </Fragment>
               );
             })}
           </div>

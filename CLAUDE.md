@@ -46,7 +46,7 @@ There are **two indicator families**, and the whole app is built generically aro
 - **~5% of master rows lack lat/long** → unplottable; flag.
 - **Year coverage differs per indicator** → default to each indicator's own latest year and always show which year is displayed; missing year → 🗓️ "Data not available for the selected year."
 - **Graduation** is cohort-grained + HS-only. **Safety** indicator is categorical. **PWC data** extends to 2025-26 while public data stops at 2024-25.
-- `school_type` in `pwc_schools.csv` = DOE/Charter/D75 governance — **NOT** the dashboard "School Type" filter (All/PWC/Anchor/Healing Arts).
+- `school_type` in `pwc_schools.csv` = DOE/Charter/D75 governance — **NOT** the dashboard "School Type" filter (All NYC / PWC schools with ☑ Anchor ☑ Healing Arts only / NYC Community Schools; the PWC checkboxes and the clickable rows of the "PWC schools in view" counter both set `schoolType` to `pwc` / `anchor` / `healing_arts`).
 
 ## School ↔ community aggregation
 To put a community indicator on the PWC KPI cards/list: average the community values across polygons **contained in or overlapping** the school's area, where area = **School District OR NTA** (user toggle). Build both crosswalks in Phase 0.

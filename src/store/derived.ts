@@ -303,10 +303,10 @@ function layerShortName(id: GeoFilterLayerId): string {
 
 function labelSchoolType(t: SchoolType): string {
   switch (t) {
-    case 'pwc': return 'PWC';
+    case 'pwc': return 'PWC schools';
     case 'nyc_community': return 'NYC Community Schools';
-    case 'anchor': return 'Anchor';
-    case 'healing_arts': return 'Healing Arts';
+    case 'anchor': return 'PWC: Anchor';
+    case 'healing_arts': return 'PWC: Healing Arts only';
     case 'all': return 'All';
   }
 }

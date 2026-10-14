@@ -32,14 +32,33 @@ interface Props {
   communityIndicator: IndicatorPublic | null;
 }
 
-// Three-option redesign (2026-07): Anchor / Healing Arts dropped from the
-// dropdown (their SchoolType values survive internally); NYC Community
-// Schools added, driven by schools_master.community_school.
+// All NYC / PWC schools (☑ Anchor ☑ Healing Arts only) / NYC Community
+// Schools. The two PWC checkboxes map onto SchoolType: both ticked = 'pwc'
+// (every PWC school, other-program ones included), one ticked = 'anchor' or
+// 'healing_arts'. NYC Community Schools is driven by schools_master.community_school.
 const SCHOOL_TYPE_OPTIONS: ReadonlyArray<{ value: SchoolType; label: string }> = [
-  { value: 'pwc', label: 'All PWC' },
   { value: 'all', label: 'All NYC' },
+  { value: 'pwc', label: 'PWC schools' },
   { value: 'nyc_community', label: 'NYC Community Schools' },
 ];
+
+const PWC_GROUP_LABELS: Record<'anchor' | 'healing_arts', string> = {
+  anchor: 'Anchor',
+  healing_arts: 'Healing Arts only',
+};
+
+/** Next School Type after clicking one PWC group checkbox. */
+function toggledPwcGroup(current: SchoolType, group: 'anchor' | 'healing_arts'): SchoolType {
+  const other = group === 'anchor' ? 'healing_arts' : 'anchor';
+  if (current === 'pwc') return other; // untick → only the other group left
+  if (current === other) return 'pwc'; // tick the second → both
+  return group; // last ticked box stays ticked; from All NYC / NYC Community → just this group
+}
+
+function schoolTypeDisplay(t: SchoolType): string {
+  if (t === 'anchor' || t === 'healing_arts') return `PWC: ${PWC_GROUP_LABELS[t]}`;
+  return SCHOOL_TYPE_OPTIONS.find((o) => o.value === t)?.label ?? 'All NYC';
+}
 
 /**
  * The cascade row that sits between the panels (spec §2). Filters cascade
@@ -148,12 +167,22 @@ export default function HeaderBar({
   // Counts per option = how many schools in the Geo-filtered universe match
   // each school-type bucket. Using `afterGeo` so the counts respect upper
   // filters but reflect what the user would see if they picked this option.
+  const pwcMode = schoolType === 'pwc' || schoolType === 'anchor' || schoolType === 'healing_arts';
   const schoolTypeOptions: DropdownOption[] = SCHOOL_TYPE_OPTIONS.map((o) => ({
     value: o.value,
     label: o.label,
+    subOptions:
+      o.value === 'pwc'
+        ? (['anchor', 'healing_arts'] as const).map((g) => ({
+            value: g,
+            label: PWC_GROUP_LABELS[g],
+            checked: schoolType === 'pwc' || schoolType === g,
+            disabled: schoolType === g,
+          }))
+        : undefined,
   }));
-  const schoolTypeLabel =
-    SCHOOL_TYPE_OPTIONS.find((o) => o.value === schoolType)?.label ?? 'All NYC';
+  const schoolTypeLabel = schoolTypeDisplay(schoolType);
+  const schoolTypeValue = pwcMode ? 'pwc' : schoolType;
 
   /* -------------------- Cohort options ---------------- */
   const cohortOptions: DropdownOption[] = universe.cohortOptions.map((c) => ({
@@ -303,12 +332,14 @@ export default function HeaderBar({
       <FilterDropdown
         triggerLabel="School Type"
         selectedLabel={schoolTypeLabel}
+        selectedValue={schoolTypeValue}
         options={schoolTypeOptions}
         searchable={false}
         prefilterNote={universe.prefilterSummary.forSchoolType}
         isAtDefault={schoolType === 'all'}
         onReset={() => setSchoolType('all')}
         onPick={(v) => setSchoolType(v as SchoolType)}
+        onPickSub={(g) => setSchoolType(toggledPwcGroup(schoolType, g as 'anchor' | 'healing_arts'))}
       />
 
       <FilterDropdown
