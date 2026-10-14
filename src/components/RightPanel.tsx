@@ -197,7 +197,7 @@ export default function RightPanel({
                 marginBottom: 4,
               }}
             >
-              PWC schools (struggling → excelling)
+              PWC schools (excelling → struggling)
             </div>
             <RankedList
               indicator={indicator}

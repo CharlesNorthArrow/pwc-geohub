@@ -17,7 +17,7 @@ const ANCHOR = '#903090';
 const HEALING = '#A0B000'; // PWC green — matches map symbology (diamond)
 const BLUE = '#027BC0';
 
-/** Spec §5.3 — ranked PWC schools (worst → best per good_direction), each
+/** Spec §5.3 — ranked PWC schools (best → worst per good_direction), each
  *  with a category symbol + latest value + sparkline. Click → flyTo (via
  *  the existing `selectedSchoolDbn` store slice; Shell wires the rest). */
 export default function RankedList({

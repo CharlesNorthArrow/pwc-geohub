@@ -14,7 +14,7 @@
  *   - kpis: per-group { n, avg, delta } at the active year — three cells:
  *       PWC schools, Citywide reference, All in view
  *   - timeline: 4 series (PWC avg, Anchor avg, HA avg, citywide avg) per year
- *   - list: ranked PWC schools (worst → best per good_direction) with sparkline
+ *   - list: ranked PWC schools (best → worst per good_direction) with sparkline
  *
  * §5.5 + §6.6 nuance:
  *   - KPI "All Schools" + timeline "All in view" line respect Geo + School
@@ -255,31 +255,35 @@ export function deriveAnalytics({
       spark,
     });
   }
-  // Worst → best per good_direction.
+  // Best → worst per good_direction (the panel reads excelling → struggling).
   const sortedList = rankByGoodDirection(
     list,
     (r) => r.latestValue,
     indicator.scale.good_direction,
     (r) => r.dbn,
+    'best_first',
   );
 
   return { kpis, timeline, list: sortedList };
 }
 
 /**
- * Sort `rows` worst → best for a given `good_direction`. Nulls sort last.
+ * Sort `rows` worst → best for a given `good_direction` (or best → worst with
+ * `order = 'best_first'`). Nulls sort last either way.
  * `tiebreakKey` (typically `r => r.dbn`) keeps output deterministic when
  * values match or both sides are null. Pure; returns a new array.
  *
  * Exported so future features (School Detail, Scorecard) can rank their own
- * rows without re-deriving the worst→best convention.
+ * rows without re-deriving the good_direction convention.
  */
 export function rankByGoodDirection<T>(
   rows: T[],
   valueOf: (row: T) => number | null,
   goodDirection: GoodDirection,
   tiebreakKey: (row: T) => string,
+  order: 'worst_first' | 'best_first' = 'worst_first',
 ): T[] {
+  const sign = order === 'best_first' ? -1 : 1;
   const out = rows.slice();
   out.sort((a, b) => {
     const av = valueOf(a);
@@ -287,8 +291,8 @@ export function rankByGoodDirection<T>(
     if (av == null && bv == null) return tiebreakKey(a).localeCompare(tiebreakKey(b));
     if (av == null) return 1;
     if (bv == null) return -1;
-    if (goodDirection === 'low') return bv - av;
-    if (goodDirection === 'high') return av - bv;
+    if (goodDirection === 'low') return sign * (bv - av);
+    if (goodDirection === 'high') return sign * (av - bv);
     return tiebreakKey(a).localeCompare(tiebreakKey(b));
   });
   return out;
