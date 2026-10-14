@@ -59,6 +59,8 @@ const SCHOOL_INDICATORS: IndicatorRegistryEntry[] = [
       ramp: 'diverging_rdbu_muted',
       discrete_values: [0, 1, 2, 3, 4],
     },
+    // "N of 4 disciplines taught" — a bounded 0–4 count, not a percent.
+    axis: { type: 'fixed', domain: [0, 4] },
     geometry: 'point',
     // Discontinuous — only these two years exist. Spec §3.2 #1.
     years: ['2020-21', '2024-25'],

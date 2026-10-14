@@ -5,6 +5,7 @@
  * here — unit-tested by `scripts/test-trend-chart.ts` (`npm run test:trend`).
  */
 
+import type { IndicatorPublic } from '../contract/types';
 import type { TimelinePoint } from './analytics';
 import type { SchoolType } from './useHubStore';
 
@@ -149,6 +150,18 @@ export function niceAxis(
     }
   }
   return { min: dataMin, max: dataMax === dataMin ? dataMin + 1 : dataMax, step: ref };
+}
+
+/** The axis options for an indicator: its registry `axis`, else percent for
+ *  percent / rate_per_100 formats and a round-number axis otherwise. */
+export function axisOptionsFor(
+  indicator: Pick<IndicatorPublic, 'axis' | 'format'>,
+): { isPercent: boolean; fixedDomain?: readonly [number, number] } {
+  const axis = indicator.axis;
+  if (axis?.type === 'fixed') return { isPercent: false, fixedDomain: axis.domain };
+  if (axis?.type === 'percent') return { isPercent: true };
+  if (axis?.type === 'number') return { isPercent: false };
+  return { isPercent: indicator.format === 'percent' || indicator.format === 'rate_per_100' };
 }
 
 /** Screen-reader summary: "Math 2020-21 to 2025-26: PWC schools 21% to 46.5%, …". */

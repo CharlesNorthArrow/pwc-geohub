@@ -5,6 +5,7 @@
 
 import {
   activeTiersFor,
+  axisOptionsFor,
   getTrendSeries,
   niceAxis,
   pointKind,
@@ -123,6 +124,16 @@ console.log('niceAxis');
       [1, 2, 5].includes(n.step / 10 ** Math.floor(Math.log10(n.step))),
     n,
   );
+}
+
+/* -------------------------------------------------------------------------- */
+console.log('axisOptionsFor');
+{
+  check('fixed axis from registry', same(axisOptionsFor({ format: 'integer', axis: { type: 'fixed', domain: [0, 4] } }), { isPercent: false, fixedDomain: [0, 4] }));
+  check('percent format, no axis → percent', axisOptionsFor({ format: 'percent' }).isPercent === true);
+  check('rate_per_100 format, no axis → percent', axisOptionsFor({ format: 'rate_per_100' }).isPercent === true);
+  check('integer format, no axis → number', axisOptionsFor({ format: 'integer' }).isPercent === false);
+  check('explicit number axis overrides a percent format', axisOptionsFor({ format: 'percent', axis: { type: 'number' } }).isPercent === false);
 }
 
 /* -------------------------------------------------------------------------- */

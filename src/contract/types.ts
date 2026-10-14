@@ -9,6 +9,7 @@
 import type {
   Format,
   GoodDirection,
+  IndicatorAxis,
   IndicatorFamily,
   ScaleType,
 } from '../registry/types';
@@ -54,6 +55,8 @@ export interface IndicatorPublic {
      *  stretch wins). */
     layer_opacity?: number;
   };
+  /** Trend-chart y-axis override; absent = derived from `format`. */
+  axis?: IndicatorAxis;
   geometry: 'point' | 'polygon';
   /** Sorted ascending. Last entry = default display year. */
   years: string[];

@@ -19,6 +19,15 @@ export type Format =
   | 'categorical';
 export type Status = 'active' | 'deferred';
 
+/** Trend-chart y-axis. 'percent' starts at 0 and stays ≤ 100; 'number' picks
+ *  round steps around the data; 'fixed' uses the given domain (a bounded
+ *  scale). When absent: percent / rate_per_100 formats → 'percent', every
+ *  other format → 'number'. */
+export type IndicatorAxis =
+  | { type: 'percent' }
+  | { type: 'number' }
+  | { type: 'fixed'; domain: [number, number] };
+
 export interface HostedSource {
   type: 'hosted';
   dataset: string;
@@ -148,6 +157,8 @@ export interface IndicatorRegistryEntry {
   data_source_url?: string;
   format: Format;
   scale: IndicatorScale;
+  /** Trend-chart y-axis override (see IndicatorAxis). */
+  axis?: IndicatorAxis;
   geometry: Geometry;
   /**
    * Year coverage — the *declared* expectation, kept for documentation and
