@@ -25,6 +25,7 @@ import type { SchoolType } from '../store/useHubStore';
 
 // One-shot stylesheet import — MapLibre fails silently without these styles.
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { PWC_ANCHOR_COLOR, PWC_HEALING_ARTS_COLOR } from '../lib/pwcColors';
 
 interface Props {
   schoolIndicator: IndicatorPublic | null;
@@ -95,8 +96,8 @@ const LAYER_SCHOOLS_NONPWC = 'schools-circles-nonpwc';
 const LAYER_SCHOOLS_PWC = 'schools-circles-pwc';
 
 /* PWC brand colors — Anchor magenta, Healing Arts green, pwc_other blue. */
-const PWC_MAGENTA = '#903090'; // Anchor (includes both-category)
-const PWC_GREEN = '#A0B000';   // Healing Arts (pure HA only — anchor-wins)
+const PWC_MAGENTA = PWC_ANCHOR_COLOR;      // Anchor (includes both-category)
+const PWC_GREEN = PWC_HEALING_ARTS_COLOR; // Healing Arts (pure HA only — anchor-wins)
 const PWC_BLUE = '#027BC0';    // pwc_other (program-active, not anchor/arts)
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
