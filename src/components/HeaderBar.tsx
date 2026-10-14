@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import FilterDropdown, { type DropdownOption } from './FilterDropdown';
+import DemographicsFilter from './DemographicsFilter';
 import GeoFilterDialog from './GeoFilterDialog';
 import TimeSlider from './TimeSlider';
 import {
@@ -84,6 +85,8 @@ export default function HeaderBar({
   const setPrograms = useHubStore((s) => s.setPrograms);
   const grades = useHubStore((s) => s.grades);
   const setGrades = useHubStore((s) => s.setGrades);
+  const demographics = useHubStore((s) => s.demographics);
+  const setDemographics = useHubStore((s) => s.setDemographics);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
   const latestPerLayer = useHubStore((s) => s.latestPerLayer);
@@ -107,7 +110,7 @@ export default function HeaderBar({
    * When the filter cluster gets too narrow to hold every chip side-by-side,
    * collapse the whole set into a single "Filters" popover button. Beats a
    * horizontal scroll (chips disappearing off-edge wasn't discoverable).
-   * Threshold = the natural inline width of the six chips + reset; tuned by
+   * Threshold = the natural inline width of the seven chips + reset; tuned by
    * eye and easy to revisit. ResizeObserver watches the cluster wrapper so
    * the switch follows left/right panel resizing too, not just window width. */
   const clusterRef = useRef<HTMLDivElement>(null);
@@ -117,7 +120,7 @@ export default function HeaderBar({
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0;
-      setCompact(w < 660);
+      setCompact(w < 780);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -276,9 +279,10 @@ export default function HeaderBar({
     if (cohort != null) n += 1;
     n += programs.length;
     n += grades.length;
+    n += Object.keys(demographics).length;
     if (selectedSchoolDbn != null) n += 1;
     return n;
-  }, [geoFilters, schoolType, cohort, programs, grades, selectedSchoolDbn]);
+  }, [geoFilters, schoolType, cohort, programs, grades, demographics, selectedSchoolDbn]);
 
   const anyFilterActive = totalActiveFilters > 0;
 
@@ -381,6 +385,12 @@ export default function HeaderBar({
         onPick={(v) => setGrades(togglePicked(grades, v))}
       />
 
+      <DemographicsFilter
+        schoolsMaster={schoolsMaster}
+        candidateDbns={universe.afterGrade}
+        prefilterNote={universe.prefilterSummary.forDemographics}
+      />
+
       <FilterDropdown
         triggerLabel="School"
         selectedLabel={selectedSchoolLabel}
@@ -402,6 +412,7 @@ export default function HeaderBar({
             setCohort(null);
             setPrograms([]);
             setGrades([]);
+            setDemographics({});
             setSelectedSchool(null);
           }}
           title="Reset all filters"

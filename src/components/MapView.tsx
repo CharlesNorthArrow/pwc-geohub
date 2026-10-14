@@ -38,6 +38,10 @@ interface Props {
   /** Phase 3 — DBNs that pass Geo + School Type + Cohort cascade. The map's
    *  school-layer filter is intersected with the PWC filter via 'all'. */
   filteredSchoolDbns: Set<string>;
+  /** When true, an empty `filteredSchoolDbns` means "nothing matches" (hide
+   *  every school) rather than "filters not settled yet". Set while the
+   *  Demographics filter is constraining. */
+  emptyHidesAll?: boolean;
   /** Phase 3 — when set, flyTo these coordinates (school filter pick / detail
    *  panel open). The zoom level is fixed at `SELECTION_ZOOM` (NTA-level)
    *  for both surfaces so the framing stays consistent. */
@@ -180,6 +184,7 @@ export default function MapView({
   tractGeoJsonUrl,
   schoolType,
   filteredSchoolDbns,
+  emptyHidesAll = false,
   flyToCoords,
   flyToView,
   flyToBbox,
@@ -508,11 +513,11 @@ export default function MapView({
     const apply = (): void => {
       const dbns = filteredSchoolDbns;
       // Empty universe normally means "filters not settled yet — show all";
-      // for nyc_community the universe IS the filter (point features carry no
-      // community-school flag), so an empty set must hide every school
-      // rather than show every school.
+      // for nyc_community and a constraining Demographics filter the universe
+      // IS the filter (point features carry neither field), so an empty set
+      // must hide every school rather than show every school.
       const inUniverse: unknown = dbns.size === 0
-        ? schoolType !== 'nyc_community'
+        ? schoolType !== 'nyc_community' && !emptyHidesAll
         : ['in', ['get', 'dbn'], ['literal', [...dbns]]];
       const cascade = ['all', filterFor(schoolType), inUniverse];
       const nonPwcFilter = ['all', cascade, ['!=', ['get', 'is_pwc'], true]];
@@ -529,7 +534,7 @@ export default function MapView({
     };
     if (styleReadyRef.current) apply();
     else map.once('phase1-style-ready', apply);
-  }, [schoolType, filteredSchoolDbns]);
+  }, [schoolType, filteredSchoolDbns, emptyHidesAll]);
 
   // --- Selected-geographies overlay --------------------------------------
   useEffect(() => {

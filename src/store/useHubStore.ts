@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { AggregationArea, GeoFilterLayerId, ProgramFlag } from '../contract/types';
+import type { AggregationArea, DemographicField, GeoFilterLayerId, ProgramFlag } from '../contract/types';
 import { DEFAULT_YEAR, type SliderYear } from '../contract/year';
 
 /**
@@ -30,6 +30,11 @@ export type SchoolType = 'all' | 'pwc' | 'nyc_community' | 'anchor' | 'healing_a
  *  layers (a school qualifies if it's in any selected pair). Missing key =
  *  no constraint from that layer. */
 export type GeoFilterMap = Partial<Record<GeoFilterLayerId, string[]>>;
+
+/** Demographics filter — an inclusive [min, max] percent range per field.
+ *  Missing key = no constraint. A school with no value for a constrained
+ *  field is excluded. */
+export type DemographicRanges = Partial<Record<DemographicField, { min: number; max: number }>>;
 
 export interface HubState {
   activeSchoolIndicator: string | null;
@@ -64,6 +69,10 @@ export interface HubState {
    *  = no constraint. Resolved against `schools_master.grades_canonical` at
    *  filter time. */
   grades: string[];
+
+  /** Demographics filter (see DemographicRanges). Empty = no constraint.
+   *  Reads each school's latest reported demographics, not the slider year. */
+  demographics: DemographicRanges;
 
   /** Spec §6.4 — the school the user picked in the School filter; drives
    *  flyTo + opens the School Details View stub. */
@@ -117,6 +126,7 @@ export interface HubState {
   setCohort: (cohort: string | null) => void;
   setPrograms: (programs: ProgramFlag[]) => void;
   setGrades: (grades: string[]) => void;
+  setDemographics: (d: DemographicRanges) => void;
   setSelectedSchool: (dbn: string | null) => void;
   setAggregationArea: (a: AggregationArea) => void;
   setRightPanelCollapsed: (collapsed: boolean) => void;
@@ -139,6 +149,7 @@ export const useHubStore = create<HubState>((set) => ({
   cohort: null,
   programs: [],
   grades: [],
+  demographics: {},
   selectedSchoolDbn: null,
   aggregationArea: 'school_district',
   // Collapsed by default — the panel has nothing to show until the user picks
@@ -163,6 +174,7 @@ export const useHubStore = create<HubState>((set) => ({
   setCohort: (c) => set({ cohort: c }),
   setPrograms: (programs) => set({ programs }),
   setGrades: (grades) => set({ grades }),
+  setDemographics: (demographics) => set({ demographics }),
   setSelectedSchool: (dbn) => set({ selectedSchoolDbn: dbn }),
   setAggregationArea: (a) => set({ aggregationArea: a }),
   setRightPanelCollapsed: (collapsed) => set({ rightPanelCollapsed: collapsed }),

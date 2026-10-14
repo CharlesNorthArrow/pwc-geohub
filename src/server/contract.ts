@@ -381,6 +381,7 @@ interface SchoolMasterRow {
   pct_poverty: number | null;
   pct_students_with_disabilities: number | null;
   pct_english_language_learners: number | null;
+  pct_white: number | null;
   community_school: string | null;
   grades: string | null;
   /** PostGIS array_agg of `geo_layer:area_id` pairs, one per crosswalk hit. */
@@ -434,6 +435,13 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
         ORDER BY sy.school_year DESC
         LIMIT 1
       ) AS pct_english_language_learners,
+      (
+        SELECT sy.pct_white
+        FROM schools_year sy
+        WHERE sy.dbn = s.dbn AND sy.pct_white IS NOT NULL
+        ORDER BY sy.school_year DESC
+        LIMIT 1
+      ) AS pct_white,
       ARRAY(
         SELECT c.geo_layer || ':' || c.area_id
         FROM school_geo_crosswalk c
@@ -467,6 +475,8 @@ export async function getSchoolsMaster(): Promise<SchoolsMasterResponse> {
         r.pct_students_with_disabilities == null ? null : r.pct_students_with_disabilities * 100,
       pct_english_language_learners:
         r.pct_english_language_learners == null ? null : r.pct_english_language_learners * 100,
+      // Students of color = every student not reported as white.
+      pct_students_of_color: r.pct_white == null ? null : 100 - r.pct_white * 100,
       community_school: r.community_school,
       grades_canonical: normalizeMasterGrades(r.grades),
       geos,

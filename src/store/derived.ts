@@ -15,12 +15,14 @@
  *   - within a layer: UNION (school in layer A area-id1 OR area-id2)
  *   - across layers:  UNION (school qualifies if it's in any selected pair)
  *   - missing layer:  no constraint
- *   - cascade order:  Geo → SchoolType → Cohort → School
+ *   - cascade order:  Geo → SchoolType → Cohort → Program → Grade →
+ *                     Demographics → School
  *
  * Both-category PWC schools (anchor ∩ healing_arts) pass either group filter.
  */
 
 import {
+  DEMOGRAPHIC_FIELDS,
   GEO_FILTER_LAYERS,
   PROGRAM_FLAGS,
   type GeoFilterLayerId,
@@ -29,7 +31,7 @@ import {
   type SchoolMaster,
 } from '../contract/types';
 import { belongsToPwcGroup } from './pwcGroups';
-import type { GeoFilterMap, HubState, SchoolType } from './useHubStore';
+import type { DemographicRanges, GeoFilterMap, HubState, SchoolType } from './useHubStore';
 
 export interface PrefilterSummary {
   /** Note shown above the School Type dropdown — driven by Geo only. */
@@ -40,6 +42,8 @@ export interface PrefilterSummary {
   forProgram: string | null;
   /** Note shown above the Grade dropdown — Geo + School Type + Cohort + Program. */
   forGrade: string | null;
+  /** Note shown in the Demographics panel — every filter up to Grade. */
+  forDemographics: string | null;
   /** Note shown above the School dropdown — every upstream filter. */
   forSchool: string | null;
 }
@@ -55,6 +59,8 @@ export interface FilteredUniverse {
   afterCohort: Set<string>;
   /** DBNs that pass Geo + School Type + Cohort + Program. */
   afterProgram: Set<string>;
+  /** DBNs that pass every filter up to Grade (the Demographics step's input). */
+  afterGrade: Set<string>;
   /** Cohort options shown in the dropdown, with `count` = number of in-view
    *  schools that belong to that cohort under the current Geo + School Type
    *  cascade. Greyed/disabled when count = 0 (per the agreed UX). */
@@ -64,7 +70,11 @@ export interface FilteredUniverse {
 }
 
 interface FiltersInput {
-  state: Pick<HubState, 'geoFilters' | 'schoolType' | 'cohort' | 'programs' | 'grades'>;
+  state: Pick<HubState, 'geoFilters' | 'schoolType' | 'cohort' | 'programs' | 'grades'> & {
+    /** Optional so callers without a Demographics filter (Scorecard, the
+     *  selectors snapshot) keep their exact behaviour. */
+    demographics?: DemographicRanges;
+  };
   schoolsMaster: SchoolMaster[];
   pwcMembers: PwcMember[];
   /** All cohort labels seen in pwc_schools.csv. Driven from the same data —
@@ -108,9 +118,16 @@ export function applyFilters({
   }
 
   // --- Step 5: Grade cascade (OR over picked tokens) -----------------------
-  const finalSet = new Set<string>();
+  const afterGrade = new Set<string>();
   for (const dbn of afterProgram) {
-    if (passesGrade(dbn, state.grades, schoolByDbn)) finalSet.add(dbn);
+    if (passesGrade(dbn, state.grades, schoolByDbn)) afterGrade.add(dbn);
+  }
+
+  // --- Step 6: Demographics (AND over constrained fields) ------------------
+  const demographics = state.demographics ?? {};
+  const finalSet = new Set<string>();
+  for (const dbn of afterGrade) {
+    if (passesDemographics(schoolByDbn.get(dbn), demographics)) finalSet.add(dbn);
   }
 
   // --- Cohort options + counts (computed against afterSchoolType so the cohort
@@ -133,6 +150,7 @@ export function applyFilters({
   const cohortSummary = state.cohort ?? null;
   const programSummary = summarizePrograms(state.programs);
   const gradeSummary = summarizeGrades(state.grades);
+  const demographicsSummary = summarizeDemographics(demographics);
 
   const forSchoolType = geoSummary ? `Geo: ${geoSummary}` : null;
   const forCohort = joinNotes({ geo: geoSummary, schoolType: schoolTypeSummary });
@@ -147,12 +165,20 @@ export function applyFilters({
     cohort: cohortSummary,
     program: programSummary,
   });
+  const forDemographics = joinNotes({
+    geo: geoSummary,
+    schoolType: schoolTypeSummary,
+    cohort: cohortSummary,
+    program: programSummary,
+    grade: gradeSummary,
+  });
   const forSchool = joinNotes({
     geo: geoSummary,
     schoolType: schoolTypeSummary,
     cohort: cohortSummary,
     program: programSummary,
     grade: gradeSummary,
+    demographics: demographicsSummary,
   });
 
   return {
@@ -161,8 +187,9 @@ export function applyFilters({
     afterSchoolType,
     afterCohort,
     afterProgram,
+    afterGrade,
     cohortOptions,
-    prefilterSummary: { forSchoolType, forCohort, forProgram, forGrade, forSchool },
+    prefilterSummary: { forSchoolType, forCohort, forProgram, forGrade, forDemographics, forSchool },
   };
 }
 
@@ -276,6 +303,23 @@ function passesGrade(
   return false;
 }
 
+/** Demographics: AND across constrained fields, each an inclusive range.
+ *  A school with no value for a constrained field fails it. */
+function passesDemographics(s: SchoolMaster | undefined, d: DemographicRanges): boolean {
+  for (const f of DEMOGRAPHIC_FIELDS) {
+    const range = d[f.id];
+    if (!range) continue;
+    const v = s?.[f.id];
+    if (v == null || v < range.min || v > range.max) return false;
+  }
+  return true;
+}
+
+/** True when any demographic field is constrained. */
+export function demographicsActive(d: DemographicRanges | undefined): boolean {
+  return DEMOGRAPHIC_FIELDS.some((f) => d?.[f.id] != null);
+}
+
 function summarizeGeo(g: GeoFilterMap): string {
   const parts: string[] = [];
   for (const layer of GEO_FILTER_LAYERS) {
@@ -317,6 +361,7 @@ interface NoteParts {
   cohort?: string | null;
   program?: string | null;
   grade?: string | null;
+  demographics?: string | null;
 }
 
 function joinNotes(parts: NoteParts): string | null {
@@ -326,6 +371,7 @@ function joinNotes(parts: NoteParts): string | null {
   if (parts.cohort) segs.push(`Cohort: ${parts.cohort}`);
   if (parts.program) segs.push(`Program: ${parts.program}`);
   if (parts.grade) segs.push(`Grade: ${parts.grade}`);
+  if (parts.demographics) segs.push(`Demographics: ${parts.demographics}`);
   return segs.length > 0 ? segs.join(' · ') : null;
 }
 
@@ -343,4 +389,13 @@ function summarizeGrades(picked: string[]): string | null {
   if (picked.length === 0) return null;
   if (picked.length <= 4) return picked.join(', ');
   return `${picked.length} selected`;
+}
+
+function summarizeDemographics(d: DemographicRanges): string | null {
+  const parts: string[] = [];
+  for (const f of DEMOGRAPHIC_FIELDS) {
+    const r = d[f.id];
+    if (r) parts.push(`${f.short} ${r.min}–${r.max}%`);
+  }
+  return parts.length > 0 ? parts.join(', ') : null;
 }

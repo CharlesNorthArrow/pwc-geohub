@@ -151,6 +151,22 @@ export const PROGRAM_FLAGS: ReadonlyArray<{ id: ProgramFlag; label: string }> = 
   { id: 'ost', label: 'Out-of-School Time' },
 ];
 
+/** Demographics filter fields — each a `SchoolMaster` percent (0..100, the
+ *  school's latest reported value). The filter, its notes and its panel all
+ *  read this list. */
+export type DemographicField =
+  | 'pct_poverty'
+  | 'pct_students_of_color'
+  | 'pct_english_language_learners'
+  | 'pct_students_with_disabilities';
+
+export const DEMOGRAPHIC_FIELDS: ReadonlyArray<{ id: DemographicField; label: string; short: string }> = [
+  { id: 'pct_poverty', label: '% poverty', short: 'Poverty' },
+  { id: 'pct_students_of_color', label: '% students of color', short: 'Students of color' },
+  { id: 'pct_english_language_learners', label: '% ELL', short: 'ELL' },
+  { id: 'pct_students_with_disabilities', label: '% IEP', short: 'IEP' },
+];
+
 export interface PwcMember extends PwcProgramFlags {
   dbn: string;
   category: PwcCategory;
@@ -262,6 +278,9 @@ export interface SchoolMaster {
   pct_poverty: number | null;
   pct_students_with_disabilities: number | null;
   pct_english_language_learners: number | null;
+  /** 100 − the latest non-null % white (0..100). Drives the Demographics
+   *  filter's "% students of color". */
+  pct_students_of_color: number | null;
   /** NYC Community School designation from the master (free text; a value
    *  containing "1" flags membership — interpret via `isNycCommunitySchool`,
    *  never inline). Null until the master refresh carrying it lands. */

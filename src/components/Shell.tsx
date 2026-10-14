@@ -35,7 +35,7 @@ import type {
   SchoolsResponse,
 } from '../contract/types';
 import { useHubStore } from '../store/useHubStore';
-import { applyFilters, type FilteredUniverse } from '../store/derived';
+import { applyFilters, demographicsActive, type FilteredUniverse } from '../store/derived';
 import { deriveAnalytics, type Analytics } from '../store/analytics';
 import { resolveActiveLayers } from '../store/activeLayers';
 import {
@@ -87,6 +87,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
   const cohort = useHubStore((s) => s.cohort);
   const programs = useHubStore((s) => s.programs);
   const grades = useHubStore((s) => s.grades);
+  const demographics = useHubStore((s) => s.demographics);
   const selectedSchoolDbn = useHubStore((s) => s.selectedSchoolDbn);
   const setYear = useHubStore((s) => s.setYear);
   const setSelectedSchool = useHubStore((s) => s.setSelectedSchool);
@@ -327,12 +328,12 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
 
   const universe: FilteredUniverse = useMemo(() => {
     return applyFilters({
-      state: { geoFilters, schoolType, cohort, programs, grades },
+      state: { geoFilters, schoolType, cohort, programs, grades, demographics },
       schoolsMaster: schoolsMaster ?? [],
       pwcMembers: pwcMembers ?? [],
       allCohorts,
     });
-  }, [geoFilters, schoolType, cohort, programs, grades, schoolsMaster, pwcMembers, allCohorts]);
+  }, [geoFilters, schoolType, cohort, programs, grades, demographics, schoolsMaster, pwcMembers, allCohorts]);
   const exportDbns = useMemo(() => [...universe.schoolDbns], [universe.schoolDbns]);
 
   /* -------------------- Phase 5 analytics series -------------------- */
@@ -741,6 +742,7 @@ export default function Shell({ initialIndicators }: InitialProps): React.JSX.El
             tractNtaMap={tractNtaMap}
             schoolType={schoolType}
             filteredSchoolDbns={universe.schoolDbns}
+            emptyHidesAll={demographicsActive(demographics)}
             flyToCoords={selectedSchoolCoords}
             flyToView={flyToView}
             flyToBbox={flyToBbox}
