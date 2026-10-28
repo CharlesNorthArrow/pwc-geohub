@@ -14,22 +14,19 @@
  *      community indicator; categorical ones (racial predominance) export
  *      the most common category across the area's tracts.
  *
- * Years: "latest" = each indicator's own latest year (the dashboard's
- * default Latest mode); otherwise the slider year, mapped to the community
- * calendar year the same way the map does (toCommunityYear).
+ * Years: every indicator is exported for every year it has (one column per
+ * indicator × year), independent of the slider. PWC program data still
+ * follows the slider year (pwcYear); demographics are the latest year.
  */
 
 import { sql } from './db';
 import { getActiveIndicatorsWithYears, getPwcMembership } from './contract';
-import { toCommunityYear } from '../contract/year';
 import { anchorProgram } from '../store/pwcGroups';
 import { GEO_FILTER_LAYERS, type AggregationArea, type IndicatorPublic, type PwcCategory } from '../contract/types';
 
 export interface SchoolExportOptions {
   dbns: string[];
   aggregationArea: AggregationArea;
-  /** Slider school year, or null for each indicator's latest year. */
-  year: string | null;
   /** School year whose PWC program data is exported (the slider year). */
   pwcYear: string;
 }
@@ -107,14 +104,12 @@ export async function getSchoolExport(opts: SchoolExportOptions): Promise<School
   const school = indicators.filter((i) => i.family === 'school');
   const community = indicators.filter((i) => i.family === 'community');
 
-  const yearFor = (i: IndicatorPublic): string | null => {
-    if (opts.year == null) return i.years[i.years.length - 1] ?? null;
-    return i.family === 'school' ? opts.year : toCommunityYear(opts.year);
+  const pairsOf = (list: IndicatorPublic[]): { ids: string[]; years: string[] } => {
+    const pairs = list.flatMap((i) => i.years.map((y) => [i.id, y] as const));
+    return { ids: pairs.map((p) => p[0]), years: pairs.map((p) => p[1]) };
   };
-  const schoolPairs = school.map((i) => [i.id, yearFor(i)] as const).filter((p): p is readonly [string, string] => p[1] != null);
-  const communityPairs = community
-    .map((i) => [i.id, yearFor(i)] as const)
-    .filter((p): p is readonly [string, string] => p[1] != null);
+  const schoolPairs = pairsOf(school);
+  const communityPairs = pairsOf(community);
 
   const [identity, geo, pwc, schoolVals, communityVals] = await Promise.all([
     sql<IdentityRow>`
@@ -140,15 +135,15 @@ export async function getSchoolExport(opts: SchoolExportOptions): Promise<School
       WHERE x.dbn = ANY(${dbns}::text[])
     `,
     getPwcMembership(opts.pwcYear),
-    sql<{ dbn: string; indicator_id: string; value_num: number | null; value_text: string | null }>`
-      SELECT v.dbn, v.indicator_id, v.value_num, v.value_text
+    sql<{ dbn: string; indicator_id: string; year: string; value_num: number | null; value_text: string | null }>`
+      SELECT v.dbn, v.indicator_id, v.school_year AS year, v.value_num, v.value_text
       FROM school_indicator_values v
-      JOIN unnest(${schoolPairs.map((p) => p[0])}::text[], ${schoolPairs.map((p) => p[1])}::text[]) AS t(indicator_id, school_year)
+      JOIN unnest(${schoolPairs.ids}::text[], ${schoolPairs.years}::text[]) AS t(indicator_id, school_year)
         ON t.indicator_id = v.indicator_id AND t.school_year = v.school_year
       WHERE v.dbn = ANY(${dbns}::text[])
     `,
-    sql<{ dbn: string; indicator_id: string; value_num: number | null; value_text: string | null }>`
-      SELECT x1.dbn, civ.indicator_id,
+    sql<{ dbn: string; indicator_id: string; year: string; value_num: number | null; value_text: string | null }>`
+      SELECT x1.dbn, civ.indicator_id, civ.year,
              AVG(civ.value_num) AS value_num,
              mode() WITHIN GROUP (ORDER BY civ.value_text) AS value_text
       FROM school_geo_crosswalk x1
@@ -156,18 +151,18 @@ export async function getSchoolExport(opts: SchoolExportOptions): Promise<School
         ON x2.area_layer = ${aggregationArea} AND x2.area_id = x1.area_id
       JOIN community_indicator_values civ
         ON civ.geo_layer = 'tract' AND civ.area_id = x2.tract_geoid
-      JOIN unnest(${communityPairs.map((p) => p[0])}::text[], ${communityPairs.map((p) => p[1])}::text[]) AS t(indicator_id, year)
+      JOIN unnest(${communityPairs.ids}::text[], ${communityPairs.years}::text[]) AS t(indicator_id, year)
         ON t.indicator_id = civ.indicator_id AND t.year = civ.year
       WHERE x1.geo_layer = ${aggregationArea} AND x1.dbn = ANY(${dbns}::text[])
-      GROUP BY x1.dbn, civ.indicator_id
+      GROUP BY x1.dbn, civ.indicator_id, civ.year
     `,
   ]);
 
-  const key = (dbn: string, id: string): string => `${dbn}|${id}`;
+  const key = (...parts: string[]): string => parts.join('|');
   const geoBy = new Map(geo.map((g) => [key(g.dbn, g.geo_layer), g]));
   const pwcBy = new Map(pwc.members.map((m) => [m.dbn, m]));
-  const schoolBy = new Map(schoolVals.map((v) => [key(v.dbn, v.indicator_id), v]));
-  const communityBy = new Map(communityVals.map((v) => [key(v.dbn, v.indicator_id), v]));
+  const schoolBy = new Map(schoolVals.map((v) => [key(v.dbn, v.indicator_id, v.year), v]));
+  const communityBy = new Map(communityVals.map((v) => [key(v.dbn, v.indicator_id, v.year), v]));
 
   // School indicators whose rows carry text (safety rating, arts disciplines)
   // get a second column so nothing on the map is lost.
@@ -184,25 +179,28 @@ export async function getSchoolExport(opts: SchoolExportOptions): Promise<School
     ...GEO_FILTER_LAYERS.map((l) => GEO_HEADER[l.id]!),
   ];
   const valueCols: Array<(dbn: string) => Cell> = [];
+  // One column per indicator × year, years ascending within each indicator.
   for (const i of school) {
-    const y = yearFor(i);
     const name = i.short_label ?? i.label;
-    headers.push(`${name} (${y ?? 'n/a'})`);
-    valueCols.push((dbn) => round(schoolBy.get(key(dbn, i.id))?.value_num));
-    if (withText.has(i.id)) {
-      headers.push(`${name} - detail (${y ?? 'n/a'})`);
-      valueCols.push((dbn) => schoolBy.get(key(dbn, i.id))?.value_text ?? null);
+    for (const y of i.years) {
+      headers.push(`${name} (${y})`);
+      valueCols.push((dbn) => round(schoolBy.get(key(dbn, i.id, y))?.value_num));
+      if (withText.has(i.id)) {
+        headers.push(`${name} - detail (${y})`);
+        valueCols.push((dbn) => schoolBy.get(key(dbn, i.id, y))?.value_text ?? null);
+      }
     }
   }
   for (const i of community) {
-    const y = yearFor(i);
     const name = i.short_label ?? i.label;
-    if (i.scale.type === 'categorical') {
-      headers.push(`${name} - most common in ${AREA_NAME[aggregationArea]} (${y ?? 'n/a'})`);
-      valueCols.push((dbn) => communityBy.get(key(dbn, i.id))?.value_text ?? null);
-    } else {
-      headers.push(`${name} - ${AREA_NAME[aggregationArea]} avg (${y ?? 'n/a'})`);
-      valueCols.push((dbn) => round(communityBy.get(key(dbn, i.id))?.value_num));
+    for (const y of i.years) {
+      if (i.scale.type === 'categorical') {
+        headers.push(`${name} - most common in ${AREA_NAME[aggregationArea]} (${y})`);
+        valueCols.push((dbn) => communityBy.get(key(dbn, i.id, y))?.value_text ?? null);
+      } else {
+        headers.push(`${name} - ${AREA_NAME[aggregationArea]} avg (${y})`);
+        valueCols.push((dbn) => round(communityBy.get(key(dbn, i.id, y))?.value_num));
+      }
     }
   }
 
