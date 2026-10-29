@@ -4,15 +4,14 @@ import { useState } from 'react';
 import { useHubStore } from '../store/useHubStore';
 
 /**
- * "Download data" — CSV of every school in the current filtered universe:
- * identity, demographics, PWC program data, geo assignments, all school
- * indicators and all community indicators (averaged over the school's
- * District / NTA per the aggregation toggle), each for every available
- * year. PWC program data follows the slider year.
+ * "Download data" — CSV of every school in the current filtered universe,
+ * one row per school × school year: identity, that year's demographics and
+ * PWC program data, geo assignments, all school indicators and all
+ * community indicators (averaged over the school's District / NTA per the
+ * aggregation toggle).
  */
 export default function ExportSchoolsButton({ dbns }: { dbns: readonly string[] }): React.JSX.Element {
   const aggregationArea = useHubStore((s) => s.aggregationArea);
-  const year = useHubStore((s) => s.year);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +22,7 @@ export default function ExportSchoolsButton({ dbns }: { dbns: readonly string[] 
       const r = await fetch('/api/export/schools', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ dbns, aggregationArea, pwcYear: year }),
+        body: JSON.stringify({ dbns, aggregationArea }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const blob = await r.blob();
@@ -48,7 +47,7 @@ export default function ExportSchoolsButton({ dbns }: { dbns: readonly string[] 
         type="button"
         onClick={() => void download()}
         disabled={busy || dbns.length === 0}
-        title={`CSV of the ${dbns.length.toLocaleString()} schools in the current filters — all school and community values (community = ${area} average), PWC programs (${year}) and geographies. Every available year of each indicator.`}
+        title={`CSV of the ${dbns.length.toLocaleString()} schools in the current filters — all school and community values (community = ${area} average), PWC programs and geographies. One row per school per school year.`}
         style={{
           background: 'white',
           border: '1px solid #c5d3df',
